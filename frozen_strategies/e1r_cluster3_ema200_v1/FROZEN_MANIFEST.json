@@ -1,0 +1,242 @@
+{
+  "strategy_name": "e1r_cluster3_ema200",
+  "strategy_version": "v1",
+  "git_commit": "adf7dac448e5fcb4202c22a0e4955ee4d43b06a4",
+  "git_tag": "e1r_cluster3_ema200_shadow_freeze_v1",
+  "git_tag_note": "Use git rev-parse TAG^{commit} for commit hash (annotated tag)",
+  "branch": "pools-ob-delta-bot",
+  "immutable": true,
+  "production_integrated": false,
+  "dev_window": [
+    "2026-06-01T00:00:00+00:00",
+    "2026-07-31T23:59:59+00:00"
+  ],
+  "coins": [
+    "XRPUSDT",
+    "ADAUSDT",
+    "DOGEUSDT"
+  ],
+  "source_files_root": "results/pool_scan/context_study_v1",
+  "source_sha256_manifest_from_E1R_FREEZE_V1.md": {
+    "floor_guard_signal_list_v1.json": "e88a4cd9bbc2ac510189eaf351eb109653f07dc64d1a31e0940e56791c77cc31",
+    "analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py": "b6c3da1906e5cbb74a707c4cbce0804ceebffd8a098537d730c31968c0e18378",
+    "analyze_crosscoin_e1r_final_pnl_comparison_v1.py": "8edf72cd29f66554730c0f17031ca40291a764098286100176d824909e5f087c",
+    "analyze_crosscoin_e1r_final_pnl_comparison_v1.json": "f97aea7b9b792435a5288e1d3508d8d4525097d913ebcfa4b3f23b91a479b2d8"
+  },
+  "source_sha256_verified_at_copy_time": {
+    "floor_guard_signal_list_v1.json": "e88a4cd9bbc2ac510189eaf351eb109653f07dc64d1a31e0940e56791c77cc31",
+    "analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py": "b6c3da1906e5cbb74a707c4cbce0804ceebffd8a098537d730c31968c0e18378",
+    "analyze_crosscoin_e1r_final_pnl_comparison_v1.py": "8edf72cd29f66554730c0f17031ca40291a764098286100176d824909e5f087c",
+    "analyze_crosscoin_e1r_final_pnl_comparison_v1.json": "f97aea7b9b792435a5288e1d3508d8d4525097d913ebcfa4b3f23b91a479b2d8"
+  },
+  "copied_files_sha256": {
+    "audit/AUDIT_REPORT.md": "7889379dc3d9bb0e13fbb0111e8d7ee14ee86413eafa2a0f6ec824377a77a5af",
+    "audit/audit_independent_v1.py": "dea6a1ca6d8da0404ead3ab51f3edf206ebaf77fd091f6e46186be015d907fb4",
+    "audit/audit_summary.json": "1474582498018266e29e93a9d21c5ac1a8587d14727678b8c9d030073e582552",
+    "audit/blocked_trade_audit.csv": "82aaf7dcdafef153814a5391b812aab9d6508127fcc2cad6613b94a0166123c4",
+    "audit/equity_dd_audit.csv": "7837ecce2f31b289983d2bb3f0436907334e798a8a26a54ea2475790a736fd6f",
+    "audit/manual_bad4_audit.md": "c03eed03da87bb408029a31991d44be8b75b6c34232ef99912213bf63b8c6b1d",
+    "audit/trade_outcome_audit.csv": "46f05a74bd159d5ea668c0b23cdbdb2d18e4b9971f2c555113e4cf5e7f565791",
+    "code/analyze_4h_lower_short_block_v1.py": "5917d897bac0af732025a955eca7d2be5ff2caf8b91ba82f0c6d9b33bf164ef8",
+    "code/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py": "b6c3da1906e5cbb74a707c4cbce0804ceebffd8a098537d730c31968c0e18378",
+    "code/analyze_crosscoin_e1r_final_pnl_comparison_v1.py": "8edf72cd29f66554730c0f17031ca40291a764098286100176d824909e5f087c",
+    "code/analyze_xrp_bull_regime_exit_shadow_v1.py": "62e53183f93be7633bd4e85d58fa9f5847d629cfe137bfad12d82f5106612c67",
+    "code/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py": "1db51b01e03ee9a7d0f80c89e1a39b1f469a8d58c8369a76d93aecd2f367f195",
+    "code/analyze_xrp_ema200_cluster_transition_shadow_v1.py": "7081c713437b7935dcabf8bb16db7c8b7c3610b67322461f4fd62d6948e3fdef",
+    "code/analyze_xrp_pool_ladder_forensics_v1.py": "2a50aebbf83ef74d5f669cf41e1f96b78ee1fcc7349717432d290b188d66bfee",
+    "code/find_short_entry_15m_v1.py": "62a3b454eab8905a619eb38ee06c39eebcc0aecc01c7457798149ab44b299421",
+    "data_reference/floor_guard_signal_list_v1.json": "e88a4cd9bbc2ac510189eaf351eb109653f07dc64d1a31e0940e56791c77cc31",
+    "data_reference/floor_guard_signal_list_v1.md": "8e4905478da649deea0e45a61762932570fc2069aa8865c9f0e86dd4551ad041",
+    "docs/E1R_FREEZE_V1.md": "700e63846ea0af651f92fdf5cc2244fb93b58fe20c5bb64bc981fd92d07870ae",
+    "reports/analyze_crosscoin_e1r_final_equity_curve_v1.csv": "7511a061000a35169a40efada248649d8a8565df68bcac931f865d1016146a39",
+    "reports/analyze_crosscoin_e1r_final_pnl_comparison_v1.json": "f97aea7b9b792435a5288e1d3508d8d4525097d913ebcfa4b3f23b91a479b2d8",
+    "reports/analyze_crosscoin_e1r_final_pnl_comparison_v1.md": "e67f98a4bf66804131c342ea802e42687fc8415519078e8f822f52fbfec1bad2",
+    "reports/analyze_crosscoin_e1r_final_pnl_trades_v1.csv": "dc90353ec7165bea9c4310e6a68c29b82f9607cd3bd80cca99c2115ff46cd1b5",
+    "reports/oos_validation/OOS_REPORT.md": "0482965662a3088797d51bcb418756d35f312094105d659427cb97cf85d5a2f1",
+    "reports/oos_validation/e1r_allowed_trades_4mo.csv": "ac7b9f37e5d4afa12363e69d4f2fbd9d671a0148180653640049eeb94a5b18a6",
+    "reports/oos_validation/oos_summary.json": "de8414bf95eccba68f14a28f0bbc28f7a938c6d6e2e24453b85241cb08995c35"
+  },
+  "hash_parity_rows": [
+    {
+      "file": "audit/AUDIT_REPORT.md",
+      "source_sha256": "7889379dc3d9bb0e13fbb0111e8d7ee14ee86413eafa2a0f6ec824377a77a5af",
+      "copy_sha256": "7889379dc3d9bb0e13fbb0111e8d7ee14ee86413eafa2a0f6ec824377a77a5af",
+      "match": true
+    },
+    {
+      "file": "audit/audit_independent_v1.py",
+      "source_sha256": "dea6a1ca6d8da0404ead3ab51f3edf206ebaf77fd091f6e46186be015d907fb4",
+      "copy_sha256": "dea6a1ca6d8da0404ead3ab51f3edf206ebaf77fd091f6e46186be015d907fb4",
+      "match": true
+    },
+    {
+      "file": "audit/audit_summary.json",
+      "source_sha256": "1474582498018266e29e93a9d21c5ac1a8587d14727678b8c9d030073e582552",
+      "copy_sha256": "1474582498018266e29e93a9d21c5ac1a8587d14727678b8c9d030073e582552",
+      "match": true
+    },
+    {
+      "file": "audit/blocked_trade_audit.csv",
+      "source_sha256": "82aaf7dcdafef153814a5391b812aab9d6508127fcc2cad6613b94a0166123c4",
+      "copy_sha256": "82aaf7dcdafef153814a5391b812aab9d6508127fcc2cad6613b94a0166123c4",
+      "match": true
+    },
+    {
+      "file": "audit/equity_dd_audit.csv",
+      "source_sha256": "7837ecce2f31b289983d2bb3f0436907334e798a8a26a54ea2475790a736fd6f",
+      "copy_sha256": "7837ecce2f31b289983d2bb3f0436907334e798a8a26a54ea2475790a736fd6f",
+      "match": true
+    },
+    {
+      "file": "audit/manual_bad4_audit.md",
+      "source_sha256": "c03eed03da87bb408029a31991d44be8b75b6c34232ef99912213bf63b8c6b1d",
+      "copy_sha256": "c03eed03da87bb408029a31991d44be8b75b6c34232ef99912213bf63b8c6b1d",
+      "match": true
+    },
+    {
+      "file": "audit/trade_outcome_audit.csv",
+      "source_sha256": "46f05a74bd159d5ea668c0b23cdbdb2d18e4b9971f2c555113e4cf5e7f565791",
+      "copy_sha256": "46f05a74bd159d5ea668c0b23cdbdb2d18e4b9971f2c555113e4cf5e7f565791",
+      "match": true
+    },
+    {
+      "file": "code/analyze_4h_lower_short_block_v1.py",
+      "source_sha256": "5917d897bac0af732025a955eca7d2be5ff2caf8b91ba82f0c6d9b33bf164ef8",
+      "copy_sha256": "5917d897bac0af732025a955eca7d2be5ff2caf8b91ba82f0c6d9b33bf164ef8",
+      "match": true
+    },
+    {
+      "file": "code/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py",
+      "source_sha256": "b6c3da1906e5cbb74a707c4cbce0804ceebffd8a098537d730c31968c0e18378",
+      "copy_sha256": "b6c3da1906e5cbb74a707c4cbce0804ceebffd8a098537d730c31968c0e18378",
+      "match": true
+    },
+    {
+      "file": "code/analyze_crosscoin_e1r_final_pnl_comparison_v1.py",
+      "source_sha256": "8edf72cd29f66554730c0f17031ca40291a764098286100176d824909e5f087c",
+      "copy_sha256": "8edf72cd29f66554730c0f17031ca40291a764098286100176d824909e5f087c",
+      "match": true
+    },
+    {
+      "file": "code/analyze_xrp_bull_regime_exit_shadow_v1.py",
+      "source_sha256": "62e53183f93be7633bd4e85d58fa9f5847d629cfe137bfad12d82f5106612c67",
+      "copy_sha256": "62e53183f93be7633bd4e85d58fa9f5847d629cfe137bfad12d82f5106612c67",
+      "match": true
+    },
+    {
+      "file": "code/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py",
+      "source_sha256": "1db51b01e03ee9a7d0f80c89e1a39b1f469a8d58c8369a76d93aecd2f367f195",
+      "copy_sha256": "1db51b01e03ee9a7d0f80c89e1a39b1f469a8d58c8369a76d93aecd2f367f195",
+      "match": true
+    },
+    {
+      "file": "code/analyze_xrp_ema200_cluster_transition_shadow_v1.py",
+      "source_sha256": "7081c713437b7935dcabf8bb16db7c8b7c3610b67322461f4fd62d6948e3fdef",
+      "copy_sha256": "7081c713437b7935dcabf8bb16db7c8b7c3610b67322461f4fd62d6948e3fdef",
+      "match": true
+    },
+    {
+      "file": "code/analyze_xrp_pool_ladder_forensics_v1.py",
+      "source_sha256": "2a50aebbf83ef74d5f669cf41e1f96b78ee1fcc7349717432d290b188d66bfee",
+      "copy_sha256": "2a50aebbf83ef74d5f669cf41e1f96b78ee1fcc7349717432d290b188d66bfee",
+      "match": true
+    },
+    {
+      "file": "code/find_short_entry_15m_v1.py",
+      "source_sha256": "62a3b454eab8905a619eb38ee06c39eebcc0aecc01c7457798149ab44b299421",
+      "copy_sha256": "62a3b454eab8905a619eb38ee06c39eebcc0aecc01c7457798149ab44b299421",
+      "match": true
+    },
+    {
+      "file": "data_reference/floor_guard_signal_list_v1.json",
+      "source_sha256": "e88a4cd9bbc2ac510189eaf351eb109653f07dc64d1a31e0940e56791c77cc31",
+      "copy_sha256": "e88a4cd9bbc2ac510189eaf351eb109653f07dc64d1a31e0940e56791c77cc31",
+      "match": true
+    },
+    {
+      "file": "data_reference/floor_guard_signal_list_v1.md",
+      "source_sha256": "8e4905478da649deea0e45a61762932570fc2069aa8865c9f0e86dd4551ad041",
+      "copy_sha256": "8e4905478da649deea0e45a61762932570fc2069aa8865c9f0e86dd4551ad041",
+      "match": true
+    },
+    {
+      "file": "docs/E1R_FREEZE_V1.md",
+      "source_sha256": "700e63846ea0af651f92fdf5cc2244fb93b58fe20c5bb64bc981fd92d07870ae",
+      "copy_sha256": "700e63846ea0af651f92fdf5cc2244fb93b58fe20c5bb64bc981fd92d07870ae",
+      "match": true
+    },
+    {
+      "file": "reports/analyze_crosscoin_e1r_final_equity_curve_v1.csv",
+      "source_sha256": "7511a061000a35169a40efada248649d8a8565df68bcac931f865d1016146a39",
+      "copy_sha256": "7511a061000a35169a40efada248649d8a8565df68bcac931f865d1016146a39",
+      "match": true
+    },
+    {
+      "file": "reports/analyze_crosscoin_e1r_final_pnl_comparison_v1.json",
+      "source_sha256": "f97aea7b9b792435a5288e1d3508d8d4525097d913ebcfa4b3f23b91a479b2d8",
+      "copy_sha256": "f97aea7b9b792435a5288e1d3508d8d4525097d913ebcfa4b3f23b91a479b2d8",
+      "match": true
+    },
+    {
+      "file": "reports/analyze_crosscoin_e1r_final_pnl_comparison_v1.md",
+      "source_sha256": "e67f98a4bf66804131c342ea802e42687fc8415519078e8f822f52fbfec1bad2",
+      "copy_sha256": "e67f98a4bf66804131c342ea802e42687fc8415519078e8f822f52fbfec1bad2",
+      "match": true
+    },
+    {
+      "file": "reports/analyze_crosscoin_e1r_final_pnl_trades_v1.csv",
+      "source_sha256": "dc90353ec7165bea9c4310e6a68c29b82f9607cd3bd80cca99c2115ff46cd1b5",
+      "copy_sha256": "dc90353ec7165bea9c4310e6a68c29b82f9607cd3bd80cca99c2115ff46cd1b5",
+      "match": true
+    },
+    {
+      "file": "reports/oos_validation/OOS_REPORT.md",
+      "source_sha256": "0482965662a3088797d51bcb418756d35f312094105d659427cb97cf85d5a2f1",
+      "copy_sha256": "0482965662a3088797d51bcb418756d35f312094105d659427cb97cf85d5a2f1",
+      "match": true
+    },
+    {
+      "file": "reports/oos_validation/e1r_allowed_trades_4mo.csv",
+      "source_sha256": "ac7b9f37e5d4afa12363e69d4f2fbd9d671a0148180653640049eeb94a5b18a6",
+      "copy_sha256": "ac7b9f37e5d4afa12363e69d4f2fbd9d671a0148180653640049eeb94a5b18a6",
+      "match": true
+    },
+    {
+      "file": "reports/oos_validation/oos_summary.json",
+      "source_sha256": "de8414bf95eccba68f14a28f0bbc28f7a938c6d6e2e24453b85241cb08995c35",
+      "copy_sha256": "de8414bf95eccba68f14a28f0bbc28f7a938c6d6e2e24453b85241cb08995c35",
+      "match": true
+    }
+  ],
+  "hash_parity_pass": true,
+  "frozen_metrics_e1r_dev_window": {
+    "trades": 48,
+    "total_pnl_pct": 64.29,
+    "profit_factor": 13.08,
+    "max_drawdown_pct": 1.75,
+    "per_coin": {
+      "XRPUSDT": {
+        "trades": 15,
+        "pnl_pct": 22.74,
+        "max_dd_pct": 0.8254
+      },
+      "ADAUSDT": {
+        "trades": 11,
+        "pnl_pct": 14.75,
+        "max_dd_pct": 2.1017
+      },
+      "DOGEUSDT": {
+        "trades": 22,
+        "pnl_pct": 26.81,
+        "max_dd_pct": 1.0579
+      }
+    }
+  },
+  "audit_verdict": "AUDIT_PASS_WITH_CAVEATS",
+  "post_freeze_oos_path": "reports/oos_validation",
+  "post_freeze_oos_note": "Not part of original freeze performance",
+  "raw_data_sources_documented_in": "docs/E1R_FREEZE_V1.md",
+  "contamination_check_files_flagged": [
+    "audit/manual_bad4_audit.md"
+  ]
+}

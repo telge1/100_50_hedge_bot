@@ -1,0 +1,4 @@
+This directory is a frozen reference copy of E1R V1.
+Do not modify files in place.
+Any future strategy development must use a new directory/version,
+for example e1r_cluster3_ema200_v2.

@@ -1,0 +1,76 @@
+{
+  "freeze_commit": "adf7dac448e5fcb4202c22a0e4955ee4d43b06a4",
+  "audit_independence": "Critical logic reimplemented in this file; pool snapshots via scanner_pools_for_index (data path only).",
+  "XRPUSDT_with_guard": 25,
+  "XRPUSDT_without_guard": 34,
+  "ADAUSDT_with_guard": 18,
+  "ADAUSDT_without_guard": 23,
+  "DOGEUSDT_with_guard": 28,
+  "DOGEUSDT_without_guard": 34,
+  "duplicate_entry_opens": 0,
+  "baseline_parity": {
+    "XRPUSDT": {
+      "trades": 25,
+      "sl": 8,
+      "tp": 17
+    },
+    "ADAUSDT": {
+      "trades": 18,
+      "sl": 7,
+      "tp": 11
+    },
+    "DOGEUSDT": {
+      "trades": 28,
+      "sl": 8,
+      "tp": 19
+    }
+  },
+  "XRPUSDT_cross_ref": 401,
+  "XRPUSDT_cross_ind": 401,
+  "ADAUSDT_cross_ref": 376,
+  "ADAUSDT_cross_ind": 376,
+  "DOGEUSDT_cross_ref": 355,
+  "DOGEUSDT_cross_ind": 355,
+  "verdict": "AUDIT_PASS_WITH_CAVEATS",
+  "entry_bar_leakage_count": 0,
+  "future_pool_leakage_count": 0,
+  "future_break_leakage_count": 0,
+  "retroactively_blocked_count": 0,
+  "cluster_mismatch_count": 0,
+  "cross_mismatch_count": 0,
+  "pnl_mismatch_count": 0,
+  "outcome_mismatch_count": 0,
+  "same_bar_ambiguous_count": 0,
+  "overlap_count": 18,
+  "state_id_match": true,
+  "dd_parity": {
+    "XRPUSDT": {
+      "expected": 0.8254,
+      "independent": 0.8254,
+      "match": true
+    },
+    "ADAUSDT": {
+      "expected": 2.1017,
+      "independent": 2.1017,
+      "match": true
+    },
+    "DOGEUSDT": {
+      "expected": 1.0579,
+      "independent": 1.0579,
+      "match": true
+    },
+    "CROSS": {
+      "expected": 1.7465,
+      "independent": 1.7465,
+      "match": true
+    }
+  },
+  "pnl_identity": {
+    "baseline_sum": 61.4442,
+    "e1r_sum": 64.2888,
+    "blocked_net": -2.8446,
+    "baseline_minus_blocked": 64.2888
+  },
+  "e1r_pf_ind": 13.0798,
+  "baseline_pf_ind": 4.2943
+}

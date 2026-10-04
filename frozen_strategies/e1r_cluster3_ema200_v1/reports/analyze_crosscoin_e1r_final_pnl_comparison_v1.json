@@ -1,0 +1,1734 @@
+{
+  "manifest": {
+    "repo": "/home/telgenbuescher/projects/pools+ob+delta_bot",
+    "branch": "pools-ob-delta-bot",
+    "head": "37fcc1c8bee0d25d830fed8df4f42c5b116255c8",
+    "signal_source": "results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json",
+    "window": [
+      "2026-06-01T00:00:00+00:00",
+      "2026-07-31T23:59:59+00:00"
+    ],
+    "coins": [
+      "XRPUSDT",
+      "ADAUSDT",
+      "DOGEUSDT"
+    ],
+    "baseline_files": [
+      "results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json",
+      "results/pool_scan/context_study_v1/floor_guard_signal_list_v1.md",
+      "results/pool_scan/context_study_v1/find_short_entry_15m_v1.py"
+    ],
+    "e1r_shadow_files": [
+      "results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_bull_regime_exit_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster_transition_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_pool_ladder_forensics_v1.py"
+    ],
+    "e1r_canonical": "analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py"
+  },
+  "code_status": {
+    "classification": {
+      "A_production_baseline": "Live/Scanner-Pfad: Short-Entry-Scanner (find_short_entry_15m_v1) + bestehende Guards au\u00dferhalb dieses Reports. `with_guard` in floor_guard_signal_list_v1 = dokumentierte Baseline-Kohorte Jun\u2013Jul 2026 (Floor-Guard gefilterte Signale), nicht E1R.",
+      "B_shadow_analysis_only": "E1R und alle analyze_*ema200* / crosscoin_e1* Skripte unter results/pool_scan/context_study_v1/ \u2014 reine Shadow-/Forensik-Logik, keine Integration in pool_pattern/machine oder Live-Bot gefunden.",
+      "C_not_integrated": "E1R one-bar reclaim, E1, GAP3, Entry-Forensik, D4-Shadows \u2014 nur JSON/MD/CSV-Artefakte."
+    },
+    "e1r_in_executable_strategy_path": false,
+    "note": "Repo grep: E1R nur in context_study_v1 Shadow-Skripten referenziert."
+  },
+  "pnl_methodology": {
+    "position_size": "NOT_AVAILABLE \u2014 nur pro-Trade pnl_pct aus Signal-Backtest",
+    "leverage": "NOT_AVAILABLE",
+    "sl_tp": "Aus Scanner/Signal-JSON (stop/tp Felder); Entry = 15m Close",
+    "fees": "NOT_AVAILABLE",
+    "funding": "NOT_AVAILABLE",
+    "slippage": "NOT_AVAILABLE",
+    "compounding": false,
+    "equity_definition": "Start 100 + chronologische Summe pnl_pct pro ausgef\u00fchrtem Trade (wie cumulative_pnl_pct in floor_guard_signal_list_v1.md)",
+    "pnl_pct_source": "floor_guard_signal_list_v1.json field pnl_pct",
+    "pnl_R": "r_multiple aus Signal-JSON wenn vorhanden",
+    "net_pnl": "identisch pnl_pct (keine Fee-Logik)",
+    "variants": {
+      "A_raw": "pnl_pct ohne Fees",
+      "B_net": "NOT_AVAILABLE"
+    }
+  },
+  "parity": {
+    "baseline": {
+      "XRPUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 25,
+          "sl": 8,
+          "tp": 17
+        },
+        "expected_e1r": {
+          "trades": 15,
+          "sl": 2,
+          "tp_first_lost": 4,
+          "max_sl_streak": 1
+        },
+        "baseline_sl_tp": {
+          "sl": 8,
+          "tp": 17
+        }
+      },
+      "ADAUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 18,
+          "sl": 7,
+          "tp": 11
+        },
+        "expected_e1r": {
+          "trades": 11,
+          "sl": 2,
+          "tp_first_lost": 2,
+          "max_sl_streak": 2
+        },
+        "baseline_sl_tp": {
+          "sl": 7,
+          "tp": 11
+        }
+      },
+      "DOGEUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 28,
+          "sl": 8,
+          "tp": 19
+        },
+        "expected_e1r": {
+          "trades": 22,
+          "sl": 3,
+          "tp_first_lost": 1,
+          "max_sl_streak": 1
+        },
+        "baseline_sl_tp": {
+          "sl": 8,
+          "tp": 19
+        }
+      }
+    },
+    "e1r": {
+      "XRPUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 25,
+          "sl": 8,
+          "tp": 17
+        },
+        "expected_e1r": {
+          "trades": 15,
+          "sl": 2,
+          "tp_first_lost": 4,
+          "max_sl_streak": 1
+        },
+        "baseline_sl_tp": {
+          "sl": 8,
+          "tp": 17
+        }
+      },
+      "ADAUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 18,
+          "sl": 7,
+          "tp": 11
+        },
+        "expected_e1r": {
+          "trades": 11,
+          "sl": 2,
+          "tp_first_lost": 2,
+          "max_sl_streak": 2
+        },
+        "baseline_sl_tp": {
+          "sl": 7,
+          "tp": 11
+        }
+      },
+      "DOGEUSDT": {
+        "ok": true,
+        "checks": {
+          "baseline_trades": true,
+          "baseline_sl": true,
+          "e1r_trades": true,
+          "e1r_sl": true,
+          "e1r_tp_lost": true,
+          "e1r_max_sl_streak": true
+        },
+        "expected_baseline": {
+          "trades": 28,
+          "sl": 8,
+          "tp": 19
+        },
+        "expected_e1r": {
+          "trades": 22,
+          "sl": 3,
+          "tp_first_lost": 1,
+          "max_sl_streak": 1
+        },
+        "baseline_sl_tp": {
+          "sl": 8,
+          "tp": 19
+        }
+      }
+    },
+    "all_ok": true
+  },
+  "by_coin": {
+    "XRPUSDT": {
+      "baseline": {
+        "pnl": {
+          "trades": 25,
+          "winners": 17,
+          "losers": 8,
+          "winrate": 0.68,
+          "TP_FIRST": 17,
+          "SL_FIRST": 2,
+          "MOVE_041_THEN_SL": 6,
+          "profit_factor": 4.5685,
+          "expectancy_per_trade_pct": 0.89958,
+          "avg_winner_pct": 1.693629,
+          "avg_loser_pct": -0.787775,
+          "total_pnl_pct": 22.4895,
+          "median_pnl_pct": 1.0116,
+          "best_trade_pct": 4.8629,
+          "worst_trade_pct": -1.5946,
+          "max_sl_streak": 4,
+          "sl_streaks_ge2": [
+            4,
+            2
+          ],
+          "median_mae": 0.3417,
+          "mean_mae": 0.46384,
+          "median_mfe": 1.2265,
+          "mean_mfe": 1.521376,
+          "sl_count": 8
+        },
+        "drawdown": {
+          "max_drawdown_pct": 3.9701,
+          "peak_timestamp": "2026-06-03T07:15:00+00:00",
+          "trough_timestamp": "2026-06-14T23:30:00+00:00",
+          "recovery_timestamp": "2026-06-18T00:30:00+00:00",
+          "dd_duration_trades": 5
+        },
+        "recovery_factor": 5.6647
+      },
+      "e1r": {
+        "pnl": {
+          "trades": 15,
+          "winners": 13,
+          "losers": 2,
+          "winrate": 0.8667,
+          "TP_FIRST": 13,
+          "SL_FIRST": 0,
+          "MOVE_041_THEN_SL": 2,
+          "profit_factor": 16.4577,
+          "expectancy_per_trade_pct": 1.51568,
+          "avg_winner_pct": 1.862,
+          "avg_loser_pct": -0.7354,
+          "total_pnl_pct": 22.7352,
+          "median_pnl_pct": 1.2172,
+          "best_trade_pct": 4.8629,
+          "worst_trade_pct": -0.8254,
+          "max_sl_streak": 1,
+          "sl_streaks_ge2": [],
+          "median_mae": 0.2524,
+          "mean_mae": 0.314553,
+          "median_mfe": 1.4152,
+          "mean_mfe": 1.955393
+        },
+        "drawdown": {
+          "max_drawdown_pct": 0.8254,
+          "peak_timestamp": "2026-07-07T15:45:00+00:00",
+          "trough_timestamp": "2026-07-09T07:45:00+00:00",
+          "recovery_timestamp": "2026-07-13T15:15:00+00:00",
+          "dd_duration_trades": 2
+        },
+        "recovery_factor": 27.5445
+      },
+      "opportunity_cost": {
+        "blocked_winners": {
+          "count": 4,
+          "sum_pnl_pct": 4.5857,
+          "avg_pnl_pct": 1.146425,
+          "median_pnl_pct": 1.12445,
+          "median_mae": 0.16525,
+          "median_mfe": 1.25055
+        },
+        "blocked_losers": {
+          "count": 6,
+          "sum_pnl_pct": -4.8314,
+          "avg_pnl_pct": -0.805233,
+          "median_pnl_pct": -0.6642,
+          "median_mae": 0.88905,
+          "median_mfe": 0.49945
+        }
+      },
+      "equity_baseline": [
+        {
+          "timestamp": "2026-06-03T07:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 4.1215,
+          "equity": 104.1215,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-11T19:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -1.0471,
+          "equity": 103.0744,
+          "drawdown_pct": 1.0471
+        },
+        {
+          "timestamp": "2026-06-14T21:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -1.5946,
+          "equity": 101.4798,
+          "drawdown_pct": 2.6417
+        },
+        {
+          "timestamp": "2026-06-14T22:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.7333,
+          "equity": 100.7465,
+          "drawdown_pct": 3.375
+        },
+        {
+          "timestamp": "2026-06-14T23:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.5951,
+          "equity": 100.1514,
+          "drawdown_pct": 3.9701
+        },
+        {
+          "timestamp": "2026-06-18T00:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 4.8629,
+          "equity": 105.0143,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-19T01:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.5992,
+          "equity": 106.6135,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-20T05:00:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.4234,
+          "equity": 108.0369,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-20T15:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.0177,
+          "equity": 109.0546,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-20T22:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.2312,
+          "equity": 110.2858,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-21T04:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.9134,
+          "equity": 111.1992,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-23T07:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.8876,
+          "equity": 112.0868,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-23T23:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.2439,
+          "equity": 113.3307,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-24T01:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.2172,
+          "equity": 114.5479,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-25T17:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 3.0678,
+          "equity": 117.6157,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T14:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.8353,
+          "equity": 118.451,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T23:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.582,
+          "equity": 120.033,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-07T15:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.8674,
+          "equity": 121.9004,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T07:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.8254,
+          "equity": 121.075,
+          "drawdown_pct": 0.8254
+        },
+        {
+          "timestamp": "2026-07-13T07:00:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.8069,
+          "equity": 121.8819,
+          "drawdown_pct": 0.0185
+        },
+        {
+          "timestamp": "2026-07-13T15:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.0116,
+          "equity": 122.8935,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-14T13:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.3771,
+          "equity": 122.5164,
+          "drawdown_pct": 0.3771
+        },
+        {
+          "timestamp": "2026-07-16T21:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.1027,
+          "equity": 123.6191,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-17T17:00:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.6454,
+          "equity": 122.9737,
+          "drawdown_pct": 0.6454
+        },
+        {
+          "timestamp": "2026-07-18T17:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.4842,
+          "equity": 122.4895,
+          "drawdown_pct": 1.1296
+        }
+      ],
+      "equity_e1r": [
+        {
+          "timestamp": "2026-06-03T07:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 4.1215,
+          "equity": 104.1215,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-18T00:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 4.8629,
+          "equity": 108.9844,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-19T01:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.5992,
+          "equity": 110.5836,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-23T07:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.8876,
+          "equity": 111.4712,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-23T23:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.2439,
+          "equity": 112.7151,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-24T01:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.2172,
+          "equity": 113.9323,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-25T17:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 3.0678,
+          "equity": 117.0001,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T14:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.8353,
+          "equity": 117.8354,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T23:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.582,
+          "equity": 119.4174,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-07T15:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.8674,
+          "equity": 121.2848,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T07:45:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.8254,
+          "equity": 120.4594,
+          "drawdown_pct": 0.8254
+        },
+        {
+          "timestamp": "2026-07-13T07:00:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.8069,
+          "equity": 121.2663,
+          "drawdown_pct": 0.0185
+        },
+        {
+          "timestamp": "2026-07-13T15:15:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.0116,
+          "equity": 122.2779,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-16T21:30:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.1027,
+          "equity": 123.3806,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-17T17:00:00+00:00",
+          "symbol": "XRPUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.6454,
+          "equity": 122.7352,
+          "drawdown_pct": 0.6454
+        }
+      ]
+    },
+    "ADAUSDT": {
+      "baseline": {
+        "pnl": {
+          "trades": 18,
+          "winners": 11,
+          "losers": 7,
+          "winrate": 0.6111,
+          "TP_FIRST": 11,
+          "SL_FIRST": 3,
+          "MOVE_041_THEN_SL": 4,
+          "profit_factor": 3.1659,
+          "expectancy_per_trade_pct": 0.774006,
+          "avg_winner_pct": 1.851318,
+          "avg_loser_pct": -0.918914,
+          "total_pnl_pct": 13.9321,
+          "median_pnl_pct": 1.42395,
+          "best_trade_pct": 2.6373,
+          "worst_trade_pct": -1.5792,
+          "max_sl_streak": 4,
+          "sl_streaks_ge2": [
+            3,
+            4
+          ],
+          "median_mae": 0.28255,
+          "mean_mae": 0.72075,
+          "median_mfe": 1.65635,
+          "mean_mfe": 1.526911,
+          "sl_count": 7
+        },
+        "drawdown": {
+          "max_drawdown_pct": 3.3525,
+          "peak_timestamp": "2026-07-13T14:30:00+00:00",
+          "trough_timestamp": "2026-07-28T16:45:00+00:00",
+          "recovery_timestamp": null,
+          "dd_duration_trades": 5
+        },
+        "recovery_factor": 4.1557
+      },
+      "e1r": {
+        "pnl": {
+          "trades": 11,
+          "winners": 9,
+          "losers": 2,
+          "winrate": 0.8182,
+          "TP_FIRST": 9,
+          "SL_FIRST": 0,
+          "MOVE_041_THEN_SL": 2,
+          "profit_factor": 8.0165,
+          "expectancy_per_trade_pct": 1.340591,
+          "avg_winner_pct": 1.872022,
+          "avg_loser_pct": -1.05085,
+          "total_pnl_pct": 14.7465,
+          "median_pnl_pct": 1.6907,
+          "best_trade_pct": 2.6373,
+          "worst_trade_pct": -1.1459,
+          "max_sl_streak": 2,
+          "sl_streaks_ge2": [
+            2
+          ],
+          "median_mae": 0.2505,
+          "mean_mae": 0.388136,
+          "median_mfe": 2.0038,
+          "mean_mfe": 1.8897
+        },
+        "drawdown": {
+          "max_drawdown_pct": 2.1017,
+          "peak_timestamp": "2026-07-13T14:30:00+00:00",
+          "trough_timestamp": "2026-07-28T16:45:00+00:00",
+          "recovery_timestamp": null,
+          "dd_duration_trades": 3
+        },
+        "recovery_factor": 7.0165
+      },
+      "opportunity_cost": {
+        "blocked_winners": {
+          "count": 2,
+          "sum_pnl_pct": 3.5163,
+          "avg_pnl_pct": 1.75815,
+          "median_pnl_pct": 1.75815,
+          "median_mae": 0.13505,
+          "median_mfe": 1.9394
+        },
+        "blocked_losers": {
+          "count": 5,
+          "sum_pnl_pct": -4.3307,
+          "avg_pnl_pct": -0.86614,
+          "median_pnl_pct": -0.7196,
+          "median_mae": 1.5863,
+          "median_mfe": 0.3505
+        }
+      },
+      "equity_baseline": [
+        {
+          "timestamp": "2026-06-01T19:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.6373,
+          "equity": 102.6373,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-08T11:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -1.5792,
+          "equity": 101.0581,
+          "drawdown_pct": 1.5792
+        },
+        {
+          "timestamp": "2026-06-14T21:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.5512,
+          "equity": 100.5069,
+          "drawdown_pct": 2.1304
+        },
+        {
+          "timestamp": "2026-06-14T21:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.9495,
+          "equity": 99.5574,
+          "drawdown_pct": 3.0799
+        },
+        {
+          "timestamp": "2026-06-20T15:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.5366,
+          "equity": 101.094,
+          "drawdown_pct": 1.5433
+        },
+        {
+          "timestamp": "2026-06-24T01:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.0169,
+          "equity": 103.1109,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-26T20:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.2154,
+          "equity": 104.3263,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T09:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.5089,
+          "equity": 105.8352,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T11:45:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.1239,
+          "equity": 107.9591,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-10T10:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.3009,
+          "equity": 110.26,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-12T21:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.339,
+          "equity": 111.599,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T06:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.9363,
+          "equity": 113.5353,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T07:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.0586,
+          "equity": 115.5939,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T14:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.6907,
+          "equity": 117.2846,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-14T05:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -1.1459,
+          "equity": 116.1387,
+          "drawdown_pct": 1.1459
+        },
+        {
+          "timestamp": "2026-07-14T13:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.7196,
+          "equity": 115.4191,
+          "drawdown_pct": 1.8655
+        },
+        {
+          "timestamp": "2026-07-14T15:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.5312,
+          "equity": 114.8879,
+          "drawdown_pct": 2.3967
+        },
+        {
+          "timestamp": "2026-07-28T16:45:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.9558,
+          "equity": 113.9321,
+          "drawdown_pct": 3.3525
+        }
+      ],
+      "equity_e1r": [
+        {
+          "timestamp": "2026-06-01T19:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.6373,
+          "equity": 102.6373,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-20T15:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.5366,
+          "equity": 104.1739,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-24T01:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.0169,
+          "equity": 106.1908,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-28T09:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.5089,
+          "equity": 107.6997,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T11:45:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.1239,
+          "equity": 109.8236,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-12T21:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.339,
+          "equity": 111.1626,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T06:15:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.9363,
+          "equity": 113.0989,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T07:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.0586,
+          "equity": 115.1575,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T14:30:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.6907,
+          "equity": 116.8482,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-14T05:00:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -1.1459,
+          "equity": 115.7023,
+          "drawdown_pct": 1.1459
+        },
+        {
+          "timestamp": "2026-07-28T16:45:00+00:00",
+          "symbol": "ADAUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.9558,
+          "equity": 114.7465,
+          "drawdown_pct": 2.1017
+        }
+      ]
+    },
+    "DOGEUSDT": {
+      "baseline": {
+        "pnl": {
+          "trades": 28,
+          "winners": 19,
+          "losers": 8,
+          "winrate": 0.6786,
+          "TP_FIRST": 19,
+          "SL_FIRST": 4,
+          "MOVE_041_THEN_SL": 4,
+          "profit_factor": 5.2289,
+          "expectancy_per_trade_pct": 0.926763,
+          "avg_winner_pct": 1.628405,
+          "avg_loser_pct": -0.739637,
+          "total_pnl_pct": 25.0226,
+          "median_pnl_pct": 1.2278,
+          "best_trade_pct": 3.9507,
+          "worst_trade_pct": -1.0807,
+          "max_sl_streak": 4,
+          "sl_streaks_ge2": [
+            4,
+            2
+          ],
+          "median_mae": 0.26245,
+          "mean_mae": 0.384561,
+          "median_mfe": 1.34885,
+          "mean_mfe": 1.408225,
+          "sl_count": 8
+        },
+        "drawdown": {
+          "max_drawdown_pct": 3.1578,
+          "peak_timestamp": "2026-06-03T21:45:00+00:00",
+          "trough_timestamp": "2026-06-14T21:30:00+00:00",
+          "recovery_timestamp": "2026-06-18T08:30:00+00:00",
+          "dd_duration_trades": 5
+        },
+        "recovery_factor": 7.9241
+      },
+      "e1r": {
+        "pnl": {
+          "trades": 22,
+          "winners": 18,
+          "losers": 3,
+          "winrate": 0.8182,
+          "TP_FIRST": 18,
+          "SL_FIRST": 1,
+          "MOVE_041_THEN_SL": 2,
+          "profit_factor": 16.3227,
+          "expectancy_per_trade_pct": 1.276529,
+          "avg_winner_pct": 1.586478,
+          "avg_loser_pct": -0.583167,
+          "total_pnl_pct": 26.8071,
+          "median_pnl_pct": 1.3253,
+          "best_trade_pct": 3.9507,
+          "worst_trade_pct": -0.6916,
+          "max_sl_streak": 1,
+          "sl_streaks_ge2": [],
+          "median_mae": 0.21405,
+          "mean_mae": 0.275159,
+          "median_mfe": 1.4429,
+          "mean_mfe": 1.597527
+        },
+        "drawdown": {
+          "max_drawdown_pct": 1.0579,
+          "peak_timestamp": "2026-07-13T14:45:00+00:00",
+          "trough_timestamp": "2026-07-18T18:15:00+00:00",
+          "recovery_timestamp": "2026-07-20T00:00:00+00:00",
+          "dd_duration_trades": 4
+        },
+        "recovery_factor": 25.3399
+      },
+      "opportunity_cost": {
+        "blocked_winners": {
+          "count": 1,
+          "sum_pnl_pct": 2.3831,
+          "avg_pnl_pct": 2.3831,
+          "median_pnl_pct": 2.3831,
+          "median_mae": 0.0114,
+          "median_mfe": 2.7024
+        },
+        "blocked_losers": {
+          "count": 5,
+          "sum_pnl_pct": -4.1676,
+          "avg_pnl_pct": -0.83352,
+          "median_pnl_pct": -0.7278,
+          "median_mae": 0.9233,
+          "median_mfe": 0.1416
+        }
+      },
+      "equity_baseline": [
+        {
+          "timestamp": "2026-06-03T11:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.8814,
+          "equity": 102.8814,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-03T21:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.9266,
+          "equity": 104.808,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-07T01:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.6916,
+          "equity": 104.1164,
+          "drawdown_pct": 0.6916
+        },
+        {
+          "timestamp": "2026-06-07T02:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.7046,
+          "equity": 103.4118,
+          "drawdown_pct": 1.3962
+        },
+        {
+          "timestamp": "2026-06-07T08:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -1.0807,
+          "equity": 102.3311,
+          "drawdown_pct": 2.4769
+        },
+        {
+          "timestamp": "2026-06-14T21:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.6809,
+          "equity": 101.6502,
+          "drawdown_pct": 3.1578
+        },
+        {
+          "timestamp": "2026-06-17T18:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.3831,
+          "equity": 104.0333,
+          "drawdown_pct": 0.7747
+        },
+        {
+          "timestamp": "2026-06-18T08:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.9048,
+          "equity": 104.9381,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-18T13:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.3807,
+          "equity": 106.3188,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-22T11:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.9736,
+          "equity": 105.3452,
+          "drawdown_pct": 0.9736
+        },
+        {
+          "timestamp": "2026-06-27T21:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.4291,
+          "equity": 106.7743,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-30T03:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.8534,
+          "equity": 107.6277,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-07T16:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 2.2025,
+          "equity": 109.8302,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T01:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.977,
+          "equity": 110.8072,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T05:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.0782,
+          "equity": 111.8854,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T14:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.3102,
+          "equity": 113.1956,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-14T00:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.5811,
+          "equity": 112.6145,
+          "drawdown_pct": 0.5811
+        },
+        {
+          "timestamp": "2026-07-14T14:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.7278,
+          "equity": 111.8867,
+          "drawdown_pct": 1.3089
+        },
+        {
+          "timestamp": "2026-07-17T21:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 0.0,
+          "equity": 111.8867,
+          "drawdown_pct": 1.3089
+        },
+        {
+          "timestamp": "2026-07-18T18:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": -0.4768,
+          "equity": 111.4099,
+          "drawdown_pct": 1.7857
+        },
+        {
+          "timestamp": "2026-07-20T00:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.3862,
+          "equity": 112.7961,
+          "drawdown_pct": 0.3995
+        },
+        {
+          "timestamp": "2026-07-27T17:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 3.9507,
+          "equity": 116.7468,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T00:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.3253,
+          "equity": 118.0721,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T09:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.2278,
+          "equity": 119.2999,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T18:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.0742,
+          "equity": 120.3741,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-30T19:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.4525,
+          "equity": 121.8266,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-31T01:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.3552,
+          "equity": 123.1818,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-31T05:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "baseline",
+          "trade_pnl_pct": 1.8408,
+          "equity": 125.0226,
+          "drawdown_pct": 0.0
+        }
+      ],
+      "equity_e1r": [
+        {
+          "timestamp": "2026-06-03T11:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.8814,
+          "equity": 102.8814,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-03T21:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.9266,
+          "equity": 104.808,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-07T01:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.6916,
+          "equity": 104.1164,
+          "drawdown_pct": 0.6916
+        },
+        {
+          "timestamp": "2026-06-18T08:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.9048,
+          "equity": 105.0212,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-18T13:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.3807,
+          "equity": 106.4019,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-27T21:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.4291,
+          "equity": 107.831,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-06-30T03:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.8534,
+          "equity": 108.6844,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-07T16:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 2.2025,
+          "equity": 110.8869,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-09T01:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.977,
+          "equity": 111.8639,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T05:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.0782,
+          "equity": 112.9421,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-13T14:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.3102,
+          "equity": 114.2523,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-14T00:45:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.5811,
+          "equity": 113.6712,
+          "drawdown_pct": 0.5811
+        },
+        {
+          "timestamp": "2026-07-17T21:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 0.0,
+          "equity": 113.6712,
+          "drawdown_pct": 0.5811
+        },
+        {
+          "timestamp": "2026-07-18T18:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": -0.4768,
+          "equity": 113.1944,
+          "drawdown_pct": 1.0579
+        },
+        {
+          "timestamp": "2026-07-20T00:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.3862,
+          "equity": 114.5806,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-27T17:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 3.9507,
+          "equity": 118.5313,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T00:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.3253,
+          "equity": 119.8566,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T09:30:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.2278,
+          "equity": 121.0844,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-29T18:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.0742,
+          "equity": 122.1586,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-30T19:15:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.4525,
+          "equity": 123.6111,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-31T01:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.3552,
+          "equity": 124.9663,
+          "drawdown_pct": 0.0
+        },
+        {
+          "timestamp": "2026-07-31T05:00:00+00:00",
+          "symbol": "DOGEUSDT",
+          "curve": "e1r",
+          "trade_pnl_pct": 1.8408,
+          "equity": 126.8071,
+          "drawdown_pct": 0.0
+        }
+      ]
+    }
+  },
+  "cross_coin": {
+    "baseline": {
+      "trades": 71,
+      "winners": 47,
+      "losers": 23,
+      "winrate": 0.662,
+      "TP_FIRST": 47,
+      "SL_FIRST": 9,
+      "MOVE_041_THEN_SL": 14,
+      "profit_factor": 4.2943,
+      "expectancy_per_trade_pct": 0.877774,
+      "avg_winner_pct": 1.704168,
+      "avg_loser_pct": -0.810943,
+      "total_pnl_pct": 61.4442,
+      "median_pnl_pct": 1.15905,
+      "best_trade_pct": 4.8629,
+      "worst_trade_pct": -1.5946,
+      "max_sl_streak": 4,
+      "sl_streaks_ge2": [
+        4,
+        2,
+        3,
+        4,
+        4,
+        2
+      ],
+      "median_mae": 0.295,
+      "mean_mae": 0.497707,
+      "median_mfe": 1.3764,
+      "mean_mfe": 1.478156
+    },
+    "e1r": {
+      "trades": 48,
+      "winners": 40,
+      "losers": 7,
+      "winrate": 0.8333,
+      "TP_FIRST": 40,
+      "SL_FIRST": 1,
+      "MOVE_041_THEN_SL": 6,
+      "profit_factor": 13.0798,
+      "expectancy_per_trade_pct": 1.367847,
+      "avg_winner_pct": 1.74027,
+      "avg_loser_pct": -0.760286,
+      "total_pnl_pct": 64.2888,
+      "median_pnl_pct": 1.3552,
+      "best_trade_pct": 4.8629,
+      "worst_trade_pct": -1.1459,
+      "max_sl_streak": 2,
+      "sl_streaks_ge2": [
+        2
+      ],
+      "median_mae": 0.23535,
+      "mean_mae": 0.31336,
+      "median_mfe": 1.5292,
+      "mean_mfe": 1.776317
+    },
+    "table_md": "| Metrik | Baseline | E1R |\n|---|---:|---:|\n| Trades gesamt | 71 | 48 |\n| Gewinner | 47 | 40 |\n| Verlierer | 23 | 7 |\n| Gesamt-PnL % | 61.4442 | 64.2888 |\n| Gesamt-PnL USDT | NOT_AVAILABLE | NOT_AVAILABLE |\n| Profit Factor | 4.2943 | 13.0798 |\n| Expectancy | 0.877774 | 1.367847 |\n| Max Drawdown % | 10.2078 | 1.7465 |\n| Max Verlustserie | 4 | 2 |\n| Median MAE | 0.295 | 0.23535 |\n| Median MFE | 1.3764 | 1.5292 |\n",
+    "drawdown_baseline": {
+      "max_drawdown_pct": 10.2078,
+      "peak_timestamp": "2026-06-03T21:45:00+00:00",
+      "trough_timestamp": "2026-06-14T23:30:00+00:00",
+      "recovery_timestamp": "2026-06-19T01:45:00+00:00",
+      "dd_duration_trades": 12
+    },
+    "drawdown_e1r": {
+      "max_drawdown_pct": 1.7465,
+      "peak_timestamp": "2026-07-13T15:15:00+00:00",
+      "trough_timestamp": "2026-07-18T18:15:00+00:00",
+      "recovery_timestamp": "2026-07-27T17:00:00+00:00",
+      "dd_duration_trades": 7
+    }
+  },
+  "blocked_opportunity": {
+    "winners_agg": {
+      "count": 7,
+      "sum_pnl_pct": 10.4851,
+      "avg_pnl_pct": 1.497871,
+      "median_pnl_pct": 1.2312,
+      "median_mae": 0.0434,
+      "median_mfe": 1.2829
+    },
+    "losers_agg": {
+      "count": 16,
+      "sum_pnl_pct": -13.3297,
+      "avg_pnl_pct": -0.833106,
+      "median_pnl_pct": -0.7237,
+      "median_mae": 1.09005,
+      "median_mfe": 0.39795
+    },
+    "per_coin": {
+      "XRPUSDT": {
+        "blocked_winners": {
+          "count": 4,
+          "sum_pnl_pct": 4.5857,
+          "avg_pnl_pct": 1.146425,
+          "median_pnl_pct": 1.12445,
+          "median_mae": 0.16525,
+          "median_mfe": 1.25055
+        },
+        "blocked_losers": {
+          "count": 6,
+          "sum_pnl_pct": -4.8314,
+          "avg_pnl_pct": -0.805233,
+          "median_pnl_pct": -0.6642,
+          "median_mae": 0.88905,
+          "median_mfe": 0.49945
+        }
+      },
+      "ADAUSDT": {
+        "blocked_winners": {
+          "count": 2,
+          "sum_pnl_pct": 3.5163,
+          "avg_pnl_pct": 1.75815,
+          "median_pnl_pct": 1.75815,
+          "median_mae": 0.13505,
+          "median_mfe": 1.9394
+        },
+        "blocked_losers": {
+          "count": 5,
+          "sum_pnl_pct": -4.3307,
+          "avg_pnl_pct": -0.86614,
+          "median_pnl_pct": -0.7196,
+          "median_mae": 1.5863,
+          "median_mfe": 0.3505
+        }
+      },
+      "DOGEUSDT": {
+        "blocked_winners": {
+          "count": 1,
+          "sum_pnl_pct": 2.3831,
+          "avg_pnl_pct": 2.3831,
+          "median_pnl_pct": 2.3831,
+          "median_mae": 0.0114,
+          "median_mfe": 2.7024
+        },
+        "blocked_losers": {
+          "count": 5,
+          "sum_pnl_pct": -4.1676,
+          "avg_pnl_pct": -0.83352,
+          "median_pnl_pct": -0.7278,
+          "median_mae": 0.9233,
+          "median_mfe": 0.1416
+        }
+      }
+    }
+  },
+  "bad4": [
+    {
+      "entry_open": "2026-06-11T19:15:00+00:00",
+      "baseline_pnl_pct": -1.0471,
+      "E1R_blocked": true,
+      "avoided_loss_pct": -1.0471,
+      "mae_pct": 1.3405,
+      "mfe_pct": 1.5069,
+      "final_outcome": "MOVE_041_THEN_SL"
+    },
+    {
+      "entry_open": "2026-06-14T21:45:00+00:00",
+      "baseline_pnl_pct": -1.5946,
+      "E1R_blocked": true,
+      "avoided_loss_pct": -1.5946,
+      "mae_pct": 1.6959,
+      "mfe_pct": 0.4454,
+      "final_outcome": "MOVE_041_THEN_SL"
+    },
+    {
+      "entry_open": "2026-06-14T22:30:00+00:00",
+      "baseline_pnl_pct": -0.7333,
+      "E1R_blocked": true,
+      "avoided_loss_pct": -0.7333,
+      "mae_pct": 1.0984,
+      "mfe_pct": 0.5535,
+      "final_outcome": "MOVE_041_THEN_SL"
+    },
+    {
+      "entry_open": "2026-06-14T23:30:00+00:00",
+      "baseline_pnl_pct": -0.5951,
+      "E1R_blocked": true,
+      "avoided_loss_pct": -0.5951,
+      "mae_pct": 0.6784,
+      "mfe_pct": 0.0254,
+      "final_outcome": "SL_FIRST"
+    }
+  ],
+  "drawdown_summary": {
+    "per_coin": {
+      "XRPUSDT": {
+        "baseline": {
+          "max_drawdown_pct": 3.9701,
+          "peak_timestamp": "2026-06-03T07:15:00+00:00",
+          "trough_timestamp": "2026-06-14T23:30:00+00:00",
+          "recovery_timestamp": "2026-06-18T00:30:00+00:00",
+          "dd_duration_trades": 5
+        },
+        "e1r": {
+          "max_drawdown_pct": 0.8254,
+          "peak_timestamp": "2026-07-07T15:45:00+00:00",
+          "trough_timestamp": "2026-07-09T07:45:00+00:00",
+          "recovery_timestamp": "2026-07-13T15:15:00+00:00",
+          "dd_duration_trades": 2
+        }
+      },
+      "ADAUSDT": {
+        "baseline": {
+          "max_drawdown_pct": 3.3525,
+          "peak_timestamp": "2026-07-13T14:30:00+00:00",
+          "trough_timestamp": "2026-07-28T16:45:00+00:00",
+          "recovery_timestamp": null,
+          "dd_duration_trades": 5
+        },
+        "e1r": {
+          "max_drawdown_pct": 2.1017,
+          "peak_timestamp": "2026-07-13T14:30:00+00:00",
+          "trough_timestamp": "2026-07-28T16:45:00+00:00",
+          "recovery_timestamp": null,
+          "dd_duration_trades": 3
+        }
+      },
+      "DOGEUSDT": {
+        "baseline": {
+          "max_drawdown_pct": 3.1578,
+          "peak_timestamp": "2026-06-03T21:45:00+00:00",
+          "trough_timestamp": "2026-06-14T21:30:00+00:00",
+          "recovery_timestamp": "2026-06-18T08:30:00+00:00",
+          "dd_duration_trades": 5
+        },
+        "e1r": {
+          "max_drawdown_pct": 1.0579,
+          "peak_timestamp": "2026-07-13T14:45:00+00:00",
+          "trough_timestamp": "2026-07-18T18:15:00+00:00",
+          "recovery_timestamp": "2026-07-20T00:00:00+00:00",
+          "dd_duration_trades": 4
+        }
+      }
+    },
+    "cross": {
+      "baseline": {
+        "max_drawdown_pct": 10.2078,
+        "peak_timestamp": "2026-06-03T21:45:00+00:00",
+        "trough_timestamp": "2026-06-14T23:30:00+00:00",
+        "recovery_timestamp": "2026-06-19T01:45:00+00:00",
+        "dd_duration_trades": 12
+      },
+      "e1r": {
+        "max_drawdown_pct": 1.7465,
+        "peak_timestamp": "2026-07-13T15:15:00+00:00",
+        "trough_timestamp": "2026-07-18T18:15:00+00:00",
+        "recovery_timestamp": "2026-07-27T17:00:00+00:00",
+        "dd_duration_trades": 7
+      }
+    }
+  },
+  "equity_summary": "Baseline end equity 161.4442; E1R end equity 164.2888; CSV: analyze_crosscoin_e1r_final_equity_curve_v1.csv",
+  "freeze_readiness": "Ja, sofern Parit\u00e4t ok: reproduzierbar via floor_guard_signal_list_v1.json + analyze_crosscoin_e1_onebar_reclaim_shadow_v1.analyze_coin @ dokumentiertem HEAD.",
+  "freeze_plan": {
+    "proposed_tag": "e1r_cluster3_ema200_shadow_freeze_v1",
+    "branch": "pools-ob-delta-bot",
+    "head": "37fcc1c8bee0d25d830fed8df4f42c5b116255c8",
+    "shadow_code": [
+      "results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_bull_regime_exit_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster_transition_shadow_v1.py",
+      "results/pool_scan/context_study_v1/analyze_xrp_pool_ladder_forensics_v1.py",
+      "results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py"
+    ],
+    "research_artifacts": [
+      "results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json",
+      "results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.json",
+      "results/pool_scan/context_study_v1/analyze_crosscoin_e1r_final_pnl_comparison_v1.json"
+    ],
+    "production_code": "Nicht Teil dieses Freeze (E1R nicht integriert)",
+    "config_constants": "REPORT_FROM/TO, PANE_FROM/TO in analyze_xrp_ema200_cluster3_persistent_shadow_v1.py; cluster gap 0.35% via price_clusters",
+    "do_not_commit_automatically": true
+  },
+  "cross_coin_table": "| Metrik | Baseline | E1R |\n|---|---:|---:|\n| Trades gesamt | 71 | 48 |\n| Gewinner | 47 | 40 |\n| Verlierer | 23 | 7 |\n| Gesamt-PnL % | 61.4442 | 64.2888 |\n| Gesamt-PnL USDT | NOT_AVAILABLE | NOT_AVAILABLE |\n| Profit Factor | 4.2943 | 13.0798 |\n| Expectancy | 0.877774 | 1.367847 |\n| Max Drawdown % | 10.2078 | 1.7465 |\n| Max Verlustserie | 4 | 2 |\n| Median MAE | 0.295 | 0.23535 |\n| Median MFE | 1.3764 | 1.5292 |\n",
+  "executive_summary": "# Final Baseline vs E1R PnL comparison v1\n\n### Code status\n{\n  \"classification\": {\n    \"A_production_baseline\": \"Live/Scanner-Pfad: Short-Entry-Scanner (find_short_entry_15m_v1) + bestehende Guards au\\u00dferhalb dieses Reports. `with_guard` in floor_guard_signal_list_v1 = dokumentierte Baseline-Kohorte Jun\\u2013Jul 2026 (Floor-Guard gefilterte Signale), nicht E1R.\",\n    \"B_shadow_analysis_only\": \"E1R und alle analyze_*ema200* / crosscoin_e1* Skripte unter results/pool_scan/context_study_v1/ \\u2014 reine Shadow-/Forensik-Logik, keine Integration in pool_pattern/machine oder Live-Bot gefunden.\",\n    \"C_not_integrated\": \"E1R one-bar reclaim, E1, GAP3, Entry-Forensik, D4-Shadows \\u2014 nur JSON/MD/CSV-Artefakte.\"\n  },\n  \"e1r_in_executable_strategy_path\": false,\n  \"note\": \"Repo grep: E1R nur in context_study_v1 Shadow-Skripten referenziert.\"\n}\n\n### Run manifest\n{\n  \"repo\": \"/home/telgenbuescher/projects/pools+ob+delta_bot\",\n  \"branch\": \"pools-ob-delta-bot\",\n  \"head\": \"37fcc1c8bee0d25d830fed8df4f42c5b116255c8\",\n  \"signal_source\": \"results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json\",\n  \"window\": [\n    \"2026-06-01T00:00:00+00:00\",\n    \"2026-07-31T23:59:59+00:00\"\n  ],\n  \"coins\": [\n    \"XRPUSDT\",\n    \"ADAUSDT\",\n    \"DOGEUSDT\"\n  ],\n  \"baseline_files\": [\n    \"results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json\",\n    \"results/pool_scan/context_study_v1/floor_guard_signal_list_v1.md\",\n    \"results/pool_scan/context_study_v1/find_short_entry_15m_v1.py\"\n  ],\n  \"e1r_shadow_files\": [\n    \"results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_bull_regime_exit_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster_transition_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_pool_ladder_forensics_v1.py\"\n  ],\n  \"e1r_canonical\": \"analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py\"\n}\n\n### PnL methodology\n{\n  \"position_size\": \"NOT_AVAILABLE \\u2014 nur pro-Trade pnl_pct aus Signal-Backtest\",\n  \"leverage\": \"NOT_AVAILABLE\",\n  \"sl_tp\": \"Aus Scanner/Signal-JSON (stop/tp Felder); Entry = 15m Close\",\n  \"fees\": \"NOT_AVAILABLE\",\n  \"funding\": \"NOT_AVAILABLE\",\n  \"slippage\": \"NOT_AVAILABLE\",\n  \"compounding\": false,\n  \"equity_definition\": \"Start 100 + chronologische Summe pnl_pct pro ausgef\\u00fchrtem Trade (wie cumulative_pnl_pct in floor_guard_signal_list_v1.md)\",\n  \"pnl_pct_source\": \"floor_guard_signal_list_v1.json field pnl_pct\",\n  \"pnl_R\": \"r_multiple aus Signal-JSON wenn vorhanden\",\n  \"net_pnl\": \"identisch pnl_pct (keine Fee-Logik)\",\n  \"variants\": {\n    \"A_raw\": \"pnl_pct ohne Fees\",\n    \"B_net\": \"NOT_AVAILABLE\"\n  }\n}\n\n### Baseline parity\n{\n  \"XRPUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 25,\n      \"sl\": 8,\n      \"tp\": 17\n    },\n    \"expected_e1r\": {\n      \"trades\": 15,\n      \"sl\": 2,\n      \"tp_first_lost\": 4,\n      \"max_sl_streak\": 1\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 8,\n      \"tp\": 17\n    }\n  },\n  \"ADAUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 18,\n      \"sl\": 7,\n      \"tp\": 11\n    },\n    \"expected_e1r\": {\n      \"trades\": 11,\n      \"sl\": 2,\n      \"tp_first_lost\": 2,\n      \"max_sl_streak\": 2\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 7,\n      \"tp\": 11\n    }\n  },\n  \"DOGEUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 28,\n      \"sl\": 8,\n      \"tp\": 19\n    },\n    \"expected_e1r\": {\n      \"trades\": 22,\n      \"sl\": 3,\n      \"tp_first_lost\": 1,\n      \"max_sl_streak\": 1\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 8,\n      \"tp\": 19\n    }\n  }\n}\n\n### E1R parity\n{\n  \"XRPUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 25,\n      \"sl\": 8,\n      \"tp\": 17\n    },\n    \"expected_e1r\": {\n      \"trades\": 15,\n      \"sl\": 2,\n      \"tp_first_lost\": 4,\n      \"max_sl_streak\": 1\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 8,\n      \"tp\": 17\n    }\n  },\n  \"ADAUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 18,\n      \"sl\": 7,\n      \"tp\": 11\n    },\n    \"expected_e1r\": {\n      \"trades\": 11,\n      \"sl\": 2,\n      \"tp_first_lost\": 2,\n      \"max_sl_streak\": 2\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 7,\n      \"tp\": 11\n    }\n  },\n  \"DOGEUSDT\": {\n    \"ok\": true,\n    \"checks\": {\n      \"baseline_trades\": true,\n      \"baseline_sl\": true,\n      \"e1r_trades\": true,\n      \"e1r_sl\": true,\n      \"e1r_tp_lost\": true,\n      \"e1r_max_sl_streak\": true\n    },\n    \"expected_baseline\": {\n      \"trades\": 28,\n      \"sl\": 8,\n      \"tp\": 19\n    },\n    \"expected_e1r\": {\n      \"trades\": 22,\n      \"sl\": 3,\n      \"tp_first_lost\": 1,\n      \"max_sl_streak\": 1\n    },\n    \"baseline_sl_tp\": {\n      \"sl\": 8,\n      \"tp\": 19\n    }\n  }\n}\n\n### XRP PnL\n| | Baseline | E1R |\n|---|--:|--:|\n| total_pnl_pct | 22.4895 | 22.7352 |\n| expectancy_per_trade_pct | 0.89958 | 1.51568 |\n| profit_factor | 4.5685 | 16.4577 |\n| max_drawdown_pct | 3.9701 | 0.8254 |\n\n### ADA PnL\n| | Baseline | E1R |\n|---|--:|--:|\n| total_pnl_pct | 13.9321 | 14.7465 |\n| expectancy_per_trade_pct | 0.774006 | 1.340591 |\n| profit_factor | 3.1659 | 8.0165 |\n| max_drawdown_pct | 3.3525 | 2.1017 |\n\n### DOGE PnL\n| | Baseline | E1R |\n|---|--:|--:|\n| total_pnl_pct | 25.0226 | 26.8071 |\n| expectancy_per_trade_pct | 0.926763 | 1.276529 |\n| profit_factor | 5.2289 | 16.3227 |\n| max_drawdown_pct | 3.1578 | 1.0579 |\n\n### Cross-coin PnL\n| Metrik | Baseline | E1R |\n|---|---:|---:|\n| Trades gesamt | 71 | 48 |\n| Gewinner | 47 | 40 |\n| Verlierer | 23 | 7 |\n| Gesamt-PnL % | 61.4442 | 64.2888 |\n| Gesamt-PnL USDT | NOT_AVAILABLE | NOT_AVAILABLE |\n| Profit Factor | 4.2943 | 13.0798 |\n| Expectancy | 0.877774 | 1.367847 |\n| Max Drawdown % | 10.2078 | 1.7465 |\n| Max Verlustserie | 4 | 2 |\n| Median MAE | 0.295 | 0.23535 |\n| Median MFE | 1.3764 | 1.5292 |\n\n\n### Drawdown\n{\n  \"per_coin\": {\n    \"XRPUSDT\": {\n      \"baseline\": {\n        \"max_drawdown_pct\": 3.9701,\n        \"peak_timestamp\": \"2026-06-03T07:15:00+00:00\",\n        \"trough_timestamp\": \"2026-06-14T23:30:00+00:00\",\n        \"recovery_timestamp\": \"2026-06-18T00:30:00+00:00\",\n        \"dd_duration_trades\": 5\n      },\n      \"e1r\": {\n        \"max_drawdown_pct\": 0.8254,\n        \"peak_timestamp\": \"2026-07-07T15:45:00+00:00\",\n        \"trough_timestamp\": \"2026-07-09T07:45:00+00:00\",\n        \"recovery_timestamp\": \"2026-07-13T15:15:00+00:00\",\n        \"dd_duration_trades\": 2\n      }\n    },\n    \"ADAUSDT\": {\n      \"baseline\": {\n        \"max_drawdown_pct\": 3.3525,\n        \"peak_timestamp\": \"2026-07-13T14:30:00+00:00\",\n        \"trough_timestamp\": \"2026-07-28T16:45:00+00:00\",\n        \"recovery_timestamp\": null,\n        \"dd_duration_trades\": 5\n      },\n      \"e1r\": {\n        \"max_drawdown_pct\": 2.1017,\n        \"peak_timestamp\": \"2026-07-13T14:30:00+00:00\",\n        \"trough_timestamp\": \"2026-07-28T16:45:00+00:00\",\n        \"recovery_timestamp\": null,\n        \"dd_duration_trades\": 3\n      }\n    },\n    \"DOGEUSDT\": {\n      \"baseline\": {\n        \"max_drawdown_pct\": 3.1578,\n        \"peak_timestamp\": \"2026-06-03T21:45:00+00:00\",\n        \"trough_timestamp\": \"2026-06-14T21:30:00+00:00\",\n        \"recovery_timestamp\": \"2026-06-18T08:30:00+00:00\",\n        \"dd_duration_trades\": 5\n      },\n      \"e1r\": {\n        \"max_drawdown_pct\": 1.0579,\n        \"peak_timestamp\": \"2026-07-13T14:45:00+00:00\",\n        \"trough_timestamp\": \"2026-07-18T18:15:00+00:00\",\n        \"recovery_timestamp\": \"2026-07-20T00:00:00+00:00\",\n        \"dd_duration_trades\": 4\n      }\n    }\n  },\n  \"cross\": {\n    \"baseline\": {\n      \"max_drawdown_pct\": 10.2078,\n      \"peak_timestamp\": \"2026-06-03T21:45:00+00:00\",\n      \"trough_timestamp\": \"2026-06-14T23:30:00+00:00\",\n      \"recovery_timestamp\": \"2026-06-19T01:45:00+00:00\",\n      \"dd_duration_trades\": 12\n    },\n    \"e1r\": {\n      \"max_drawdown_pct\": 1.7465,\n      \"peak_timestamp\": \"2026-07-13T15:15:00+00:00\",\n      \"trough_timestamp\": \"2026-07-18T18:15:00+00:00\",\n      \"recovery_timestamp\": \"2026-07-27T17:00:00+00:00\",\n      \"dd_duration_trades\": 7\n    }\n  }\n}\n\n### Blocked winners\n{\n  \"count\": 7,\n  \"sum_pnl_pct\": 10.4851,\n  \"avg_pnl_pct\": 1.497871,\n  \"median_pnl_pct\": 1.2312,\n  \"median_mae\": 0.0434,\n  \"median_mfe\": 1.2829\n}\n\n### Avoided losses\n{\n  \"count\": 16,\n  \"sum_pnl_pct\": -13.3297,\n  \"avg_pnl_pct\": -0.833106,\n  \"median_pnl_pct\": -0.7237,\n  \"median_mae\": 1.09005,\n  \"median_mfe\": 0.39795\n}\n\n### BAD-4\n[\n  {\n    \"entry_open\": \"2026-06-11T19:15:00+00:00\",\n    \"baseline_pnl_pct\": -1.0471,\n    \"E1R_blocked\": true,\n    \"avoided_loss_pct\": -1.0471,\n    \"mae_pct\": 1.3405,\n    \"mfe_pct\": 1.5069,\n    \"final_outcome\": \"MOVE_041_THEN_SL\"\n  },\n  {\n    \"entry_open\": \"2026-06-14T21:45:00+00:00\",\n    \"baseline_pnl_pct\": -1.5946,\n    \"E1R_blocked\": true,\n    \"avoided_loss_pct\": -1.5946,\n    \"mae_pct\": 1.6959,\n    \"mfe_pct\": 0.4454,\n    \"final_outcome\": \"MOVE_041_THEN_SL\"\n  },\n  {\n    \"entry_open\": \"2026-06-14T22:30:00+00:00\",\n    \"baseline_pnl_pct\": -0.7333,\n    \"E1R_blocked\": true,\n    \"avoided_loss_pct\": -0.7333,\n    \"mae_pct\": 1.0984,\n    \"mfe_pct\": 0.5535,\n    \"final_outcome\": \"MOVE_041_THEN_SL\"\n  },\n  {\n    \"entry_open\": \"2026-06-14T23:30:00+00:00\",\n    \"baseline_pnl_pct\": -0.5951,\n    \"E1R_blocked\": true,\n    \"avoided_loss_pct\": -0.5951,\n    \"mae_pct\": 0.6784,\n    \"mfe_pct\": 0.0254,\n    \"final_outcome\": \"SL_FIRST\"\n  }\n]\n\n### Equity curve\nBaseline end equity 161.4442; E1R end equity 164.2888; CSV: analyze_crosscoin_e1r_final_equity_curve_v1.csv\n\n### Freeze readiness\nJa, sofern Parit\u00e4t ok: reproduzierbar via floor_guard_signal_list_v1.json + analyze_crosscoin_e1_onebar_reclaim_shadow_v1.analyze_coin @ dokumentiertem HEAD.\n\n### Freeze plan\n{\n  \"proposed_tag\": \"e1r_cluster3_ema200_shadow_freeze_v1\",\n  \"branch\": \"pools-ob-delta-bot\",\n  \"head\": \"37fcc1c8bee0d25d830fed8df4f42c5b116255c8\",\n  \"shadow_code\": [\n    \"results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster3_persistent_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_bull_regime_exit_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_ema200_cluster_transition_shadow_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_xrp_pool_ladder_forensics_v1.py\",\n    \"results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py\"\n  ],\n  \"research_artifacts\": [\n    \"results/pool_scan/context_study_v1/floor_guard_signal_list_v1.json\",\n    \"results/pool_scan/context_study_v1/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.json\",\n    \"results/pool_scan/context_study_v1/analyze_crosscoin_e1r_final_pnl_comparison_v1.json\"\n  ],\n  \"production_code\": \"Nicht Teil dieses Freeze (E1R nicht integriert)\",\n  \"config_constants\": \"REPORT_FROM/TO, PANE_FROM/TO in analyze_xrp_ema200_cluster3_persistent_shadow_v1.py; cluster gap 0.35% via price_clusters\",\n  \"do_not_commit_automatically\": true\n}\n"
+}
