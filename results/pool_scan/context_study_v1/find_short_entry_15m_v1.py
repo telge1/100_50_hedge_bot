@@ -53,7 +53,8 @@ def _ensure_paths() -> None:
     ensure_paths()
 
 
-def load_market(symbol: str):
+def load_market(symbol: str, load_end: datetime | None = None):
+    """Load multi-TF market bars from ClickHouse 1m (research default: ``LOAD_END``)."""
     from dashboard.research_charts.service import _candles_from_packed, load_candles
     from dashboard.research_charts.trp_import import load_trp
     from dashboard.research_charts.ui_lld_parity import ui_lld_config
@@ -61,13 +62,15 @@ def load_market(symbol: str):
     from pool_state_maschine.features import ema
 
     trp = load_trp()
+    end_dt = load_end if load_end is not None else LOAD_END
+    end_unix = int(end_dt.timestamp())
     markets = {}
     for timeframe in TIMEFRAMES:
         packed = load_candles(
             symbol,
             timeframe,
             start=int(LOAD_START.timestamp()),
-            end=int(LOAD_END.timestamp()),
+            end=end_unix,
             limit=50000,
         )
         if not packed.get("strict_complete_buckets"):
