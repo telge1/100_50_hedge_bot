@@ -1,0 +1,202 @@
+{
+  "test_window": [
+    "2026-06-01T00:00:00+00:00",
+    "2026-06-30T23:59:59+00:00"
+  ],
+  "sim_window_for_e1r_state": [
+    "2026-04-01T00:00:00+00:00",
+    "2026-07-31T23:59:59+00:00"
+  ],
+  "import_audit": {
+    "entry_script": "/home/telgenbuescher/projects/pools+ob+delta_bot/frozen_strategies/e1r_cluster3_ema200_v1/reproduction_test_june_2026/run_reproduction_june_2026.py",
+    "e1r_module": "/home/telgenbuescher/projects/pools+ob+delta_bot/frozen_strategies/e1r_cluster3_ema200_v1/code/analyze_crosscoin_e1_onebar_reclaim_shadow_v1.py",
+    "find_short_entry_module": "/home/telgenbuescher/projects/pools+ob+delta_bot/frozen_strategies/e1r_cluster3_ema200_v1/code/find_short_entry_15m_v1.py",
+    "e1r_from_frozen": true,
+    "find_from_frozen": true
+  },
+  "frozen_hash_pass": true,
+  "contamination_pass": true,
+  "contamination_notes": [
+    "reads reference JSON from context_study_v2 path (data only)"
+  ],
+  "reference": {
+    "source": "frozen/reports/oos_validation/oos_summary.json segments.2026-06 + e1r_allowed_trades_4mo.csv",
+    "funnel_counts": "results/pool_scan/context_study_v2/e1r_4month_oos/apr_may_funnel_v1.json (read-only)",
+    "segment": {
+      "trades": 20,
+      "tp_count": 19,
+      "sl_count": 1,
+      "winrate": 0.95,
+      "gross_profit": 36.4931,
+      "gross_loss": -0.6916,
+      "total_pnl_pct": 35.8015,
+      "profit_factor": 52.7662,
+      "max_drawdown_pct": 0.6916,
+      "max_sl_streak": 1,
+      "mean_mae": 0.2043,
+      "mean_mfe": 2.0751,
+      "median_mae": 0.1608,
+      "median_mfe": 1.6873,
+      "mean_tp_dist_pct": 1.9796,
+      "mean_sl_dist_pct": 0.6359,
+      "mean_rr": 3.363,
+      "median_rr": 2.8277
+    },
+    "allowed_ids": [
+      "2026-06-01T19:15:00+00:00",
+      "2026-06-03T07:15:00+00:00",
+      "2026-06-03T11:00:00+00:00",
+      "2026-06-03T21:45:00+00:00",
+      "2026-06-07T01:15:00+00:00",
+      "2026-06-18T00:30:00+00:00",
+      "2026-06-18T08:30:00+00:00",
+      "2026-06-18T13:15:00+00:00",
+      "2026-06-19T01:45:00+00:00",
+      "2026-06-20T15:15:00+00:00",
+      "2026-06-23T07:15:00+00:00",
+      "2026-06-23T23:45:00+00:00",
+      "2026-06-24T01:30:00+00:00",
+      "2026-06-25T17:15:00+00:00",
+      "2026-06-27T21:00:00+00:00",
+      "2026-06-28T09:00:00+00:00",
+      "2026-06-28T14:15:00+00:00",
+      "2026-06-28T23:30:00+00:00",
+      "2026-06-30T03:00:00+00:00"
+    ]
+  },
+  "reproduction": {
+    "with_guard_june": 37,
+    "blocked_june": 17,
+    "allowed_june": 20,
+    "blocked_ids": [
+      "2026-06-07T02:45:00+00:00",
+      "2026-06-07T08:15:00+00:00",
+      "2026-06-08T11:15:00+00:00",
+      "2026-06-11T19:15:00+00:00",
+      "2026-06-14T21:15:00+00:00",
+      "2026-06-14T21:30:00+00:00",
+      "2026-06-14T21:45:00+00:00",
+      "2026-06-14T22:30:00+00:00",
+      "2026-06-14T23:30:00+00:00",
+      "2026-06-17T18:30:00+00:00",
+      "2026-06-20T05:00:00+00:00",
+      "2026-06-20T15:15:00+00:00",
+      "2026-06-20T22:30:00+00:00",
+      "2026-06-21T04:30:00+00:00",
+      "2026-06-22T11:30:00+00:00",
+      "2026-06-26T20:00:00+00:00"
+    ],
+    "allowed_ids": [
+      "2026-06-01T19:15:00+00:00",
+      "2026-06-03T07:15:00+00:00",
+      "2026-06-03T11:00:00+00:00",
+      "2026-06-03T21:45:00+00:00",
+      "2026-06-07T01:15:00+00:00",
+      "2026-06-18T00:30:00+00:00",
+      "2026-06-18T08:30:00+00:00",
+      "2026-06-18T13:15:00+00:00",
+      "2026-06-19T01:45:00+00:00",
+      "2026-06-20T15:15:00+00:00",
+      "2026-06-23T07:15:00+00:00",
+      "2026-06-23T23:45:00+00:00",
+      "2026-06-24T01:30:00+00:00",
+      "2026-06-25T17:15:00+00:00",
+      "2026-06-27T21:00:00+00:00",
+      "2026-06-28T09:00:00+00:00",
+      "2026-06-28T14:15:00+00:00",
+      "2026-06-28T23:30:00+00:00",
+      "2026-06-30T03:00:00+00:00"
+    ],
+    "ref_blocked_keys": [
+      [
+        "ADAUSDT",
+        "2026-06-08T11:15:00+00:00"
+      ],
+      [
+        "ADAUSDT",
+        "2026-06-14T21:15:00+00:00"
+      ],
+      [
+        "ADAUSDT",
+        "2026-06-14T21:30:00+00:00"
+      ],
+      [
+        "ADAUSDT",
+        "2026-06-26T20:00:00+00:00"
+      ],
+      [
+        "DOGEUSDT",
+        "2026-06-07T02:45:00+00:00"
+      ],
+      [
+        "DOGEUSDT",
+        "2026-06-07T08:15:00+00:00"
+      ],
+      [
+        "DOGEUSDT",
+        "2026-06-14T21:30:00+00:00"
+      ],
+      [
+        "DOGEUSDT",
+        "2026-06-17T18:30:00+00:00"
+      ],
+      [
+        "DOGEUSDT",
+        "2026-06-22T11:30:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-11T19:15:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-14T21:45:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-14T22:30:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-14T23:30:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-20T05:00:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-20T15:15:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-20T22:30:00+00:00"
+      ],
+      [
+        "XRPUSDT",
+        "2026-06-21T04:30:00+00:00"
+      ]
+    ],
+    "metrics": {
+      "trades": 20,
+      "tp_count": 19,
+      "sl_count": 1,
+      "total_pnl_pct": 35.8015,
+      "profit_factor": 52.7662,
+      "max_drawdown_pct": 0.6916,
+      "max_sl_streak": 1
+    }
+  },
+  "parity": {
+    "allowed_id_match": true,
+    "with_guard_count_match": true,
+    "blocked_count_match": true,
+    "blocked_id_match": true,
+    "outcome_match": "20/20",
+    "pnl_match": "20/20",
+    "pnl_total_match": true,
+    "pf_match": true,
+    "dd_match": true
+  },
+  "verdict": "FROZEN_JUNE_REPRODUCTION_PASS"
+}
