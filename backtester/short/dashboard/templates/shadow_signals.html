@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow Signale</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .profit-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .profit-summary-card {
+            background: #1f1f1f;
+            padding: 16px;
+            border-radius: 8px;
+            color: #f5f5f5;
+            border: 1px solid #333;
+        }
+        .summary-label {
+            color: #bdbdbd;
+            font-size: 0.82rem;
+            margin-bottom: 6px;
+        }
+        .summary-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        .profit-trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        .profit-trades-table th, .profit-trades-table td {
+            padding: 8px;
+            border: 1px solid #2f2f2f;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        .profit-positive { color: #0f0; }
+        .profit-negative { color: #f55; }
+        .refresh-btn {
+            cursor: pointer;
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
+        }
+        .refresh-btn:disabled,
+        .filter-btn:disabled,
+        .filter-select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .profit-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .refresh-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .refresh-select-label {
+            color: #cfcfcf;
+            font-size: 0.82rem;
+        }
+        .last-updated {
+            color: #bdbdbd;
+            font-size: 0.85rem;
+            margin-left: auto;
+        }
+        .trade-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: end;
+            background: #1b1b1b;
+            border: 1px solid #2f2f2f;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 14px;
+        }
+        .filter-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 165px;
+        }
+        .filter-field label {
+            color: #cfcfcf;
+            font-size: 0.82rem;
+        }
+        .filter-input,
+        .filter-select,
+        .filter-btn {
+            background: #252525;
+            color: #f5f5f5;
+            border: 1px solid #383838;
+            border-radius: 6px;
+            padding: 7px 10px;
+            font-size: 0.9rem;
+        }
+        .filter-btn {
+            cursor: pointer;
+        }
+        .trade-pagination-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-left: auto;
+        }
+        .trade-pagination-info {
+            color: #cfcfcf;
+            font-size: 0.85rem;
+            min-width: 200px;
+            text-align: right;
+        }
+        .shadow-offline-banner {
+            background: #3a2020;
+            border: 1px solid #6a3030;
+            color: #f5c5c5;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📊 Shadow Signale</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        {% set nav_active = 'profit-verlauf-shadow-signals' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            {% if offline %}
+            <div class="shadow-offline-banner" id="shadow-offline-banner">{{ offline_message }}</div>
+            {% else %}
+            <div class="shadow-offline-banner" id="shadow-offline-banner" style="display:none;"></div>
+            {% endif %}
+
+            <div class="profit-summary-grid">
+                <div class="profit-summary-card">
+                    <div class="summary-label">Total Signals</div>
+                    <div class="summary-value" id="summary-total-signals">{{ summary.total_signals }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Closed Signals</div>
+                    <div class="summary-value" id="summary-closed-signals">{{ summary.closed_signals }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Open Signals</div>
+                    <div class="summary-value" id="summary-open-signals">{{ summary.open_signals }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winrate</div>
+                    <div class="summary-value" id="summary-winrate">{{ summary.winrate }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Winning Signals</div>
+                    <div class="summary-value" id="summary-winning-signals">{{ summary.winning_signals }}</div>
+                </div>
+                <div class="profit-summary-card">
+                    <div class="summary-label">Total PnL</div>
+                    <div class="summary-value" id="summary-total-pnl">{{ summary.total_pnl }}</div>
+                </div>
+            </div>
+
+            <div class="profit-toolbar">
+                <div class="refresh-group">
+                    <button class="refresh-btn" id="shadow-refresh-btn" type="button">Refresh</button>
+                    <label class="refresh-select-label" for="shadow-side-select">Signal Seite</label>
+                    <select class="filter-select" id="shadow-side-select" name="side">
+                        <option value="long" {% if side == "long" %}selected{% endif %}>LONG</option>
+                        <option value="short" {% if side == "short" %}selected{% endif %}>SHORT</option>
+                    </select>
+                </div>
+                <span id="shadow-last-updated" class="last-updated">Zuletzt aktualisiert: –</span>
+            </div>
+
+            <div class="trade-filter-bar">
+                <div class="filter-field">
+                    <label for="shadow-filter-start">Von</label>
+                    <input class="filter-input" id="shadow-filter-start" type="datetime-local" value="{{ filter_start_time }}">
+                </div>
+                <div class="filter-field">
+                    <label for="shadow-filter-end">Bis</label>
+                    <input class="filter-input" id="shadow-filter-end" type="datetime-local" value="{{ filter_end_time }}">
+                </div>
+                <div class="filter-field">
+                    <label for="shadow-page-size">Blockgröße</label>
+                    <select class="filter-select" id="shadow-page-size">
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <button class="filter-btn" id="shadow-filter-apply" type="button">Anwenden</button>
+                <button class="filter-btn" id="shadow-filter-reset" type="button">Zurücksetzen</button>
+                <div class="trade-pagination-controls">
+                    <button class="filter-btn" id="shadow-page-prev" type="button" {% if not pagination.has_prev %}disabled{% endif %}>Zurück</button>
+                    <button class="filter-btn" id="shadow-page-next" type="button" {% if not pagination.has_next %}disabled{% endif %}>Weiter</button>
+                    <span class="trade-pagination-info" id="shadow-pagination-info">
+                        {% if pagination.total_signals %}
+                            {% set start_idx = pagination.page * pagination.page_size + 1 %}
+                            {% set end_idx = pagination.page * pagination.page_size + rows|length %}
+                            Zeige {{ start_idx }}-{{ end_idx }} von {{ pagination.total_signals }} Signalen
+                        {% else %}
+                            Keine Signale
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <table class="profit-trades-table">
+                <thead>
+                    <tr>
+                        {% for col in columns %}
+                        <th>{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="shadow-signals-body">
+                    {% for row in rows %}
+                    <tr>
+                        <td>{{ row["StartTime"] }}</td>
+                        <td>{{ row["EndTime"] }}</td>
+                        <td>{{ row["Coin"] }}</td>
+                        <td>{{ row["Status"] }}</td>
+                        <td>{{ row["Entry"] }}</td>
+                        <td>{{ row["SL"] }}</td>
+                        <td>{{ row["TP"] }}</td>
+                        <td class="{{ row.pnl_class }}">{{ row["PnL"] }}</td>
+                        <td class="{{ row.endprofit_class }}">{{ row["Endprofit +/-"] }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        window.SHADOW_INITIAL = {
+            side: "{{ side }}",
+            startTime: "{{ filter_start_time }}",
+            endTime: "{{ filter_end_time }}",
+            page: {{ trade_page }},
+            pageSize: {{ page_size }},
+        };
+        window.SHADOW_COLUMNS = {{ columns | tojson }};
+    </script>
+    <script src="/static/js/shadow_signals.js"></script>
+</body>
+</html>

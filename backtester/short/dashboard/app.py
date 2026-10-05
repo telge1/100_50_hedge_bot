@@ -3053,11 +3053,15 @@ from collector_health.api import build_router as _build_collector_health_router 
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
 from symbol_onboarding.api import build_router as _build_symbol_onboarding_router  # noqa: E402
 from wall_decision_v1.api import build_router as _build_wall_decision_router  # noqa: E402
+from shadow_signals.api import build_router as _build_shadow_signals_router  # noqa: E402
 app.include_router(
     _build_research_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(
     _build_gold_shadow_router(require_auth=require_auth, render_template=render_template)
+)
+app.include_router(
+    _build_shadow_signals_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(
     _build_market_profile_router(require_auth=require_auth, render_template=render_template)
