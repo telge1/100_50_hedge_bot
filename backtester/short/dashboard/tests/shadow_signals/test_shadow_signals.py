@@ -337,7 +337,9 @@ def test_nav_link_present():
     assert "Shadow Signale" not in html
     assert "/profit-verlauf/gold-shadow" not in html
     assert 'href="/dashboard"' not in html
-    assert 'href="/position-calculator"' not in html
+    assert 'href="/position-calculator"' in html
+    assert "Position Calculator" in html
+    assert "nav-link-position-calculator" in html
 
 
 def test_profit_verlauf_2_untouched():
