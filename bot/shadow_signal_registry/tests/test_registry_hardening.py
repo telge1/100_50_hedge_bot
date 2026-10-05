@@ -382,6 +382,7 @@ def test_summary_unchanged_after_none_normalization() -> None:
 
 def test_snapshot_schema_block_reason_never_null_on_flush(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(store_mod, "RUNTIME", tmp_path)
+    monkeypatch.setenv("SHADOW_CH_SYNC_ENABLED", "0")
     reg = ShadowRegistry("short")
     reg.register_short_product(_short_product())
     reg.flush_snapshots()
