@@ -286,7 +286,7 @@ def test_routes_authenticated_and_api():
 
     page = asyncio.run(call("/profit-verlauf/shadow-signals"))
     assert page.status_code == 200
-    assert "Shadow Signale" in page.text
+    assert "Signal-Verlauf" in page.text
     assert "profit-verlauf-shadow-signals" in (DASHBOARD / "templates" / "shadow_signals.html").read_text()
 
     api = asyncio.run(call("/api/dashboard/shadow-signals?side=short")).json()
@@ -333,7 +333,11 @@ def test_no_scanner_registry_imports():
 def test_nav_link_present():
     html = (DASHBOARD / "templates" / "partials" / "nav.html").read_text(encoding="utf-8")
     assert "/profit-verlauf/shadow-signals" in html
-    assert "Shadow Signale" in html
+    assert "Signal-Verlauf" in html
+    assert "Shadow Signale" not in html
+    assert "/profit-verlauf/gold-shadow" not in html
+    assert 'href="/dashboard"' not in html
+    assert 'href="/position-calculator"' not in html
 
 
 def test_profit_verlauf_2_untouched():
