@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -20,8 +21,9 @@ from bot.e1r_live_scanner.state import Readiness, SymbolState
 
 
 class SymbolProcessor:
-    def __init__(self, config: ScannerConfig | None = None) -> None:
+    def __init__(self, config: ScannerConfig | None = None, registry: Any | None = None) -> None:
         self.config = config or ScannerConfig()
+        self.registry = registry
 
     def _load_end(self, now: datetime | None = None) -> datetime | None:
         if not self.config.live:
@@ -281,6 +283,17 @@ class SymbolProcessor:
                 )
             enriched = enrich_signal_row(row, e1r_eval=e1r_eval, decision_time=decision, state_ts=st.state_ts)
             out.append(enriched)
+        if emit_signals and self.registry and out:
+            from bot.shadow_signal_registry.short_product import consolidate_short_product
+
+            by_pool: dict[str, list[dict]] = defaultdict(list)
+            for row in out:
+                if row.get("pool_id"):
+                    by_pool[row["pool_id"]].append(row)
+            for group in by_pool.values():
+                product = consolidate_short_product(group)
+                if product:
+                    self.registry.register_short_product(product)
         st.note_ts("last_bar", moment)
         return out
 

@@ -62,6 +62,11 @@ Thumbs.db
 *.swo__pycache__/
 *.pyc
 
+# Shadow signal registry + live scanner runtime (local SoT)
+bot/shadow_signal_registry/runtime/
+bot/long_v1_live_scanner/logs/
+bot/long_v1_live_scanner/runtime/
+
 # Bot runtime files
 live_bots/**/state/*.json
 live_bots/**/logs/*.log

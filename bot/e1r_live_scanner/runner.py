@@ -11,10 +11,15 @@ from bot.e1r_live_scanner.logging_store import JsonlSignalLog
 from bot.e1r_live_scanner.processing import SymbolProcessor, data_readiness_row
 from bot.e1r_live_scanner.state import Readiness
 from bot.e1r_live_scanner.universe import log_universe_header, universe_meta
+from bot.long_v1_live_scanner.data_1m import load_1m_bars
+from bot.shadow_signal_registry import ShadowRegistry
+from bot.shadow_signal_registry.ch_config import apply_live_scanner_runtime_env
 
 
 def run_dry_loop(config: ScannerConfig | None = None, once: bool = False) -> None:
     config = config or ScannerConfig(live=True)
+    if config.live:
+        apply_live_scanner_runtime_env()
     if not config.live:
         config = ScannerConfig(
             pane_from=config.pane_from,
@@ -32,7 +37,8 @@ def run_dry_loop(config: ScannerConfig | None = None, once: bool = False) -> Non
     print(log_universe_header(meta), flush=True)
     symbols = list(meta.symbols)
     log = JsonlSignalLog(config.log_path)
-    proc = SymbolProcessor(config)
+    short_registry = ShadowRegistry("short")
+    proc = SymbolProcessor(config, registry=short_registry)
     states: dict[str, object] = {}
     now0 = datetime.now(timezone.utc)
     for sym in symbols:
@@ -133,6 +139,9 @@ def run_dry_loop(config: ScannerConfig | None = None, once: bool = False) -> Non
             }
             log.write_wave_summary(summary)
             print(summary, flush=True)
+
+        short_registry.track_open(load_1m_bars, detected_at)
+        short_registry.flush_snapshots()
 
         if once and catchup_bars == 0:
             break
