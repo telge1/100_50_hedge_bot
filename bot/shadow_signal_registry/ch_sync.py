@@ -5,11 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
 import bot.shadow_signal_registry.store as registry_store
+from bot.shadow_signal_registry.utc_datetime import (
+    ch_datetime64_utc,
+    version_from_utc_datetime,
+)
 
 from bot.shadow_signal_registry.ch_config import (
     SHADOW_CH_DATABASE,
@@ -143,28 +147,8 @@ def pending_path(side: Side) -> Path:
     return registry_store.RUNTIME / f"ch_pending_{side}.jsonl"
 
 
-def _parse_utc(iso: str | None) -> datetime | None:
-    if not iso:
-        return None
-    dt = datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
-
-
-def _ch_datetime(dt: datetime | None) -> datetime | None:
-    """Naive UTC for ClickHouse DateTime64('UTC') inserts."""
-    if dt is None:
-        return None
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)
-
-
 def version_from_updated_at(updated_at: str | None) -> int:
-    if not updated_at:
-        return 0
-    dt = _parse_utc(updated_at)
-    assert dt is not None
-    return int(dt.timestamp() * 1000)
+    return version_from_utc_datetime(updated_at)
 
 
 def content_hash(row: dict[str, Any]) -> str:
@@ -192,9 +176,9 @@ def snapshot_to_ch_row(side: Side, row: dict[str, Any]) -> dict[str, Any]:
         "strategy_version": row.get("strategy_version") or "",
         "symbol": row.get("symbol") or "",
         "side": (row.get("side") or side.upper()).upper(),
-        "decision_time": _ch_datetime(_parse_utc(row.get("decision_time"))),
-        "detected_at": _ch_datetime(_parse_utc(row.get("detected_at") or row.get("decision_time"))),
-        "end_time": _ch_datetime(_parse_utc(row.get("exit_time"))),
+        "decision_time": ch_datetime64_utc(row.get("decision_time")),
+        "detected_at": ch_datetime64_utc(row.get("detected_at") or row.get("decision_time")),
+        "end_time": ch_datetime64_utc(row.get("exit_time")),
         "signal_status": row.get("signal_status") or "",
         "allowed": _u8(row.get("allowed")),
         "blocked": _u8(row.get("blocked")),
@@ -212,13 +196,13 @@ def snapshot_to_ch_row(side: Side, row: dict[str, Any]) -> dict[str, Any]:
         "mae_pct": float(row.get("mae_pct") or 0),
         "mfe_pct": float(row.get("mfe_pct") or 0),
         "duration_min": row.get("duration_min"),
-        "horizon_time": _ch_datetime(_parse_utc(row.get("horizon_time"))),
+        "horizon_time": ch_datetime64_utc(row.get("horizon_time")),
         "backfilled": _u8(row.get("backfilled")),
         "backfill_source": row.get("backfill_source"),
-        "last_processed_1m": _ch_datetime(_parse_utc(row.get("last_processed_1m"))),
+        "last_processed_1m": ch_datetime64_utc(row.get("last_processed_1m")),
         "causality_status": row.get("causality_status") or "PASS",
-        "created_at": _ch_datetime(_parse_utc(row.get("created_at") or row.get("decision_time"))),
-        "updated_at": _ch_datetime(_parse_utc(updated_at)),
+        "created_at": ch_datetime64_utc(row.get("created_at") or row.get("decision_time")),
+        "updated_at": ch_datetime64_utc(updated_at),
         "version": version_from_updated_at(updated_at),
     }
     if side == "long":
@@ -228,7 +212,7 @@ def snapshot_to_ch_row(side: Side, row: dict[str, Any]) -> dict[str, Any]:
                 "m15_lower_2_age_h": row.get("m15_lower_2_age_h"),
                 "be_trigger_pct": row.get("be_trigger_pct"),
                 "be_triggered": _u8(row.get("be_triggered")),
-                "be_trigger_time": _ch_datetime(_parse_utc(row.get("be_trigger_time"))),
+                "be_trigger_time": ch_datetime64_utc(row.get("be_trigger_time")),
             }
         )
     else:
@@ -284,7 +268,9 @@ def _deserialize_pending_row(side: Side, raw: dict[str, Any]) -> dict[str, Any]:
         "updated_at",
     ):
         if key in out and isinstance(out[key], str):
-            out[key] = _parse_utc(out[key])
+            out[key] = ch_datetime64_utc(out[key])
+        elif key in out and isinstance(out[key], datetime):
+            out[key] = ch_datetime64_utc(out[key])
     if side == "long" and "be_trigger_time" not in out:
         pass
     return out
