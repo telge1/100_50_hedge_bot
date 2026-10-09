@@ -1,0 +1,10 @@
+from __future__ import annotations
+
+
+class CompareVerdict:
+    PASS = "PASS"
+    CONFIG_MISMATCH = "CONFIG_MISMATCH"
+    INPUT_MISMATCH = "INPUT_MISMATCH"
+    CONFIG_NOT_AVAILABLE = "CONFIG_NOT_AVAILABLE"
+    NOT_VERIFIED = "NOT_VERIFIED"
+    OUT_OF_COVERAGE = "OUT_OF_COVERAGE"
