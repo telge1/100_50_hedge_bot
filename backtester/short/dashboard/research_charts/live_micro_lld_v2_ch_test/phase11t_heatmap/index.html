@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>Phase 11T isolated remaining-pool heatmap</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0e1116; color: #d5dbe3; font: 14px/1.4 sans-serif; }
+    header { display: flex; gap: 12px; align-items: center; padding: 8px 12px; flex-wrap: wrap; }
+    button { background: #1c2430; color: #d5dbe3; border: 1px solid #3a4658; padding: 6px 10px; cursor: pointer; }
+    button[aria-pressed="true"] { border-color: #00e5ff; color: #fff; }
+    label { display: inline-flex; gap: 6px; align-items: center; }
+    #status { opacity: 0.85; }
+    #wrap { position: relative; height: calc(100% - 84px); }
+    #chart { position: absolute; inset: 0; }
+    #overlay { position: absolute; inset: 0; pointer-events: none; }
+    p { margin: 0 12px 8px; max-width: 980px; }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>DOGEUSDT 5m PD10</strong>
+    <span id="closes"></span>
+    <label><input id="layer-original" type="checkbox" checked /> Original bounds</label>
+    <label><input id="layer-remaining" type="checkbox" checked /> Remaining boxes</label>
+    <span id="status"></span>
+  </header>
+  <p>Isolated historical view. Colored boxes are the untraversed part of original Live Micro LLD V2 pools, not resting order-book size.</p>
+  <div id="wrap">
+    <div id="chart"></div>
+    <canvas id="overlay"></canvas>
+  </div>
+  <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
+  <script src="./viewer.js"></script>
+</body>
+</html>
