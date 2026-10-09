@@ -110,6 +110,13 @@ def _cache_ttl(start: int | None, end: int | None) -> float | None:
         return None
     if end is None:
         return _DEFAULT_WINDOW_TTL
+    # History windows pinned to "now" must not serve a 45s stale tip (looks like
+    # the chart stops days in the past until incremental poll catches up).
+    try:
+        if int(time.time()) - int(end) < 1800:
+            return None
+    except (TypeError, ValueError):
+        pass
     return _HISTORY_TTL
 
 

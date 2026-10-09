@@ -128,12 +128,11 @@ def test_pnl_format_and_colors():
     assert format_endprofit(None, is_open=True) == "OPEN"
 
 
-def test_utc_to_dashboard_tz_display():
+def test_utc_dashboard_time_display():
     utc = datetime(2026, 10, 4, 15, 45, 0, tzinfo=timezone.utc)
     label = format_dashboard_time_label(utc)
-    local = utc.astimezone(DASHBOARD_TZ)
-    assert label == local.strftime("%d.%m.%y, %H:%M:%S")
-    assert "18:45:00" in label
+    assert label == "04.10.26, 15:45:00 UTC"
+    assert "15:45:00" in label
 
 
 def test_filter_dashboard_tz_to_utc():

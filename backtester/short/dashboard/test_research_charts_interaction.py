@@ -150,6 +150,9 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     assert "closedCandleFingerprint" in host
     assert "formingBarForTf" in host
     assert "pollForming(gen)" in host
+    assert "lastClosedBarTime(pane)" in host
+    dec = host[host.index("function resolveScannerCommonDecisionIso") : host.index("function renderEndUnixForScannerPane")]
+    assert "lastClosedBarTime(pane)" in dec
 
 
 def test_host_generation_guard():

@@ -1,3 +1,47 @@
+.research-guard-banner {
+    background: #1e3a5f;
+    border: 1px solid #3b82f6;
+    color: #dbeafe;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+}
+
+.research-guard-warn {
+    color: #fbbf24;
+    background: #422006;
+    border: 1px solid #b45309;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+}
+
+.research-scanner-engine-locked {
+    border-color: #475569;
+    background: #0f172a;
+}
+
+.research-locked-dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 16px;
+    margin: 8px 0 0;
+    font-size: 0.88rem;
+}
+
+.research-locked-dl dt {
+    color: #94a3b8;
+    margin: 0;
+}
+
+.research-locked-dl dd {
+    margin: 0;
+    color: #e2e8f0;
+    font-family: ui-monospace, monospace;
+}
+
 .research-page-header {
     display: flex;
     flex-wrap: wrap;

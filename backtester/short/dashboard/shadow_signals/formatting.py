@@ -1,4 +1,4 @@
-"""Display formatting (mirrors profit-verlauf timezone, not registry exports)."""
+"""Display formatting for shadow-signals dashboard (times in UTC)."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def format_dashboard_time_label(value: Any) -> str:
     dt = _as_utc_datetime(value)
     if dt is None:
         return ""
-    return dt.astimezone(DASHBOARD_TZ).strftime(TIME_LABEL_FORMAT)
+    return dt.strftime(TIME_LABEL_FORMAT) + " UTC"
 
 
 def parse_filter_input_to_utc(value: str | None) -> datetime | None:

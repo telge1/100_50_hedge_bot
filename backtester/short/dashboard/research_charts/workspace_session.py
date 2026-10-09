@@ -316,7 +316,13 @@ class ResearchWorkspace:
             "ezm": self._ezm_snapshot(),
             "pool_signals": self._pool_signals_snapshot(),
             "nested_ask_pool": self._nested_ask_pool_snapshot(),
+            **self._scanner_settings_meta(),
         }
+
+    def _scanner_settings_meta(self) -> dict[str, Any]:
+        from .scanner_settings_guard_v1 import workspace_frozen_engine_parity
+
+        return workspace_frozen_engine_parity()
 
     def _cluster_sweep_snapshot(self) -> dict[str, Any]:
         run = self._cluster_sweep_run or {}
@@ -483,7 +489,10 @@ class ResearchWorkspace:
         if orderbook_levels is not None:
             self.orderbook_levels = normalize_orderbook_levels(orderbook_levels)
         self.persist_settings()
-        return self.snapshot()
+        snap = self.snapshot()
+        if liquidity is not None:
+            snap["settings_affects"] = ["research_lld_only"]
+        return snap
 
     def set_indicator_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
         if name == "stochastic":
@@ -1645,16 +1654,12 @@ class ResearchWorkspace:
         }
         if not cfg.enabled:
             return [], empty_ema, {"3": 0, "4-5": 0, "6+": 0}
-        from .service import lld_config_for_timeframe, select_lld_pools_for_chart, strip_lld_strength_labels
+        from .lld_research_kernel import compute_lld_selected
+        from .service import strip_lld_strength_labels
 
         tf = str(getattr(candles[0], "timeframe", "") or "") if candles else ""
-        cfg = lld_config_for_timeframe(cfg, tf)
-        result = trp["run_liquidity_location"](candles, cfg)
-        result.pools = select_lld_pools_for_chart(
-            result.pools_all,
-            int(cfg.amount),
-            tip=getattr(result, "last_timestamp", None),
-        )
+        selected, cfg, result, _tip = compute_lld_selected(candles, tf, cfg, tip=None)
+        result.pools = selected
         clusters = None
         counts = {"3": 0, "4-5": 0, "6+": 0}
         if cfg.clusters_enabled:

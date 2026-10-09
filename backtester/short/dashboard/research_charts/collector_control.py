@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 
+from .forming_from_ch import forming_bar_from_clickhouse
 from .live_universe import (
     HISTORY_AVAILABLE_AND_LIVE_CONFIGURED,
     HISTORY_AVAILABLE_BUT_NOT_LIVE_CONFIGURED,
@@ -68,39 +69,90 @@ def unavailable_status(*, detail: str = "collector_api_unreachable") -> dict[str
     }
 
 
+def _valid_collector_forming(raw: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    try:
+        ft = int(raw["time"])
+        px = float(raw["close"])
+    except (TypeError, ValueError, KeyError):
+        return None
+    if ft <= 0 or px <= 0:
+        return None
+    return dict(raw)
+
+
+def _stamp_forming_metadata(bar: dict[str, Any], *, source: str) -> dict[str, Any]:
+    out = dict(bar)
+    out["forming_source"] = source
+    out.setdefault("forming", True)
+    try:
+        ft = int(out["time"])
+        out["forming_lag_seconds"] = max(0, int(time.time()) - ft)
+    except (TypeError, ValueError, KeyError):
+        pass
+    return out
+
+
+def _fetch_collector_forming(
+    sym: str, *, timeout: float
+) -> tuple[dict[str, Any] | None, str]:
+    """Return (bar, reason). reason is ok | null_forming | http_error | unreachable."""
+    url = f"{_base()}/api/collector/forming"
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            resp = client.get(url, params={"symbol": sym})
+        if resp.status_code >= 400:
+            return None, "http_error"
+        try:
+            payload = resp.json()
+        except Exception:
+            return None, "http_error"
+        if not isinstance(payload, dict):
+            return None, "null_forming"
+        bar = _valid_collector_forming(payload.get("forming"))
+        if bar is None:
+            return None, "null_forming"
+        return bar, "ok"
+    except (httpx.ConnectError, httpx.TimeoutException):
+        return None, "unreachable"
+    except Exception:
+        return None, "unreachable"
+
+
 def fetch_forming_candle(symbol: str, *, timeout: float = 2.0) -> dict[str, Any] | None:
-    """Return live forming candle; briefly reuse last-good bar if collector returns null.
+    """Collector forming first; ClickHouse partial-bucket fallback for Research UI.
 
     The collector clears forming around minute rolls / reconnect gaps (~10% of polls).
     Without a short hold, Research Charts look frozen even though the next tick is fine.
+    When the control API is down, synthesize from closed 1m in ClickHouse.
     """
     sym = str(symbol or "").strip().upper()
     if not sym:
         return None
 
-    url = f"{_base()}/api/collector/forming"
-    bar: dict[str, Any] | None = None
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            resp = client.get(url, params={"symbol": sym})
-        payload = resp.json()
-        if isinstance(payload, dict):
-            raw = payload.get("forming")
-            if isinstance(raw, dict):
-                bar = raw
-    except Exception:
-        bar = None
-
+    bar, reason = _fetch_collector_forming(sym, timeout=timeout)
     now = time.monotonic()
-    with _forming_lock:
-        if bar is not None:
-            _forming_cache[sym] = (now, dict(bar))
-            return dict(bar)
-        cached = _forming_cache.get(sym)
-        if cached and (now - float(cached[0])) <= _FORMING_HOLD_S:
-            out = dict(cached[1])
-            out["_stale_hold"] = True
-            return out
+    if bar is not None:
+        stamped = _stamp_forming_metadata(bar, source="collector")
+        with _forming_lock:
+            _forming_cache[sym] = (now, dict(stamped))
+        return stamped
+
+    if reason == "null_forming":
+        with _forming_lock:
+            cached = _forming_cache.get(sym)
+            if cached and (now - float(cached[0])) <= _FORMING_HOLD_S:
+                out = _stamp_forming_metadata(dict(cached[1]), source="collector")
+                out["_stale_hold"] = True
+                return out
+
+    try:
+        ch_bar = forming_bar_from_clickhouse(sym)
+    except Exception:
+        ch_bar = None
+    if ch_bar is not None:
+        return ch_bar
     return None
 
 

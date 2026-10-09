@@ -4056,6 +4056,22 @@
       "<div>quality: " + (b.quality_flags || "—") + "</div>";
   }
 
+  function getVisiblePriceRange() {
+    if (!chart || !candleSeries) return null;
+    try {
+      const visible = candleSeries.priceScale && candleSeries.priceScale().getVisibleRange
+        ? candleSeries.priceScale().getVisibleRange()
+        : (chart.priceScale("right").getVisibleRange && chart.priceScale("right").getVisibleRange());
+      if (!visible || visible.from == null || visible.to == null) return null;
+      const lo = Math.min(Number(visible.from), Number(visible.to));
+      const hi = Math.max(Number(visible.from), Number(visible.to));
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+      return { from: lo, to: hi };
+    } catch (e) {
+      return null;
+    }
+  }
+
   function getVisibleTimeRange() {
     if (!chart) return null;
     try {
@@ -6825,6 +6841,7 @@
     tradeBubbleAtUnix: tradeBubbleAtUnix,
     tradeBubbleAtPoint: tradeBubbleAtPoint,
     getVisibleTimeRange: getVisibleTimeRange,
+    getVisiblePriceRange: getVisiblePriceRange,
     setVisibleTimeRange: setVisibleTimeRange,
     focusOnTime: focusOnTime,
     setFollowLive: setFollowLive,
