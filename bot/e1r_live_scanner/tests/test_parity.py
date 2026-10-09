@@ -14,6 +14,7 @@ JUNE_TO = datetime(2026, 6, 30, 23, 59, 59, tzinfo=timezone.utc)
 JUN_JUL_TO = datetime(2026, 7, 31, 23, 59, 59, tzinfo=timezone.utc)
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("symbol", PARITY_COINS)
 def test_june_baseline_and_e1r_parity(symbol: str) -> None:
     r = compare_parity(symbol, JUNE_FROM, JUNE_TO)
@@ -21,6 +22,7 @@ def test_june_baseline_and_e1r_parity(symbol: str) -> None:
     assert r["e1r_parity"], r
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("symbol", PARITY_COINS)
 def test_jun_jul_baseline_and_e1r_parity(symbol: str) -> None:
     r = compare_parity(symbol, JUNE_FROM, JUN_JUL_TO)

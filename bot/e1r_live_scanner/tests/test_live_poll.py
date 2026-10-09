@@ -141,7 +141,7 @@ def test_repeated_poll_no_duplicate(mock_refresh, mock_process):
 
 def test_lld_cache_invalidated_on_append():
     st = SymbolState(symbol="XRPUSDT")
-    st.lld_cache["_ui_selected"] = ("pools", "tip")
+    st.lld_cache[0] = ("pools", "tip")
     st.bars15 = [_bar(datetime(2026, 1, 1, tzinfo=timezone.utc), 0)]
     proc = SymbolProcessor(ScannerConfig(live=True))
 
@@ -151,7 +151,7 @@ def test_lld_cache_invalidated_on_append():
 
     with patch.object(proc, "_fetch_market_and_pane", side_effect=fake_fetch):
         proc.refresh_candles(st, datetime.now(timezone.utc))
-    assert "_ui_selected" not in st.lld_cache
+    assert st.lld_cache == {}
     assert len(st.bars15) == 2
 
 

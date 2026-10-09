@@ -10,6 +10,7 @@ from bot.e1r_live_scanner.config import ScannerConfig
 from bot.e1r_live_scanner.logging_store import JsonlSignalLog
 from bot.e1r_live_scanner.processing import SymbolProcessor, data_readiness_row
 from bot.e1r_live_scanner.state import Readiness
+from bot.e1r_live_scanner.warmup_metrics import WarmupStartupSummary, utc_now_iso
 from bot.e1r_live_scanner.universe import log_universe_header, universe_meta
 from bot.long_v1_live_scanner.data_1m import load_1m_bars
 from bot.shadow_signal_registry import ShadowRegistry
@@ -41,18 +42,46 @@ def run_dry_loop(config: ScannerConfig | None = None, once: bool = False) -> Non
     proc = SymbolProcessor(config, registry=short_registry)
     states: dict[str, object] = {}
     now0 = datetime.now(timezone.utc)
+    startup_started = utc_now_iso()
+    t_startup = time.perf_counter()
+    warmed = 0
+    skipped = 0
+    waiting = 0
+    per_symbol_metrics: list[dict] = []
     for sym in symbols:
         st = proc.load_state(sym, now0)
         if st.readiness == Readiness.DATA_MISSING:
             print(f"SKIP {sym}: {st.data_missing_reason}", flush=True)
+            skipped += 1
             continue
         if st.readiness == Readiness.WAITING_FOR_DATA:
             print(f"WAIT {sym}: {st.data_missing_reason}", flush=True)
             states[sym] = st
+            waiting += 1
             continue
-        proc.warmup(st)
+        metrics = proc.warmup_from_checkpoint_or_full(st, now0)
         states[sym] = st
+        warmed += 1
+        if metrics is not None:
+            summary = metrics.as_summary()
+            log.write_event(summary)
+            print(summary, flush=True)
+            per_symbol_metrics.append(summary)
         print(f"READY {sym} last={st.last_processed_15m_close}", flush=True)
+
+    startup_summary = WarmupStartupSummary(
+        warmup_started_at=startup_started,
+        warmup_finished_at=utc_now_iso(),
+        symbols_total=len(symbols),
+        symbols_warmed=warmed,
+        symbols_skipped=skipped,
+        symbols_waiting=waiting,
+        total_seconds=time.perf_counter() - t_startup,
+        per_symbol=per_symbol_metrics,
+    )
+    if per_symbol_metrics:
+        log.write_event(startup_summary.as_summary())
+        print(startup_summary.as_summary(), flush=True)
 
     while True:
         detected_at = datetime.now(timezone.utc)

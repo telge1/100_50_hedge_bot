@@ -15,20 +15,20 @@ def process_bar_baseline(
     moment: datetime,
     candles15,
     market: dict,
-    lld_cfg,
-    lld_cache: dict,
+    pools: list[dict],
     guard,
     by_open: dict,
     seen_no_guard: set[str],
     seen_with_guard: set[str],
     report_from: datetime,
     report_to: datetime,
+    lld_cfg=None,
+    lld_cache: dict | None = None,
 ) -> list[dict]:
     """
     One closed 15m bar. Mirrors analyze_floor_guard_signal_list_v1.collect_signals loop body.
     """
     ensure_runtime_paths()
-    from dashboard.research_charts.lld_research_kernel import scanner_pools_for_index
     from find_short_entry_15m_v1 import down_4h, entry_setup, last_closed_index, row_for
 
     blocked, reason = guard.advance(bar, moment)
@@ -36,8 +36,6 @@ def process_bar_baseline(
     if moment < report_from or moment > report_to:
         return out
 
-    idx = bar["candle_index"]
-    pools, _ui, _proof = scanner_pools_for_index(candles15, "15m", idx, lld_cfg, cache=lld_cache)
     setup = entry_setup(pools, bar, moment)
     if setup is None:
         return out

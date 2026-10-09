@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from bot.e1r_live_scanner.config import ScannerConfig
 from bot.e1r_live_scanner.parity import PANE_FROM, SIM_FROM, SIM_TO
 from bot.e1r_live_scanner.processing import SymbolProcessor
 
 
+@pytest.mark.slow
 def test_restart_e1r_machine_xrp() -> None:
     cfg = ScannerConfig(
         pane_from=PANE_FROM,

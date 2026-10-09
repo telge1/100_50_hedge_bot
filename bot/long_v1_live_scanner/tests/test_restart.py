@@ -6,6 +6,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from bot.long_v1_live_scanner.config import ScannerConfig
 from bot.long_v1_live_scanner.processing import SymbolProcessor
 from bot.long_v1_live_scanner.state import PersistedState, apply_symbol_snapshot, load_persisted, save_persisted, symbol_snapshot
@@ -14,6 +16,7 @@ JUN_TO = datetime(2026, 6, 15, tzinfo=timezone.utc)
 JUN_FROM = datetime(2026, 6, 1, tzinfo=timezone.utc)
 
 
+@pytest.mark.slow
 def test_restart_no_duplicate_allowed(tmp_path: Path) -> None:
     state_path = tmp_path / "state.json"
     cfg = ScannerConfig(live=False, report_from=JUN_FROM, report_to=JUN_TO, state_path=state_path)

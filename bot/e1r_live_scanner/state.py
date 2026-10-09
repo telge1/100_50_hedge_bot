@@ -27,7 +27,10 @@ class SymbolState:
     by_open: dict = field(default_factory=dict)
     market: dict | None = None
     lld_cache: dict = field(default_factory=dict)
-    lld_cfg: Any = None
+    frozen_lld_cache: dict = field(default_factory=dict)
+    legacy_lld_cache: dict = field(default_factory=dict)
+    frozen_shadow_cache: dict = field(default_factory=dict)
+    lld_cfg: Any = None  # legacy workspace LLD — E1R only; entry_setup uses frozen kernel
 
     floor_guard: Any = None
     seen_no_guard: set[str] = field(default_factory=set)
@@ -35,6 +38,9 @@ class SymbolState:
 
     e1r_engine: Any = None
     state_ts: dict[str, str] = field(default_factory=dict)
+
+    pane_load_seconds: float | None = None
+    strict_complete_buckets: bool | None = None
 
     def note_ts(self, key: str, moment: datetime) -> None:
         self.state_ts[key] = moment.isoformat()

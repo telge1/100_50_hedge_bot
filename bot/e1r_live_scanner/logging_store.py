@@ -21,3 +21,7 @@ class JsonlSignalLog:
         row.setdefault("event", "wave_summary")
         with self.path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, default=str) + "\n")
+
+    def write_event(self, row: dict[str, Any]) -> None:
+        with self.path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, default=str) + "\n")

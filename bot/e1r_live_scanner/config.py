@@ -23,6 +23,11 @@ LIVE_REPORT_TO = datetime(2099, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
 PARITY_COINS = ("XRPUSDT", "ADAUSDT", "DOGEUSDT")
 POLL_SECONDS_DEFAULT = 45
 MAX_CLOSED_15M_LAG_MINUTES_DEFAULT = 25
+FROZEN_POOL_SHADOW_PARITY_DEFAULT = False
+FROZEN_POOL_TRANSITION_PARITY_DEFAULT = True
+USE_RESUME_CHECKPOINT_AT_STARTUP_DEFAULT = True
+REQUIRE_SCANNER_CONFIG_HASH_MATCH_DEFAULT = True
+RESUME_STARTUP_INVARIANT_CHECK_DEFAULT = True
 
 
 def ensure_runtime_paths() -> None:
@@ -68,6 +73,21 @@ class ScannerConfig:
     log_path: Path = field(
         default_factory=lambda: REPO_ROOT / "bot/e1r_live_scanner/logs/signals.jsonl"
     )
+    frozen_pool_shadow_parity: bool = FROZEN_POOL_SHADOW_PARITY_DEFAULT
+    frozen_pool_transition_parity: bool = FROZEN_POOL_TRANSITION_PARITY_DEFAULT
+    frozen_pool_parity_log_path: Path = field(
+        default_factory=lambda: REPO_ROOT / "bot/e1r_live_scanner/logs/frozen_pool_parity.jsonl"
+    )
+    frozen_pool_transition_log_path: Path = field(
+        default_factory=lambda: REPO_ROOT / "bot/e1r_live_scanner/logs/frozen_pool_transition.jsonl"
+    )
+    checkpoint_dir: Path = field(
+        default_factory=lambda: REPO_ROOT / "bot/e1r_live_scanner/runtime/checkpoints"
+    )
+    write_resume_checkpoint: bool = True
+    use_resume_checkpoint_at_startup: bool = USE_RESUME_CHECKPOINT_AT_STARTUP_DEFAULT
+    require_scanner_config_hash_match: bool = REQUIRE_SCANNER_CONFIG_HASH_MATCH_DEFAULT
+    resume_startup_invariant_check: bool = RESUME_STARTUP_INVARIANT_CHECK_DEFAULT
 
     def utc(self, ts: datetime) -> datetime:
         return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)

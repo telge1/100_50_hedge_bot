@@ -18,6 +18,7 @@ LOG_DIR = REPO_ROOT / "bot/long_v1_live_scanner/logs"
 POLL_SECONDS_DEFAULT = 45
 MAX_CLOSED_15M_LAG_MINUTES_DEFAULT = 25
 MAX_CLOSED_1M_LAG_MINUTES_DEFAULT = 5
+LIVE_REPORT_TO = datetime(2099, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
 
 PARITY_COINS = ("DOGEUSDT", "XRPUSDT", "APTUSDT")
 
@@ -78,3 +79,7 @@ class ScannerConfig:
         if not self.live:
             return self.utc(self.report_to)
         return self.utc(now or datetime.now(timezone.utc))
+
+    def effective_report_to(self) -> datetime:
+        """Live shadow: emit through current era; frozen backtests keep ``report_to``."""
+        return LIVE_REPORT_TO if self.live else self.utc(self.report_to)

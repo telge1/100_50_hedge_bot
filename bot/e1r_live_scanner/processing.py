@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from dataclasses import fields
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -17,7 +18,9 @@ from bot.e1r_live_scanner.live_refresh import (
     scan_new_bar_metrics,
     utc,
 )
+from bot.e1r_live_scanner.resume_checkpoint import try_startup_resume, write_read_only_checkpoint
 from bot.e1r_live_scanner.state import Readiness, SymbolState
+from bot.e1r_live_scanner.warmup_metrics import WarmupMetrics, utc_now_iso
 
 
 class SymbolProcessor:
@@ -60,7 +63,10 @@ class SymbolProcessor:
 
         st = SymbolState(symbol=symbol)
         try:
+            t_pane = time.perf_counter()
             market, candles15, bars15, packed, strict = self._fetch_market_and_pane(symbol, now)
+            st.pane_load_seconds = time.perf_counter() - t_pane
+            st.strict_complete_buckets = strict
             if not strict:
                 st.readiness = Readiness.WAITING_FOR_DATA if self.config.live else Readiness.DATA_MISSING
                 st.data_missing_reason = "strict_complete_buckets=False for 15m pane"
@@ -76,6 +82,7 @@ class SymbolProcessor:
             st.by_open = {b["open_time"]: b for b in bars15}
             from dashboard.research_charts.lld_research_kernel import ui_lld_config
 
+            # Legacy workspace LLD — E1R engine only (not productive entry_setup pools).
             st.lld_cfg = ui_lld_config("15m")
             st.floor_guard = H4FloorGuard(symbol, self.config.pane_from, end)
             st.e1r_engine = E1REngine(self.config.e1r_sim_from, utc(end))
@@ -103,7 +110,10 @@ class SymbolProcessor:
 
         end = self._load_end(now) or self.config.pane_to
         if len(bars15) > old_len:
-            st.lld_cache.pop("_ui_selected", None)
+            st.lld_cache.clear()
+            st.frozen_lld_cache.clear()
+            st.legacy_lld_cache.clear()
+            st.frozen_shadow_cache.clear()
         st.market = market
         st.candles15 = candles15
         st.bars15 = bars15
@@ -133,20 +143,139 @@ class SymbolProcessor:
             else:
                 st.readiness = Readiness.LIVE_READY
 
-    def warmup(self, st: SymbolState, through_close: datetime | None = None) -> None:
+    def warmup(self, st: SymbolState, through_close: datetime | None = None) -> WarmupMetrics | None:
         if st.readiness in (Readiness.DATA_MISSING, Readiness.WAITING_FOR_DATA):
-            return
+            return None
+        warmup_started = utc_now_iso()
+        t_total = time.perf_counter()
+        pane_load = float(st.pane_load_seconds or 0.0)
         last = through_close
         if last is None:
             last = st.bars15[-1]["close_time"]
+        last_bar: dict | None = None
+        first_close: datetime | None = None
+        bars_processed = 0
+        t_replay = time.perf_counter()
         for bar in st.bars15:
             ct = bar["close_time"]
             if ct > last:
                 break
+            if first_close is None:
+                first_close = ct
             self._process_one_bar(st, bar, emit_signals=False)
+            last_bar = bar
+            bars_processed += 1
+        replay_seconds = time.perf_counter() - t_replay
         st.last_processed_15m_close = last
+        legacy_prime_seconds = 0.0
+        if last_bar is not None:
+            t_prime = time.perf_counter()
+            self._prime_legacy_transition_cache(st, last_bar)
+            legacy_prime_seconds = time.perf_counter() - t_prime
         st.readiness = Readiness.LIVE_READY
         st.note_ts("live_ready", last)
+        warmup_wall = time.perf_counter() - t_total
+        metrics = WarmupMetrics(
+            symbol=st.symbol,
+            warmup_started_at=warmup_started,
+            warmup_finished_at=utc_now_iso(),
+            bars_processed=bars_processed,
+            first_close=first_close.isoformat() if first_close else None,
+            last_close=last.isoformat() if last else None,
+            pane_load_seconds=pane_load,
+            replay_seconds=replay_seconds,
+            legacy_prime_seconds=legacy_prime_seconds,
+            total_seconds=warmup_wall,
+        )
+        self._write_read_only_checkpoint_after_warmup(st)
+        return metrics
+
+    def _replace_symbol_state(self, target: SymbolState, source: SymbolState) -> None:
+        for field in fields(SymbolState):
+            setattr(target, field.name, getattr(source, field.name))
+
+    def warmup_from_checkpoint_or_full(self, st: SymbolState, now: datetime | None = None) -> WarmupMetrics | None:
+        if not self.config.use_resume_checkpoint_at_startup:
+            return self.warmup(st)
+
+        if st.readiness in (Readiness.DATA_MISSING, Readiness.WAITING_FOR_DATA):
+            return None
+
+        warmup_started = utc_now_iso()
+        t_total = time.perf_counter()
+        pane_load = float(st.pane_load_seconds or 0.0)
+        attempt = try_startup_resume(st, self, config=self.config)
+        if attempt.ok and attempt.loaded is not None and attempt.loaded.metadata is not None:
+            last = st.last_processed_15m_close
+            meta = attempt.loaded.metadata
+            metrics = WarmupMetrics(
+                symbol=st.symbol,
+                warmup_started_at=warmup_started,
+                warmup_finished_at=utc_now_iso(),
+                bars_processed=attempt.tail_bars_processed,
+                first_close=meta.get("checkpoint_decision_close"),
+                last_close=last.isoformat() if last is not None else None,
+                pane_load_seconds=pane_load,
+                replay_seconds=attempt.tail_seconds,
+                legacy_prime_seconds=attempt.legacy_prime_seconds,
+                total_seconds=time.perf_counter() - t_total,
+                startup_mode="resume",
+                resume_used=True,
+                checkpoint_schema_version=meta.get("schema_version"),
+                checkpoint_decision_close=meta.get("checkpoint_decision_close"),
+                resume_load_seconds=round(attempt.load_seconds, 3),
+                resume_prime_seconds=round(attempt.restore_seconds + attempt.prime_seconds, 3),
+                resume_tail_seconds=round(attempt.tail_seconds, 3),
+            )
+            self._write_read_only_checkpoint_after_warmup(st)
+            return metrics
+
+        reason = attempt.fallback_reason or "resume_failed"
+        fresh = self.load_state(st.symbol, now)
+        self._replace_symbol_state(st, fresh)
+        if st.readiness in (Readiness.DATA_MISSING, Readiness.WAITING_FOR_DATA):
+            return None
+        metrics = self.warmup(st)
+        if metrics is None:
+            return None
+        return WarmupMetrics(
+            symbol=metrics.symbol,
+            warmup_started_at=metrics.warmup_started_at,
+            warmup_finished_at=metrics.warmup_finished_at,
+            bars_processed=metrics.bars_processed,
+            first_close=metrics.first_close,
+            last_close=metrics.last_close,
+            pane_load_seconds=metrics.pane_load_seconds,
+            replay_seconds=metrics.replay_seconds,
+            legacy_prime_seconds=metrics.legacy_prime_seconds,
+            total_seconds=metrics.total_seconds,
+            startup_mode="fallback_full",
+            resume_used=False,
+            resume_fallback_reason=reason,
+            checkpoint_schema_version=(
+                attempt.loaded.metadata.get("schema_version") if attempt.loaded and attempt.loaded.metadata else None
+            ),
+            checkpoint_decision_close=(
+                attempt.loaded.metadata.get("checkpoint_decision_close")
+                if attempt.loaded and attempt.loaded.metadata
+                else None
+            ),
+            resume_load_seconds=round(attempt.load_seconds, 3) if attempt.load_seconds else None,
+            resume_prime_seconds=round(attempt.restore_seconds + attempt.prime_seconds, 3)
+            if (attempt.restore_seconds or attempt.prime_seconds)
+            else None,
+            resume_tail_seconds=None,
+        )
+
+    def _write_read_only_checkpoint_after_warmup(self, st: SymbolState) -> None:
+        if not self.config.write_resume_checkpoint:
+            return
+        if st.last_processed_15m_close is None or not st.strict_complete_buckets:
+            return
+        try:
+            write_read_only_checkpoint(st, self.config)
+        except Exception:
+            return
 
     def replay_through(
         self, symbol: str, through_close: datetime, *, emit_signals: bool = True
@@ -240,10 +369,92 @@ class SymbolProcessor:
         _ = (time.perf_counter() - t0) * 1000
         return res
 
+    def _prime_legacy_transition_cache(self, st: SymbolState, bar: dict) -> None:
+        if not self.config.frozen_pool_transition_parity:
+            return
+        from bot.e1r_live_scanner.frozen_pool_transition import prime_legacy_transition_cache
+
+        prime_legacy_transition_cache(
+            candles15=st.candles15,
+            lld_cfg=st.lld_cfg,
+            legacy_lld_cache=st.legacy_lld_cache,
+            bar=bar,
+        )
+
     def _process_one_bar(self, st: SymbolState, bar: dict, *, emit_signals: bool) -> list[dict]:
         moment = bar["close_time"]
         i = bar["candle_index"]
         st.e1r_engine.process_bar(i, bar, st.bars15, st.candles15, st.lld_cfg, st.lld_cache)
+
+        from bot.e1r_live_scanner.frozen_pool_transition import (
+            REASON_KERNEL_ERROR,
+            run_transition_parity,
+        )
+        from bot.e1r_live_scanner.frozen_pool_shadow import maybe_run_frozen_pool_shadow_parity
+        from bot.e1r_live_scanner.short_pools import available_for_short_entry
+        from dashboard.research_charts.frozen_pool_kernel_v1 import FrozenPoolKernelError
+
+        block_signals = False
+        block_reason: str | None = None
+        try:
+            frozen_result = available_for_short_entry(
+                st.symbol,
+                st.candles15,
+                moment,
+                frozen_lld_cache=st.frozen_lld_cache,
+            )
+            pools = frozen_result.available
+        except FrozenPoolKernelError as exc:
+            block_signals = True
+            block_reason = REASON_KERNEL_ERROR
+            if emit_signals and self.config.frozen_pool_transition_parity:
+                from bot.e1r_live_scanner.frozen_pool_transition import append_transition_log
+
+                append_transition_log(
+                    {
+                        "symbol": st.symbol,
+                        "decision_time": moment.isoformat(),
+                        "status": "KERNEL_ERROR",
+                        "reason_code": REASON_KERNEL_ERROR,
+                        "error": str(exc),
+                    },
+                    self.config.frozen_pool_transition_log_path,
+                )
+            pools = []
+        else:
+            if emit_signals:
+                parity = run_transition_parity(
+                    enabled=self.config.frozen_pool_transition_parity,
+                    log_path=self.config.frozen_pool_transition_log_path,
+                    symbol=st.symbol,
+                    bar=bar,
+                    candles15=st.candles15,
+                    lld_cfg=st.lld_cfg,
+                    legacy_lld_cache=st.legacy_lld_cache,
+                    frozen_result=frozen_result,
+                )
+                if parity.block_signals:
+                    block_signals = True
+                    block_reason = parity.reason_code
+
+        maybe_run_frozen_pool_shadow_parity(
+            enabled=self.config.frozen_pool_shadow_parity,
+            log_path=self.config.frozen_pool_parity_log_path,
+            symbol=st.symbol,
+            bar=bar,
+            candles15=st.candles15,
+            lld_cfg=st.lld_cfg,
+            lld_cache=st.legacy_lld_cache,
+            frozen_shadow_cache=st.frozen_lld_cache,
+        )
+
+        if block_signals:
+            st.floor_guard.advance(bar, moment)
+            if emit_signals:
+                st.note_ts("frozen_pool_blocked", moment)
+                if block_reason:
+                    st.state_ts["frozen_pool_block_reason"] = block_reason
+            return []
 
         baseline_rows = process_bar_baseline(
             st.symbol,
@@ -251,8 +462,7 @@ class SymbolProcessor:
             moment=moment,
             candles15=st.candles15,
             market=st.market,
-            lld_cfg=st.lld_cfg,
-            lld_cache=st.lld_cache,
+            pools=pools,
             guard=st.floor_guard,
             by_open=st.by_open,
             seen_no_guard=st.seen_no_guard,
@@ -306,11 +516,14 @@ class SymbolProcessor:
         refresh_ms = (time.perf_counter() - t_refresh) * 1000
         bar = st.bars15[-1]
         t0 = time.perf_counter()
-        ensure_runtime_paths()
-        from dashboard.research_charts.lld_research_kernel import scanner_pools_for_index
+        from bot.e1r_live_scanner.short_pools import available_for_short_entry
 
-        idx = bar["candle_index"]
-        scanner_pools_for_index(st.candles15, "15m", idx, st.lld_cfg, cache=st.lld_cache)
+        available_for_short_entry(
+            st.symbol,
+            st.candles15,
+            bar["close_time"],
+            frozen_lld_cache=st.frozen_lld_cache,
+        )
         lld_ms = (time.perf_counter() - t0) * 1000
 
         t_g = time.perf_counter()
@@ -322,14 +535,19 @@ class SymbolProcessor:
         e1r_ms = (time.perf_counter() - t_e) * 1000
 
         t_b = time.perf_counter()
+        frozen = available_for_short_entry(
+            st.symbol,
+            st.candles15,
+            bar["close_time"],
+            frozen_lld_cache=st.frozen_lld_cache,
+        )
         process_bar_baseline(
             st.symbol,
             bar,
             moment=bar["close_time"],
             candles15=st.candles15,
             market=st.market,
-            lld_cfg=st.lld_cfg,
-            lld_cache=st.lld_cache,
+            pools=frozen.available,
             guard=st.floor_guard,
             by_open=st.by_open,
             seen_no_guard=set(st.seen_no_guard),

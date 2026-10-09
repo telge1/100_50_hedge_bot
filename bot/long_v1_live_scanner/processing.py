@@ -18,6 +18,7 @@ from bot.long_v1_live_scanner.live_refresh import (
 )
 from bot.long_v1_live_scanner.management import ShadowTrade, log_row_from_trade, process_one_1m_bar
 from bot.long_v1_live_scanner.state import Readiness, SymbolState
+from bot.common_causal_pools_v1 import common_causal_pools_from_loaded_pane
 
 
 class SymbolProcessor:
@@ -85,7 +86,7 @@ class SymbolProcessor:
             st.data_missing_reason = "no 15m bars after refresh"
             return
         if len(bars15) > old_len:
-            st.lld_cache.pop("_ui_selected", None)
+            st.lld_cache.clear()
         st.candles15 = candles15
         st.bars15 = bars15
         st.by_open = {b["open_time"]: b for b in bars15}
@@ -239,11 +240,15 @@ class SymbolProcessor:
         report_to: datetime | None = None,
     ) -> list[dict]:
         ensure_runtime_paths()
-        from dashboard.research_charts.lld_research_kernel import scanner_pools_for_index
-
         moment = bar["close_time"]
-        idx = bar["candle_index"]
-        pools, _ui, _proof = scanner_pools_for_index(st.candles15, "15m", idx, st.lld_cfg, cache=st.lld_cache)
+        common = common_causal_pools_from_loaded_pane(
+            st.symbol,
+            st.candles15,
+            moment,
+            timeframe="15m",
+            cache=st.lld_cache,
+        )
+        pools = common.available
         sig = evaluate_geometry_bar(st.symbol, pools, bar, moment, st.by_open)
         if sig is None:
             return []
@@ -251,14 +256,20 @@ class SymbolProcessor:
         pool_id = sig["pool_id"]
         if pool_id in st.seen_pool_ids:
             return []
+
+        rf = report_from or self.config.report_from
+        if report_to is not None:
+            rt = report_to
+        elif self.config.live:
+            rt = self.config.effective_report_to()
+        else:
+            rt = self.config.report_to
+        if moment < rf or moment > rt:
+            return []
+
         st.seen_pool_ids.add(pool_id)
 
         if not emit_signals:
-            return []
-
-        rf = report_from or self.config.report_from
-        rt = report_to or self.config.report_to
-        if moment < rf or moment > rt:
             return []
 
         ts = log_ts or moment
