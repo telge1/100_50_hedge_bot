@@ -1,0 +1,21 @@
+{
+  "symbol": "XRPUSDT",
+  "calibrate_from": "2026-03-17T00:00:00+00:00",
+  "calibrate_to": "2026-05-17T20:00:00+00:00",
+  "fitted": false,
+  "thresholds": {
+    "symbol": "XRPUSDT",
+    "lookback_days": 180,
+    "cluster_gap_pct": 3.0,
+    "standalone_gap_pct": 3.0,
+    "wide_upper_gap_pct": 4.5,
+    "min_stair_steps": 2,
+    "stair_drop_pct": 6.0,
+    "stair_separation_pct": 1.2,
+    "relevant_pool_width_pct": 2.5,
+    "reclaim_from_low_pct": 10.0,
+    "floor_hold_bars": 30,
+    "floor_clear_bars": 18,
+    "floor_break_pct": 1.5
+  }
+}
