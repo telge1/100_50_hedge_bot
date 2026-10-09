@@ -50,10 +50,15 @@ def replay(
     old_lower: Zone | None = None
     tail: Zone | None = None
     floor_seen = False
+    climb = _Climb()
     stamps: list[PhaseStamp] = []
 
     for obs in samples:
         picture = zones_at(pools, obs.as_of, profile)
+        if phase is Phase.UPPER_BUILD:
+            _track_climb(climb, obs, picture, profile)
+        else:
+            climb.clear()
         desired, desired_reason, seen_tagged, seen_leg, seen_lower, seen_tail, seen_floor = _desired(
             phase,
             obs,
@@ -66,6 +71,7 @@ def replay(
             tail=tail,
             floor_seen=floor_seen,
             delta_taken=delta_taken,
+            ceiling=climb.ceiling if climb.failed else None,
         )
         if desired in (Phase.STAIR_DOWN, Phase.EXHAUSTED):
             if seen_tail is not None:
@@ -111,6 +117,65 @@ def replay(
     return stamps
 
 
+class _Climb:
+    """The high of an upper leg, the pullback under it, and a later high that fails to beat it."""
+
+    def __init__(self) -> None:
+        self.clear()
+
+    def clear(self) -> None:
+        self.swing_high = 0.0
+        self.swing_low = 0.0
+        self.swing_at: datetime | None = None
+        self.trough_low = 0.0
+        self.trough_high = 0.0
+        self.retest_high = 0.0
+        self.failed = False
+        self.ceiling: Zone | None = None
+
+
+def _track_climb(climb: _Climb, obs: Observation, zones: list[Zone], profile: PatternProfile) -> None:
+    if obs.high > climb.swing_high:
+        climb.swing_high = obs.high
+        climb.swing_low = obs.low
+        climb.swing_at = obs.as_of
+        climb.trough_low = obs.low
+        climb.trough_high = obs.high
+        climb.retest_high = 0.0
+        climb.failed = False
+        climb.ceiling = None
+    ceiling = _gap_ceiling(zones, climb.swing_high, profile)
+    climb.ceiling = ceiling
+    if ceiling is None or obs.as_of == climb.swing_at:
+        climb.failed = False
+        return
+    if obs.low < climb.trough_low:
+        climb.trough_low = obs.low
+        climb.trough_high = obs.high
+        climb.retest_high = 0.0
+        climb.failed = False
+    if climb.trough_low >= climb.swing_low:
+        return
+    if climb.retest_high > 0.0 and obs.high < climb.retest_high:
+        climb.failed = True
+        return
+    if climb.trough_high < obs.high < climb.swing_high and obs.high > climb.retest_high:
+        climb.retest_high = obs.high
+        climb.failed = False
+
+
+def _gap_ceiling(zones: list[Zone], swing_high: float, profile: PatternProfile) -> Zone | None:
+    """The upper the swing high reached, when the next pool above it is at least 4.5 % away."""
+    hit = [zone for zone in relevant(zones, "upper") if zone.low <= swing_high <= zone.high]
+    if not hit:
+        return None
+    zone = min(hit, key=lambda item: item.low)
+    nxt, gap = next_relevant_above(zones, zone.high)
+    if nxt is None or gap < profile.wide_upper_gap_pct:
+        return None
+    return zone
+
+
 def _desired(
     phase: Phase,
     obs: Observation,
@@ -124,6 +189,7 @@ def _desired(
     tail: Zone | None,
     floor_seen: bool,
     delta_taken: bool,
+    ceiling: Zone | None = None,
 ) -> tuple[Phase, str, Zone | None, datetime | None, Zone | None, Zone | None, bool]:
     uppers = relevant(zones, "upper")
     entered = [
@@ -146,6 +212,8 @@ def _desired(
         return Phase.NEUTRAL, "not_scanned", tagged, leg_at, old_lower, None, False
 
     if phase is Phase.UPPER_BUILD:
+        if ceiling is not None and _stair_ready(obs, zones, pools, profile, ceiling, leg_at):
+            return Phase.STAIR_DOWN, "failed_high_under_gap", ceiling, leg_at, old_lower, None, False
         if tagged is not None and _stair_ready(obs, zones, pools, profile, tagged, leg_at):
             return Phase.STAIR_DOWN, "collecting_lower_pools", tagged, leg_at, old_lower, None, False
         staffel = tagged is not None and obs.close < tagged.low
@@ -166,7 +234,7 @@ def _desired(
                 False,
             )
         dest = _next_lower(zones, old_lower, tail, profile)
-        settled = _floor_settled(obs, zones, dest, profile, floor_seen, tail)
+        settled = _floor_settled(obs, zones, dest, profile, floor_seen, tail, leg_at)
         turned = _turned_up(obs, zones, dest, settled)
         if turned is not None:
             leg = obs.as_of
@@ -179,12 +247,12 @@ def _desired(
                 None,
                 False,
             )
-        if dest is not None and _reached_old_lower(obs, zones, dest, profile):
+        if dest is not None and _reached_old_lower(obs, zones, dest, profile, leg_at):
             return Phase.EXHAUSTED, "old_lower_reached", tagged, leg_at, old_lower, dest, settled
         return Phase.STAIR_DOWN, "collecting_lower_pools", tagged, leg_at, old_lower, dest, settled
 
     dest = _next_lower(zones, old_lower, tail, profile)
-    settled = _floor_settled(obs, zones, dest, profile, floor_seen, tail)
+    settled = _floor_settled(obs, zones, dest, profile, floor_seen, tail, leg_at)
     turned = _turned_up(obs, zones, dest, settled)
     if turned is not None:
         leg = obs.as_of
@@ -278,9 +346,16 @@ def _next_lower(
     return anchor if best is None else best
 
 
-def _deeper_lower(zones: list[Zone], followed: Zone, profile: PatternProfile) -> bool:
+def _deeper_lower(
+    zones: list[Zone],
+    followed: Zone,
+    profile: PatternProfile,
+    leg_at: datetime | None,
+) -> bool:
     limit = followed.low * (1.0 - profile.standalone_gap_pct / 100.0)
-    return any(zone.high <= limit for zone in relevant(zones, "lower"))
+    if leg_at is None:
+        return any(zone.high <= limit for zone in relevant(zones, "lower"))
+    return any(zone.born <= leg_at and zone.high <= limit for zone in relevant(zones, "lower"))
 
 
 def _floor_settled(
@@ -290,8 +365,9 @@ def _floor_settled(
     profile: PatternProfile,
     floor_seen: bool,
     prior: Zone | None,
+    leg_at: datetime | None,
 ) -> bool:
-    if followed is None or _deeper_lower(zones, followed, profile):
+    if followed is None or _deeper_lower(zones, followed, profile, leg_at):
         return False
     tagged = obs.low <= followed.low * (1.0 + profile.standalone_gap_pct / 100.0)
     if prior is not None and followed.low < prior.low:
@@ -320,7 +396,13 @@ def _old_lower(zones: list[Zone], price: float, leg_at: datetime) -> Zone | None
     return max(candidates, key=lambda zone: zone.high)
 
 
-def _reached_old_lower(obs: Observation, zones: list[Zone], old_lower: Zone, profile: PatternProfile) -> bool:
+def _reached_old_lower(
+    obs: Observation,
+    zones: list[Zone],
+    old_lower: Zone,
+    profile: PatternProfile,
+    leg_at: datetime | None,
+) -> bool:
     """The stair ends at the bottom of the last old lower, held as support.
 
     A wick into the top of a wide lower zone is still a step of the fall.
@@ -331,7 +413,9 @@ def _reached_old_lower(obs: Observation, zones: list[Zone], old_lower: Zone, pro
     if obs.close > floor:
         return False
     limit = old_lower.low * (1.0 - profile.standalone_gap_pct / 100.0)
-    return not any(zone.high <= limit for zone in relevant(zones, "lower"))
+    if leg_at is None:
+        return not any(zone.high <= limit for zone in relevant(zones, "lower"))
+    return not any(zone.born <= leg_at and zone.high <= limit for zone in relevant(zones, "lower"))
 
 
 def _fresh_upper(obs: Observation, zones: list[Zone], old_lower: Zone | None) -> Zone | None:

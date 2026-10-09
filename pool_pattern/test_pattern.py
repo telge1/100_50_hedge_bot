@@ -3,7 +3,9 @@
 from datetime import datetime, timedelta, timezone
 
 from pool_pattern.confirm_15m import annotate
+from pool_pattern.excursion import measure
 from pool_pattern.machine import Phase, PhaseStamp, replay
+from pool_pattern.signal import Signal, SignalStamp, read_signals
 from pool_pattern.market import Bar, Observation, ensure_paths
 from pool_pattern.profile import PatternProfile
 from pool_pattern.snapshot import next_relevant_above, zones_at
@@ -178,6 +180,29 @@ def test_the_rise_starts_after_the_last_lower_pool() -> None:
     assert stamps[6].phase is Phase.UPPER_BUILD
 
 
+def test_a_later_born_deeper_lower_does_not_block_the_next_rise() -> None:
+    born = _moment(1, 0)
+    later = _moment(2, 16)
+    pools = [
+        *_stack("upper", 1.00, born),
+        *_stack("upper", 0.78, born),
+        _pool("lower", 0.70, 0.74, born),
+        _pool("lower", 0.64, 0.66, later),
+    ]
+    samples = [
+        _obs(2, 0, 1.015, high=1.02, low=1.01, up=True),
+        _obs(2, 4, 1.016, high=1.02, low=1.01, up=True),
+        _obs(2, 8, 0.900, high=0.910, low=0.890, up=False),
+        _obs(2, 12, 0.720, high=0.730, low=0.705, up=False),
+        _obs(2, 16, 0.730, high=0.735, low=0.725, up=False),
+        _obs(2, 20, 0.800, high=0.810, low=0.790, up=True),
+    ]
+    stamps = replay(samples, pools, PatternProfile())
+    assert stamps[3].phase is Phase.STAIR_DOWN
+    assert stamps[4].phase is Phase.STAIR_DOWN
+    assert stamps[5].phase is Phase.UPPER_BUILD
+
+
 def test_a_new_upper_below_a_broken_stair_starts_again() -> None:
     born = _moment(1, 0)
     leg = _moment(2, 4)
@@ -266,6 +291,136 @@ def test_15m_rejects_a_fall_that_goes_back_into_the_upper() -> None:
     assert noted[-1].confirmed is False
 
 
+def _hold_bars(moment, *, minutes: int, count: int, close: float) -> list[Bar]:
+    step = timedelta(minutes=minutes)
+    return [Bar(moment + step * index, close, close + 0.01, close - 0.01, close) for index in range(count)]
+
+
+def test_a_confirmed_stair_is_a_short_and_a_confirmed_upper_is_a_long() -> None:
+    moment = _moment(2, 16)
+    before = PhaseStamp(moment - timedelta(hours=4), Phase.UPPER_BUILD, "working_upper_cluster", upper_low=1.00)
+    stair = PhaseStamp(moment, Phase.STAIR_DOWN, "collecting_lower_pools", upper_low=1.00, lower_high=0.70)
+    upper = PhaseStamp(
+        moment + timedelta(hours=4),
+        Phase.UPPER_BUILD,
+        "left_lower_zone",
+        upper_low=1.00,
+        lower_high=0.70,
+    )
+    still = PhaseStamp(
+        moment + timedelta(hours=12),
+        Phase.UPPER_BUILD,
+        "working_upper_cluster",
+        upper_low=1.00,
+        lower_high=0.70,
+    )
+    bars_15m = [
+        Bar(moment - timedelta(hours=2), 1.02, 1.05, 1.01, 1.02),
+        Bar(moment - timedelta(minutes=15), 0.98, 0.99, 0.97, 0.98),
+        *_hold_bars(moment, minutes=15, count=32, close=0.80),
+    ]
+    bars_1h = [
+        Bar(moment - timedelta(hours=1), 0.98, 1.05, 0.97, 0.98),
+        *_hold_bars(moment, minutes=60, count=8, close=0.80),
+    ]
+    noted = read_signals([before, stair, upper, still], bars_15m, bars_1h)
+    assert noted[1].signal is Signal.SHORT
+    assert noted[2].signal is Signal.LONG
+
+
+def test_a_later_touch_in_the_same_stair_is_no_trade() -> None:
+    moment = _moment(2, 16)
+    again = PhaseStamp(moment + timedelta(hours=4), Phase.STAIR_DOWN, "collecting_lower_pools", upper_low=1.00)
+    before = PhaseStamp(moment - timedelta(hours=4), Phase.STAIR_DOWN, "collecting_lower_pools", upper_low=1.00)
+    bars_15m = [
+        Bar(moment - timedelta(hours=2), 1.02, 1.05, 1.01, 1.02),
+        Bar(moment - timedelta(minutes=15), 0.98, 0.99, 0.97, 0.98),
+        *_hold_bars(moment, minutes=15, count=16, close=0.96),
+    ]
+    bars_1h = [
+        Bar(moment - timedelta(hours=1), 0.98, 1.05, 0.97, 0.98),
+        *_hold_bars(moment, minutes=60, count=4, close=0.96),
+    ]
+    assert read_signals([before, again], bars_15m, bars_1h)[-1].signal is Signal.NONE
+
+
+def test_one_timeframe_or_an_exhausted_phase_is_no_trade() -> None:
+    moment = _moment(2, 16)
+    stair = PhaseStamp(moment, Phase.STAIR_DOWN, "collecting_lower_pools", upper_low=1.00)
+    exhausted = PhaseStamp(moment, Phase.EXHAUSTED, "old_lower_reached", upper_low=1.00, lower_high=0.70)
+    held_15m = [
+        Bar(moment - timedelta(hours=2), 1.02, 1.05, 1.01, 1.02),
+        Bar(moment - timedelta(minutes=15), 0.98, 0.99, 0.97, 0.98),
+        *_hold_bars(moment, minutes=15, count=16, close=0.96),
+    ]
+    reclaimed_1h = [
+        Bar(moment - timedelta(hours=1), 0.98, 1.05, 0.97, 0.98),
+        *_hold_bars(moment, minutes=60, count=4, close=1.02),
+    ]
+    assert read_signals([stair], held_15m, reclaimed_1h)[0].signal is Signal.NONE
+    both = [
+        Bar(moment - timedelta(hours=1), 0.98, 1.05, 0.97, 0.98),
+        *_hold_bars(moment, minutes=60, count=4, close=0.96),
+    ]
+    assert read_signals([exhausted], held_15m, both)[0].signal is Signal.NONE
+
+
+def test_a_failed_retest_under_a_wide_gap_starts_the_stair() -> None:
+    born = _moment(1, 0)
+    gone = _moment(2, 16)
+    base = [
+        _pool("upper", 1.00, 1.02, born, gone),
+        _pool("upper", 1.01, 1.03, born, gone),
+        _pool("upper", 1.02, 1.04, born, gone),
+    ]
+    top_born = _moment(3, 4)
+    top = [
+        _pool("upper", 1.095, 1.105, top_born),
+        _pool("upper", 1.098, 1.110, top_born),
+        _pool("upper", 1.100, 1.112, top_born),
+    ]
+    pools = [*base, *top, *_stack("upper", 1.17, born), _pool("lower", 0.80, 0.84, born)]
+    samples = [
+        _obs(2, 0, 1.025, high=1.030, low=1.015, up=True),
+        _obs(2, 4, 1.030, high=1.035, low=1.020, up=True),
+        _obs(2, 8, 1.040, high=1.050, low=1.030, up=True),
+        _obs(2, 12, 1.055, high=1.070, low=1.045, up=True),
+        _obs(2, 16, 1.065, high=1.080, low=1.055, up=True),
+        _obs(2, 20, 1.075, high=1.085, low=1.065, up=True),
+        _obs(3, 0, 1.080, high=1.095, low=1.070, up=True),
+        _obs(3, 4, 1.050, high=1.070, low=1.040, up=False),
+        _obs(3, 8, 1.055, high=1.065, low=1.045, up=False),
+        _obs(3, 12, 1.070, high=1.085, low=1.055, up=True),
+        _obs(3, 16, 1.050, high=1.060, low=1.045, up=False),
+        _obs(3, 20, 1.045, high=1.055, low=1.040, up=False),
+    ]
+    stamps = replay(samples, pools, PatternProfile())
+    assert stamps[6].phase is Phase.UPPER_BUILD
+    assert stamps[9].phase is Phase.UPPER_BUILD
+    assert stamps[-1].phase is Phase.STAIR_DOWN
+    assert stamps[-1].reason == "failed_high_under_gap"
+    assert stamps[-1].upper_low is not None and stamps[-1].upper_low > 1.05
+
+
+def test_mfe_and_mae_follow_the_path_until_the_next_signal() -> None:
+    moment = _moment(2, 16)
+    long = SignalStamp(moment, Signal.LONG, Phase.UPPER_BUILD, "confirmed_upper")
+    short = SignalStamp(moment + timedelta(hours=4), Signal.SHORT, Phase.STAIR_DOWN, "confirmed_stair")
+    bars = [
+        Bar(moment, 1.00, 1.00, 0.98, 0.99),
+        Bar(moment + timedelta(minutes=15), 0.99, 1.05, 0.99, 1.02),
+        Bar(moment + timedelta(minutes=30), 1.02, 1.08, 0.90, 1.04),
+        Bar(moment + timedelta(hours=4), 1.00, 1.03, 0.97, 0.99),
+        Bar(moment + timedelta(hours=4, minutes=15), 0.99, 0.99, 0.95, 0.96),
+    ]
+    noted = measure([long, short], bars, {long.as_of: 1.0, short.as_of: 1.0})
+    assert round(noted[0].mae_before_profit_pct or 0, 2) == 2.0
+    assert round(noted[0].mfe_pct, 2) == 8.0
+    assert round(noted[0].mae_pct, 2) == 10.0
+    assert noted[1].mae_before_profit_pct is not None
+    assert noted[1].until is None
+
+
 def test_15m_does_not_change_the_4h_phase() -> None:
     born = _moment(1, 0)
     pools = [*_stack("upper", 1.00, born), _pool("lower", 0.78, 0.82, born)]
@@ -299,5 +454,10 @@ if __name__ == "__main__":
     test_15m_confirms_the_fall_after_the_upper_is_taken()
     test_1h_confirms_the_same_fall_without_a_later_bar()
     test_15m_rejects_a_fall_that_goes_back_into_the_upper()
+    test_a_confirmed_stair_is_a_short_and_a_confirmed_upper_is_a_long()
+    test_one_timeframe_or_an_exhausted_phase_is_no_trade()
+    test_a_later_touch_in_the_same_stair_is_no_trade()
+    test_a_failed_retest_under_a_wide_gap_starts_the_stair()
+    test_mfe_and_mae_follow_the_path_until_the_next_signal()
     test_15m_does_not_change_the_4h_phase()
     print("ok")

@@ -7,5 +7,6 @@ The 4h sequence comes from the liquidity-location clusters.
 from pool_pattern.confirm_15m import annotate
 from pool_pattern.machine import Phase, replay
 from pool_pattern.profile import PatternProfile
+from pool_pattern.signal import Signal, read_signals
 
-__all__ = ["PatternProfile", "Phase", "annotate", "replay"]
+__all__ = ["PatternProfile", "Phase", "Signal", "annotate", "read_signals", "replay"]

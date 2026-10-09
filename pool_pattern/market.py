@@ -6,6 +6,7 @@ The phase code keeps the LiquidityPool objects. A stripped copy cannot be cluste
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -75,6 +76,7 @@ def load_4h(symbol: str, start: datetime, end: datetime):
     ]
     trp = load_trp()
     cfg = lld_config_for_timeframe(trp["LiquidityLocationConfig"].defaults(), "4h")
+    cfg = replace(cfg, amount=2000, highest_len=3, lowest_len=3)
     result = trp["run_liquidity_location"](candles, cfg)
     pools = list(getattr(result, "pools_all", None) or result.pools)
     return bars, pools
