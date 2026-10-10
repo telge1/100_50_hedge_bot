@@ -158,3 +158,12 @@ results/pool_order_plan_v1/
 dashboard/wall_decision_v1/screenshots/
 dashboard/wall_decision_v1/screenshots_real_mp_3012/
 dashboard/logs/wall_decision_shadow/
+
+# Live Micro LLD V2 historical production trees (code + reports tracked separately)
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/production/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/inputs/*.parquet
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11l/runs/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11m/runs/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11o_single_worker_benchmark/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/research_runs/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/report_archives/

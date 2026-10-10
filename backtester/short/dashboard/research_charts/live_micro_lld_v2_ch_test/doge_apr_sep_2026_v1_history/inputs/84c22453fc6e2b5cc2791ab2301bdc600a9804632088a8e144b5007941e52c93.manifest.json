@@ -1,0 +1,21 @@
+{
+  "candle_content_hash": "d489aa686f6f648850f248d4809338abbee0d7ab6f0bda3ec5ffe3e698757f48",
+  "created_at": "2026-10-10T12:28:36.087449Z",
+  "data_file": "84c22453fc6e2b5cc2791ab2301bdc600a9804632088a8e144b5007941e52c93.parquet",
+  "exchange": "bybit",
+  "file_checksum": "6956fc3bf5b00df6caf8b1fe15b0491a2f4d57a996e15e933ebe64f6c76df108",
+  "first_open_time": "2025-09-30T20:00:00.000Z",
+  "interval": "1m",
+  "last_open_time": "2026-09-30T23:59:00.000Z",
+  "ohlcv_content_hash": "d489aa686f6f648850f248d4809338abbee0d7ab6f0bda3ec5ffe3e698757f48",
+  "range_end_exclusive": "2026-10-01T00:00:00.000Z",
+  "range_start": "2025-09-30T20:00:00.000Z",
+  "revision_metadata_hash": "9a3ba3066376d27aabc81ffe01b9b08741e819ba5095bf895f8dd0125812258e",
+  "row_count": 525840,
+  "snapshot_completeness_status": "COMPLETE",
+  "snapshot_format_version": "immutable_candle_input_v1",
+  "snapshot_id": "84c22453fc6e2b5cc2791ab2301bdc600a9804632088a8e144b5007941e52c93",
+  "source_query_semantics": "single SELECT ... FINAL on signal_generator.candles_1m WHERE exchange, symbol, interval='1m', is_closed=1, open_time >= range_start AND open_time < range_end_exclusive ORDER BY open_time",
+  "source_table": "signal_generator.candles_1m",
+  "symbol": "DOGEUSDT"
+}

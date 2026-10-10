@@ -1,0 +1,144 @@
+{
+  "APRIL_FIRST_CLOSE_FEASIBILITY": "PASS",
+  "APRIL_PILOT_RESULTS": {
+    "15m_PD1": {
+      "active_count": 220,
+      "fingerprint": "99d3dcffda16cdd6f4fb1c2cbb2df1cc84092edb88a7933081bd5125e75bdab6",
+      "status": "PASS"
+    },
+    "15m_PD10": {
+      "active_count": 202,
+      "fingerprint": "2fcab1f7184684fdd7d758e86bd1208806edaaa9bfacedb6d7e135db9cf23bf0",
+      "status": "PASS"
+    },
+    "15m_PD5": {
+      "active_count": 181,
+      "fingerprint": "37c8dee27b3fae60fe727e1cacbe20bf94f669b561eef7fa2862652d11f2eed2",
+      "status": "PASS"
+    },
+    "4h_PD10": {
+      "active_count": 76,
+      "fingerprint": "9d3ff6ff9c9fcfd85a705093acfd1d6d594fcbf401f38c229775349e1624eef0",
+      "status": "PASS"
+    }
+  },
+  "CATALOG_BOUNDARY_RESULTS": [
+    {
+      "combo": "4h_PD10",
+      "compare_published": [],
+      "compare_records": [],
+      "decision_close": "2026-06-30T20:00:00+00:00",
+      "status": "PASS"
+    },
+    {
+      "combo": "15m_PD10",
+      "compare_published": [],
+      "compare_records": [],
+      "decision_close": "2026-07-01T00:00:00+00:00",
+      "status": "PASS"
+    },
+    {
+      "combo": "4h_PD10",
+      "compare_published": [],
+      "compare_records": [],
+      "decision_close": "2026-08-31T20:00:00+00:00",
+      "status": "PASS"
+    },
+    {
+      "combo": "15m_PD10",
+      "compare_published": [],
+      "compare_records": [],
+      "decision_close": "2026-09-01T00:00:00+00:00",
+      "status": "PASS"
+    }
+  ],
+  "COLLECTORS_TOUCHED": "NO",
+  "DASHBOARD_RESTARTED": "NO",
+  "ENGINE_CODE_HASH": "7cd1059cb83ed8ac3fbb9a8442184568da2a558a2df9040a08e8da0583e9c3e2",
+  "ENGINE_CONFIG_EFFECTIVE_PD10": {
+    "box_amount": 300,
+    "candidate_max_bars": 3,
+    "confirmation_bars": 1,
+    "duplicate_pct": 0.05,
+    "early_micro": true,
+    "early_timing": 0,
+    "manual_override": false,
+    "micro_left_bars": 2,
+    "micro_min_strength": 0.0,
+    "micro_strength_filter": false,
+    "min_strength": 0.0,
+    "pool_detail": 10,
+    "reclaim_detection": true,
+    "reclaim_lookback": 8,
+    "reclaim_proximity_pct": 0.1,
+    "require_reclaim": true,
+    "show_micro_pools": true,
+    "show_normal_pools": true,
+    "show_reclaim_pools": false,
+    "swing_len": 2,
+    "volume_lookback": 300,
+    "volume_percentile": 95,
+    "zone_extension": 15,
+    "zone_size_mult": 0.1
+  },
+  "ENGINE_CONFIG_PARITY": {
+    "1": "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9",
+    "5": "533e04c7cd0e1c93540ed9466a2a5a2eb626f82b828b9a45d1da234703ebd03c",
+    "10": "bd9ac4f30e177321b688f5adb0fe2681ebb4966d51701e3b323498bfcd0d06c2"
+  },
+  "ENGINE_VERSION": "live_micro_lld_v2@trp",
+  "EXISTING_FROZEN_MODIFIED": "NO",
+  "EXISTING_SNAPSHOTS_MODIFIED": "NO",
+  "FULL_BACKTEST_STARTED": "NO",
+  "GUARD_OFF_BACKTEST_FEASIBILITY": "YES",
+  "HISTORY_POLICY": "ROLLING_4_CALENDAR_MONTHS",
+  "JULY_AUGUST_REUSE_ELIGIBLE": "YES",
+  "JULY_REFERENCE_RESULTS": {
+    "compare_published_errors": [],
+    "compare_records_errors": [],
+    "pilot_active_count": 232,
+    "pilot_fingerprint": "a0ef72597501e19de89fa4509271edf8e6689b68d4abc994d4b31aad67063b82",
+    "ref_active_count": 232,
+    "ref_fingerprint": "a0ef72597501e19de89fa4509271edf8e6689b68d4abc994d4b31aad67063b82",
+    "ref_frozen": "cfae2571806c823407767e4d81da82fe984a928ce29843c9f061fc66d79c115b"
+  },
+  "JULY_REPRODUCIBILITY": "PASS",
+  "MASS_PRODUCTION_STARTED": "NO",
+  "NEW_FROZEN_1M_ROWS": 525840,
+  "NEW_FROZEN_ID": "84c22453fc6e2b5cc2791ab2301bdc600a9804632088a8e144b5007941e52c93",
+  "NEW_FROZEN_RANGE": {
+    "end_exclusive": "2026-10-01T00:00:00.000Z",
+    "start": "2025-09-30T20:00:00.000Z"
+  },
+  "NEXT_SAFE_STEP": "Separate approval for gap-fill production under NEW_FROZEN_ID into doge_apr_sep_2026_v1/production/results",
+  "RAW_1M_INTEGRITY": "PASS",
+  "RAW_1M_PARITY": "PASS",
+  "RAW_1M_PARITY_WITH_CFAE": "PASS",
+  "RAW_1M_PARITY_WITH_FE549": "PASS",
+  "REMAINING_PRODUCTION_WORK": {
+    "note": "Mass production not started; ~9148 Apr-Jun strategy closes still missing vs full calendar",
+    "pilot_outputs": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_apr_sep_2026_v1_history/pilot"
+  },
+  "SCANNERS_TOUCHED": "NO",
+  "SEPTEMBER_REUSE_ELIGIBLE": "YES",
+  "V2_ENGINE_MODIFIED": "NO",
+  "expected_minutes": 525840,
+  "fetch_row_count": "skipped_reuse",
+  "finished_at": "2026-10-10T12:30:43.716763+00:00",
+  "parity_cfae_detail": {
+    "common": 380160,
+    "first_diff_unix": null,
+    "ohlcv_diff": 0,
+    "only_a": 0,
+    "only_b": 0
+  },
+  "parity_fe549_detail": {
+    "common": 265200,
+    "first_diff_unix": null,
+    "ohlcv_diff": 0,
+    "only_a": 0,
+    "only_b": 0
+  },
+  "phase": "P2P3",
+  "started_at": "2026-10-10T12:30:11.934674+00:00"
+}
