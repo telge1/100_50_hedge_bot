@@ -187,3 +187,21 @@ bot/e1r_live_scanner/runtime/
 # ClickHouse data/backups if present under this repo tree (primary CH data lives on host mount)
 **/data/clickhouse/
 **/clickhouse/backups/
+
+# Pool-scan / forward research outputs (local bulk, not versioned)
+results/pool_scan/
+results/live_forward/
+results/ob200_3coins/
+backtester/short/results/
+
+# OB200 experiment reports (runners may stay tracked)
+backtester/ob200_backtester/reports/
+backtester/ob200_test/reports/
+
+# Phase-11 viewer runtime artifacts inside package dirs
+**/phase11u_f/*.json
+**/phase11u_f/server_port.txt
+**/phase11v_a/*.json
+
+# Research Charts UI persistence (prevent new local state commits)
+backtester/short/dashboard/research_charts/user_data/
