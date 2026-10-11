@@ -1,6 +1,6 @@
 # CURRENT STATUS — pools+ob+delta_bot / DOGEUSDT LMV2
 
-**Stand:** 2026-10-11 (nach Git-Cleanup C1–D und Etablierung der Root-Dokumentation). **Aktualisieren:** nach Phasenabschluss oder auf Anforderung.
+**Stand:** 2026-10-11 (Phase 4J abgeschlossen, Phase 4K/4L Multi-Batch-Vorbereitung). **Aktualisieren:** nach Phasenabschluss oder auf Anforderung.
 
 ---
 
@@ -9,74 +9,66 @@
 | Feld | Wert |
 |------|------|
 | Branch | `pools-ob-delta-bot` |
-| **Letzter Code-/Hygiene-Commit vor Root-Doku** | `aae3d3f2` — `chore: extend gitignore for research results and runtime artifacts` |
-| **Zentrale Dokumentation** | `MASTER_PROJECT_CONTEXT.md`, `CURRENT_STATUS.md` (Repository-Root) |
-| Remote | `origin/pools-ob-delta-bot` — **Push nicht erfolgt** (lokale Commits noch nicht auf GitHub; Zähler: `git rev-list --left-right --count origin/pools-ob-delta-bot...HEAD`) |
-| LMV2/Dashboard-Checkpoints | `3c21f371` Import · `133ab776` Chart/API · `77fe9b9c` EMA V2 |
-| Forschungs-Cleanup | `004286e2` Phase11v · `3b0e849f` Phase11u_f · `bce35ddb` april_smoke · `aae3d3f2` gitignore |
-| Working tree | `indicator_settings.json` modified (tracked legacy; `user_data/` per `.gitignore` für neue Adds) |
+| **Letzter Remote-Checkpoint** | `a81d8c0f` |
+| **Lokal (nach 4L-Commit)** | Controlled-Orchestrator-Checkpoint (siehe `git log -1`) |
+| Remote Ahead/Behind | nach Commit: `git status` prüfen — **Push nicht freigegeben** |
 
 ---
 
-## 2. Historischer Katalog (Disk, extern zu Git)
+## 2. ClickHouse (nach Phase 4J)
 
 | Metrik | Stand |
 |--------|--------|
-| Original-V2-Snapshots im Katalog | **53.802** (Apr–Sep 2026) |
-| Pfad | `.../doge_apr_sep_2026_v1_history/production/results/` (ignoriert) |
+| Historische Original-V2-Snapshots | **190** |
+| April `4h_PD10` Produktionslinie | **180 / 180** |
+| Letzter Batch | `phase4i_final_30_apr2026_4hpd10_v1` (30/30) |
+| `test_run_id` 4J | `903090d6-d0e2-49d2-a1b9-c65d327115bf` |
+| Backup-Referenz (vor 500er) | `e134b0fa-9cba-4c0f-b8d9-60125001de50` — **neues Backup vor 500er: ausstehend** |
+| Orphans | **0** |
 
 ---
 
-## 3. ClickHouse (verifiziert Phase 4H)
+## 3. Multi-Batch-Vorbereitung (April `15m_PD1`, 500)
 
-| Metrik | Stand |
-|--------|--------|
-| **Historische Snapshots importiert (gesamt)** | **160** |
-| August-Pilot (15m PD10) | **10** |
-| April 4h PD10 (Produktionslinie) | **150 / 180** |
-| Letzter Batch | `phase4h_second_100_apr2026_4hpd10_v1` — **100/100** Readback + Sidecar PASS |
-| Backup (vor 100er-Batch) | `e134b0fa-9cba-4c0f-b8d9-60125001de50` |
-
-**Weitere historische Imports:** **nicht freigegeben.**
+| Feld | Wert |
+|------|------|
+| Manifest | `manifests/phase4k_april_15mpd1_500_v1.json` |
+| Scope | `stems[0:500]` · `20260401T000000Z` … `20260406T044500Z` |
+| Batches | **10 × 50** |
+| Pipeline | `historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd1_v1` |
+| Dry-Run | OK · **0** Publish auf Ziel-Linie |
+| Erwartete Writes (bei Freigabe) | 500 meta · **108.250** member/catalog · 500 sidecar/publish |
 
 ---
 
-## 4. Tests (letzter grüner Lauf)
+## 4. Phase 4K/4L — Sicherheit
+
+- **Pre-Write-Gate:** `HISTORICAL_JSON_IMPORT_ALLOW_WRITE` + `HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE` vor erstem INSERT.
+- **Recovery-Bridge:** `recovery_orchestrator_bridge.py` — `meta_without_publish` + layer `SAFE_RESUME` (Catalog ohne Sidecar) zulässig.
+- **Ressourcen-Limits:** optional per Env (`resource_limit_proposal.proposed_500_batch_limit_environ()`); Batch/Readback-Wall-Clock in Orchestrator.
+
+---
+
+## 5. Tests (Phase 4L)
 
 | Suite | Ergebnis |
 |-------|----------|
-| LMV2 erweitert | **117 passed** |
-| Phase-4 Import | **74 passed** |
-| Research Chart/API | **21 passed** |
-| EMA V2 | **14 passed** |
-| Phase 11V-A | **17 passed** (TRP-Pfad) |
-| Phase 11U-F viewer | **5 passed** |
-| April smoke (Abhängigkeiten) | **43 passed** |
+| 4I + 4K + 4L + 4G + 4A + 4C + historical_json_import | **59 passed** |
 
 ---
 
-## 5. Implementiert / getestet / abgenommen / Freigabe
+## 6. Freigaben
 
-| Thema | Impl. | Getestet | CH/Abnahme | Freigabe nächster Schritt |
-|-------|:-----:|:--------:|:----------:|---------------------------|
-| CH Import + Sidecar | ✓ | ✓ | ✓ (160 Snapshots) | Weitere Batches: **NEIN** |
-| Research API + Remaining | ✓ | ✓ | — | Chart-Gesamtabnahme offen |
-| EMA V2 Dashboard | ✓ | ✓ | — | optional |
-| Phase11v / 11u_f Tools | ✓ | ✓ | — | in Git (C1/C2) |
-| Root Master + Status | ✓ | Review | — | versioniert mit Commit E |
-| GitHub Push | — | — | — | **ausstehend** (separate Freigabe) |
-
----
-
-## 6. Nächster freigegebener Schritt
-
-1. **GitHub-Push** der lokalen Commit-Kette nur nach **separater** Freigabe und Review.
-2. **Kein** weiterer historischer CH-Import ohne neue Batch-Freigabe.
-3. Chart-/Backtest-Gesamtabnahme gemäß `MASTER_PROJECT_CONTEXT.md` §5.
+| Schritt | Status |
+|---------|--------|
+| 500er `15m_PD1` CH-Import | **NEIN** |
+| Neues Fünf-Tabellen-Backup | **NEIN** (Preflight bereit) |
+| GitHub-Push | **NEIN** |
 
 ---
 
 ## 7. Verweise
 
 - `MASTER_PROJECT_CONTEXT.md`
-- `docs/live_micro_lld_v2/DEVELOPMENT_CHECKPOINT.md`
+- `historical_json_import/controlled_monthly_orchestrator.py`
+- `historical_json_import/productive_prewrite_gate.py`

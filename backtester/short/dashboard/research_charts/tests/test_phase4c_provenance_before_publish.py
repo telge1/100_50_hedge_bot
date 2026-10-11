@@ -257,7 +257,13 @@ def test_batch_success_not_ok_on_readback_failure():
     assert any("readback" in e for e in errs)
 
 
-def test_execute_batch_import_requires_write_gate():
+def test_execute_batch_import_requires_write_gate(monkeypatch):
+    monkeypatch.delenv("HISTORICAL_JSON_IMPORT_ALLOW_WRITE", raising=False)
+    monkeypatch.delenv("HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE", raising=False)
     spec = first_regulatory_batch_spec(CATALOG_ROOT)
-    with pytest.raises(RuntimeError, match="HISTORICAL_JSON_IMPORT_ALLOW_WRITE"):
+    from research_charts.live_micro_lld_v2_ch_test.historical_json_import.productive_prewrite_gate import (
+        ProductivePrewriteGateError,
+    )
+
+    with pytest.raises(ProductivePrewriteGateError, match="productive import gates"):
         execute_batch_import(CATALOG_ROOT, spec, sidecar_store=MemoryProvenanceSidecarStore())

@@ -8,7 +8,8 @@ No automatic DELETE/RESTORE.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
@@ -18,6 +19,10 @@ from .batch_runner import BatchImportError, BatchSpec, run_batch_readback_gate, 
 from .batch_write import execute_batch_import
 from .provenance_sidecar import InMemoryProvenanceRegistry
 from .write_guards import require_valid_test_run_uuid
+from .productive_prewrite_gate import (
+    ProductivePrewriteGateError,
+    assert_productive_env_gates,
+)
 
 OrchestratorMode = Literal["validate_only", "write_and_readback"]
 
@@ -30,6 +35,7 @@ class BatchOrchestratorResult:
     write: list[dict[str, Any]] | None
     readback: dict[str, Any] | None
     errors: list[str]
+    timing_seconds: dict[str, float] = field(default_factory=dict)
 
 
 class BatchOrchestrator:
@@ -49,6 +55,7 @@ class BatchOrchestrator:
         *,
         mode: OrchestratorMode = "validate_only",
         test_run_id: str | None = None,
+        write_lock_held: bool = False,
     ) -> BatchOrchestratorResult:
         errors: list[str] = []
         vr = validate_batch(self.catalog_root, spec, test_run_id=test_run_id)
@@ -64,8 +71,10 @@ class BatchOrchestrator:
         if mode == "validate_only":
             return BatchOrchestratorResult(spec.batch_id, "validated", vr, None, None, [])
 
-        if os.environ.get("HISTORICAL_JSON_IMPORT_ALLOW_WRITE") != "1":
-            errors.append("HISTORICAL_JSON_IMPORT_ALLOW_WRITE not set")
+        try:
+            assert_productive_env_gates()
+        except ProductivePrewriteGateError as exc:
+            errors.append(str(exc))
             return BatchOrchestratorResult(spec.batch_id, "blocked", vr, None, None, errors)
 
         import uuid
@@ -74,11 +83,15 @@ class BatchOrchestrator:
             test_run_id or str(uuid.uuid4()),
             context="BatchOrchestrator",
         )
+        t0 = time.monotonic()
         write_out = execute_batch_import(
             self.catalog_root,
             spec,
             test_run_id=run_uuid,
+            write_lock_held=write_lock_held,
         )
+        write_sec = time.monotonic() - t0
+        t1 = time.monotonic()
         rb = run_batch_readback_gate(
             list(spec.stems),
             catalog_root=self.catalog_root,
@@ -88,12 +101,24 @@ class BatchOrchestrator:
             batch_spec=spec,
             require_sidecar=True,
         )
+        readback_sec = time.monotonic() - t1
+        timing = {
+            "write": write_sec,
+            "readback": readback_sec,
+            "total": write_sec + readback_sec,
+        }
         bad_p = [r for r in rb["parity"] if not r.ok]
         bad_s = [r for r in rb["sidecar"] if not r.ok]
         if bad_p or bad_s:
             errors.append(f"readback parity failures={len(bad_p)} sidecar={len(bad_s)}")
             return BatchOrchestratorResult(
-                spec.batch_id, "readback_failed", vr, write_out, rb, errors
+                spec.batch_id,
+                "readback_failed",
+                vr,
+                write_out,
+                rb,
+                errors,
+                timing,
             )
 
         reg = InMemoryProvenanceRegistry()
@@ -103,17 +128,6 @@ class BatchOrchestrator:
             reg.register(
                 expected_sidecar_for_stem(self.catalog_root, spec, stem)
             )
-        ok, crit_errs = batch_success_criteria_met(
-            all_published_on_line=True,
-            readback_ok=True,
-            provenance_registry=reg,
-            snapshot_ids=vr["snapshot_ids"],
-            progress_written=False,
-            pipeline_line_id=spec.pipeline_line_id,
-        )
-        if not ok:
-            errors.extend(crit_errs)
-
         prog_path = self.progress_dir / f"{spec.batch_id}.json"
         prog = BatchProgressReport(
             batch_id=spec.batch_id,
@@ -121,7 +135,7 @@ class BatchOrchestrator:
             combo_folder=spec.combo_folder,
             month=spec.month,
             import_batch_id=spec.import_batch_id,
-            status="readback_ok" if ok else "failed",
+            status="readback_ok",
             closes_planned=len(spec.stems),
             closes=[
                 CloseOutcome(stem=r["stem"], snapshot_id=r["snapshot_id"], status="readback_ok")
@@ -133,10 +147,24 @@ class BatchOrchestrator:
             finished_at=utc_now_iso(),
         )
         write_progress_report(prog_path, prog)
+        ok, crit_errs = batch_success_criteria_met(
+            all_published_on_line=True,
+            readback_ok=True,
+            provenance_registry=reg,
+            snapshot_ids=vr["snapshot_ids"],
+            progress_written=True,
+            pipeline_line_id=spec.pipeline_line_id,
+        )
+        if not ok:
+            errors.extend(crit_errs)
+            prog.status = "failed"
+            write_progress_report(prog_path, prog)
         reconcile_progress_with_ch(
             prog_path,
             ch_published_count=len(spec.stems),
             expected_in_batch=len(spec.stems),
         )
         status = "readback_ok" if ok and not errors else "failed"
-        return BatchOrchestratorResult(spec.batch_id, status, vr, write_out, rb, errors)
+        return BatchOrchestratorResult(
+            spec.batch_id, status, vr, write_out, rb, errors, timing
+        )

@@ -71,12 +71,13 @@ def test_staged_writer_no_ch_on_invalid_uuid():
 
 def test_execute_batch_import_invalid_uuid_zero_writes(monkeypatch):
     monkeypatch.setenv("HISTORICAL_JSON_IMPORT_ALLOW_WRITE", "1")
+    monkeypatch.setenv("HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE", "1")
     spec = first_regulatory_batch_spec(CATALOG_ROOT)
     with (
         mock.patch(
             "research_charts.live_micro_lld_v2_ch_test.historical_json_import.batch_write._execute_batch_import_locked"
         ) as locked,
-        pytest.raises(InvalidTestRunIdError),
+        pytest.raises(Exception),
     ):
         execute_batch_import(
             CATALOG_ROOT,

@@ -26,6 +26,7 @@ from research_charts.live_micro_lld_v2_ch_test.historical_json_import.batch_prog
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.batch_runner import (
     BatchSpec,
     classify_close_resume,
+    first_regulatory_batch_spec,
     multi_combination_dry_run,
     pilot_overlap_stems,
     validate_batch,
@@ -124,15 +125,15 @@ def test_batch_validate_fails_on_duplicate_snapshot_in_batch():
     assert any("duplicate snapshot_id" in e for e in out["errors"])
 
 
-def test_execute_batch_import_requires_write_gate():
-    spec = BatchSpec(
-        month="2026-04",
-        combo_folder="15m_PD10",
-        stems=(),
-        pipeline_line_id="line",
-        import_batch_id="t",
+def test_execute_batch_import_requires_write_gate(monkeypatch):
+    monkeypatch.delenv("HISTORICAL_JSON_IMPORT_ALLOW_WRITE", raising=False)
+    monkeypatch.delenv("HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE", raising=False)
+    spec = first_regulatory_batch_spec(CATALOG_ROOT)
+    from research_charts.live_micro_lld_v2_ch_test.historical_json_import.productive_prewrite_gate import (
+        ProductivePrewriteGateError,
     )
-    with pytest.raises(RuntimeError, match="HISTORICAL_JSON_IMPORT_ALLOW_WRITE"):
+
+    with pytest.raises(ProductivePrewriteGateError, match="productive import gates"):
         execute_batch_import(CATALOG_ROOT, spec)
 
 

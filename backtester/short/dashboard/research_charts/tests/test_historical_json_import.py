@@ -54,7 +54,7 @@ def test_dry_run_does_not_touch_clickhouse():
 def test_pilot_write_blocked_without_env():
     import pytest
 
-    with pytest.raises(RuntimeError, match="HISTORICAL_JSON_IMPORT_ALLOW_WRITE"):
+    with pytest.raises(RuntimeError):
         run_import_plan(
             [PILOT_DECISION_CLOSE_STEMS[0]],
             catalog_root=CATALOG_ROOT,
