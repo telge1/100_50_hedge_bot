@@ -27,3 +27,15 @@ class UnknownCatalogError(HistoricalLmV2Error):
 
 class RequestFrozenMismatchError(HistoricalLmV2Error):
     """Client expected_frozen_input_id does not match catalog."""
+
+
+class ProvenanceMissingError(HistoricalLmV2Error):
+    """Snapshot path has no provenance entry in the catalog lookup."""
+
+
+class ProvenanceMismatchError(HistoricalLmV2Error):
+    """Payload frozen_input does not match per-path provenance."""
+
+
+class Sha256MismatchError(HistoricalLmV2Error):
+    """On-disk snapshot file hash does not match provenance."""

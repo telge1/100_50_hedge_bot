@@ -11,6 +11,7 @@ from ...clickhouse_config import load_clickhouse_config
 from .extract import ActiveStateSnapshot
 from .faults import FaultInjector
 from .schema import TABLE_SNAPSHOT_MEMBER, TABLE_SNAPSHOT_META, ensure_active_snapshot_tables
+from ..historical_json_import.write_guards import require_valid_test_run_uuid
 from .writer import (
     PartialSnapshotError,
     SnapshotExistsError,
@@ -28,6 +29,7 @@ def write_active_snapshot_staged(
     faults: FaultInjector | None = None,
 ) -> dict[str, Any]:
     faults = faults or FaultInjector()
+    require_valid_test_run_uuid(test_run_id, context="write_active_snapshot_staged")
     ensure_active_snapshot_tables()
     ch_cfg = load_clickhouse_config()
     client = clickhouse_connect.get_client(**ch_cfg.connect_kwargs())

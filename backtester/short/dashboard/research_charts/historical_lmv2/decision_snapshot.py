@@ -131,13 +131,25 @@ def load_decision_snapshot(
     expected = str(expected_frozen_input_id or "").strip()
     if not expected:
         raise RequestFrozenMismatchError("expected_frozen_input_id required")
-    if expected != catalog.frozen_input_id:
+    mixed = bool(getattr(catalog, "mixed_frozen", False))
+    if mixed:
+        authorized = getattr(catalog, "authorized_frozen_input_ids", frozenset())
+        if expected not in authorized:
+            raise RequestFrozenMismatchError(
+                f"expected_frozen_input_id {expected!r} not authorized for catalog {catalog_id!r}"
+            )
+    elif expected != catalog.frozen_input_id:
         raise RequestFrozenMismatchError(
             f"expected_frozen_input_id {expected!r} != catalog {catalog.frozen_input_id!r}"
         )
 
     store = HistoricalLmV2PoolStore(catalog)
     payload = store.load_payload(timeframe, int(pool_detail), decision_close_dt)
+    payload_frozen = str((payload.get("frozen_input") or {}).get("snapshot_id") or "")
+    if mixed and payload_frozen != expected:
+        raise RequestFrozenMismatchError(
+            f"expected_frozen_input_id {expected!r} != snapshot {payload_frozen!r}"
+        )
     validate_snapshot_active_state(
         payload,
         symbol=symbol,

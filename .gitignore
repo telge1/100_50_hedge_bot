@@ -159,11 +159,31 @@ dashboard/wall_decision_v1/screenshots/
 dashboard/wall_decision_v1/screenshots_real_mp_3012/
 dashboard/logs/wall_decision_shadow/
 
-# Live Micro LLD V2 historical production trees (code + reports tracked separately)
-backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/production/
+# Live Micro LLD V2 historical production blobs (runners/reports tracked separately)
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/production/results/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/production/workers/
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/production/provenance_index.json
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_apr_sep_2026_v1_history/production/provenance_lookup.json
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/inputs/*.parquet
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11l/runs/
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11m/runs/
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11o_single_worker_benchmark/
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/research_runs/
 backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/report_archives/
+
+# LMV2 historical import runtime progress (local batch state)
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_*_history/_batch_progress/
+
+# LMV2 generated research / audit JSON (runners and .py stay tracked)
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11*_*.json
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase*_report.json
+backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/phase11t_heatmap/payloads/
+backtester/short/dashboard/research_charts/historical_lmv2/artifacts/*_report.json
+backtester/short/dashboard/research_charts/historical_lmv2/artifacts/*_plan.json
+
+# E1R live scanner runtime (local state)
+bot/e1r_live_scanner/runtime/
+
+# ClickHouse data/backups if present under this repo tree (primary CH data lives on host mount)
+**/data/clickhouse/
+**/clickhouse/backups/

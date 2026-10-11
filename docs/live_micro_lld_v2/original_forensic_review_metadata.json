@@ -1,0 +1,31 @@
+{
+  "transcript_id": "547b7bf5-7a3c-46fb-8790-952ebb1eec7e",
+  "transcript_path": "/home/telgenbuescher/.cursor/projects/home-telgenbuescher-projects-pools-ob-delta-bot/agent-transcripts/547b7bf5-7a3c-46fb-8790-952ebb1eec7e/547b7bf5-7a3c-46fb-8790-952ebb1eec7e.jsonl",
+  "original_timestamp_utc_plus_3": "2026-10-08T13:19:00+03:00",
+  "prompt_source_line": 1024,
+  "report_source_line": 1033,
+  "prompt_char_length_expected": 18631,
+  "prompt_char_length_extracted": 18631,
+  "report_char_length_extracted": 20513,
+  "prompt": {
+    "path": "/home/telgenbuescher/projects/pools+ob+delta_bot/docs/live_micro_lld_v2/original_forensic_review_prompt_2026-10-08.md",
+    "action": "CREATED",
+    "text_sha256": "a3b6aebab30fc98aad2ac53c06725646300cfc6a80179818550c0961282f253e",
+    "file_sha256": "a3b6aebab30fc98aad2ac53c06725646300cfc6a80179818550c0961282f253e",
+    "bytes": 18918,
+    "match": true
+  },
+  "report": {
+    "path": "/home/telgenbuescher/projects/pools+ob+delta_bot/docs/live_micro_lld_v2/original_forensic_review_report_2026-10-08.md",
+    "action": "CREATED",
+    "text_sha256": "8c6fa4955049197c61b917dba9792d7c925f8de0e7252a8fb430e56159358118",
+    "file_sha256": "8c6fa4955049197c61b917dba9792d7c925f8de0e7252a8fb430e56159358118",
+    "bytes": 20852,
+    "match": true
+  },
+  "redacted_or_incomplete_sections": [
+    "report ends with Cursor-internal [REDACTED] marker in transcript"
+  ],
+  "secrets_included": false,
+  "meta_file_action": "CREATED"
+}

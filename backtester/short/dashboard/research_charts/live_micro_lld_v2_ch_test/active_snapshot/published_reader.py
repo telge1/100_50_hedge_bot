@@ -8,7 +8,12 @@ from typing import Any
 import clickhouse_connect
 
 from ...clickhouse_config import load_clickhouse_config
+from research_charts.live_micro_lld_v2_ch_test.historical_json_import.catalog_integrity import (
+    assert_member_catalog_id_sets,
+    load_catalog_pool_ids_from_ch,
+)
 from .fingerprint import active_state_fingerprint
+from .pool_catalog_schema import TABLE_ACTIVE_POOL
 from .publish_schema import TABLE_PUBLISH, ensure_publish_tables
 from .reader import ActiveSnapshotReader, IncompleteSnapshotError
 from .schema import TABLE_SNAPSHOT_META
@@ -24,6 +29,7 @@ class PublishedActiveReader:
     - publish ledger row with publish_complete=1 (FINAL)
     - meta row write_complete=1 (FINAL) for snapshot_id
     - member count matches meta
+    - catalog row count and pool_id set match members (not JSON field parity)
     - member-derived fingerprint matches publish + meta fingerprints
     """
 
@@ -107,6 +113,18 @@ class PublishedActiveReader:
                 )
             if meta["prefix_candle_fingerprint"] != prefix_fp:
                 raise IncompleteSnapshotError("prefix_candle_fingerprint mismatch vs publish")
+            if pool_ids:
+                cat_ids = load_catalog_pool_ids_from_ch(
+                    client, self._db, TABLE_ACTIVE_POOL, sid
+                )
+                if len(cat_ids) != len(pool_ids):
+                    raise IncompleteSnapshotError(
+                        f"catalog incomplete for {sid}: {len(cat_ids)} rows vs {len(pool_ids)} members"
+                    )
+                try:
+                    assert_member_catalog_id_sets(pool_ids, cat_ids)
+                except Exception as exc:
+                    raise IncompleteSnapshotError(str(exc)) from exc
             return {
                 "publish_id": pub_id,
                 "snapshot_id": sid,
