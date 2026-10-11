@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historical LMV2 Parity Demo (Phase 1)</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { background: #020617; color: #e5e7eb; }
+        .wrap { max-width: 1200px; margin: 1rem auto; padding: 0 1rem; }
+        .banner { background: #1e293b; border: 1px solid #334155; padding: 0.75rem 1rem; margin-bottom: 1rem; border-radius: 6px; }
+        .banner strong { color: #fbbf24; }
+        #chartHost { height: 520px; border: 1px solid #334155; border-radius: 6px; }
+        .meta { font-size: 0.9rem; color: #94a3b8; margin-top: 0.5rem; }
+        .err { color: #f87171; }
+    </style>
+    <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
+</head>
+<body>
+    <div class="wrap">
+        <h1>Historical LMV2 — Trade #4 Parity Demo</h1>
+        <div class="banner" id="snapBanner">
+            <strong>HISTORICAL DECISION SNAPSHOT @ 2026-07-07 07:00 UTC</strong>
+            — Pools sind nur für diesen Entscheidungszeitpunkt gültig, nicht für die gesamte Chart-Historie.
+        </div>
+        <div id="chartHost"></div>
+        <pre class="meta" id="metaOut">Lade …</pre>
+    </div>
+    <script>
+      (async function () {
+        const DECISION_ISO = "2026-07-07T07:00:00Z";
+        const CATALOG = "doge_multi_month_2026";
+        const FROZEN = "cfae2571806c823407767e4d81da82fe984a928ce29843c9f061fc66d79c115b";
+        const ENTRY = 0.07543;
+        const SL = 0.07564098;
+        const TP = 0.0747;
+        const meta = document.getElementById("metaOut");
+
+        async function postSnap() {
+          const res = await fetch("/api/research/historical-lmv2/decision-snapshot", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              catalog_id: CATALOG,
+              symbol: "DOGEUSDT",
+              timeframe: "15m",
+              pool_detail: 10,
+              decision_close: DECISION_ISO,
+              expected_frozen_input_id: FROZEN,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error(data.message || data.error || res.status);
+          }
+          return data;
+        }
+
+        async function loadCandles() {
+          const t0 = Math.floor(Date.parse("2026-07-07T02:00:00Z") / 1000);
+          const t1 = Math.floor(Date.parse("2026-07-07T12:00:00Z") / 1000);
+          const url = "/api/research/candles?symbol=DOGEUSDT&timeframe=15m&from=" + t0 + "&to=" + t1;
+          const res = await fetch(url, { credentials: "include" });
+          const data = await res.json();
+          if (!data.candles) throw new Error("no candles");
+          return data.candles.map((c) => ({
+            time: Number(c.time),
+            open: Number(c.open),
+            high: Number(c.high),
+            low: Number(c.low),
+            close: Number(c.close),
+          }));
+        }
+
+        function drawPoolBands(chart, series, zones, tDecision) {
+          zones.forEach((z) => {
+            const color = z.style && z.style.fillColor ? z.style.fillColor : "rgba(136,136,136,0.2)";
+            try {
+              series.createPriceLine({
+                price: Number(z.bottom_price),
+                color: color,
+                lineWidth: 1,
+                lineStyle: 2,
+                axisLabelVisible: false,
+                title: "",
+              });
+              series.createPriceLine({
+                price: Number(z.top_price),
+                color: color,
+                lineWidth: 1,
+                lineStyle: 2,
+                axisLabelVisible: false,
+                title: "",
+              });
+            } catch (e) { /* best effort */ }
+          });
+        }
+
+        function addLine(series, price, color, title) {
+          series.createPriceLine({
+            price: price,
+            color: color,
+            lineWidth: 2,
+            lineStyle: title === "Entry" ? 0 : 2,
+            axisLabelVisible: true,
+            title: title,
+          });
+        }
+
+        try {
+          const snap = await postSnap();
+          const candles = await loadCandles();
+          const host = document.getElementById("chartHost");
+          const chart = LightweightCharts.createChart(host, {
+            layout: { background: { color: "#020617" }, textColor: "#e5e7eb" },
+            grid: { vertLines: { color: "#1f2937" }, horzLines: { color: "#1f2937" } },
+            timeScale: { timeVisible: true, secondsVisible: false },
+          });
+          const series = chart.addSeries(LightweightCharts.CandlestickSeries, {
+            upColor: "#26a69a",
+            downColor: "#ef5350",
+            borderVisible: false,
+            wickUpColor: "#26a69a",
+            wickDownColor: "#ef5350",
+          });
+          series.setData(candles);
+          const tDecision = Math.floor(Date.parse(DECISION_ISO) / 1000);
+          drawPoolBands(chart, series, snap.zones || [], tDecision);
+          addLine(series, ENTRY, "#9ca3af", "Entry");
+          addLine(series, SL, "#ef4444", "SL");
+          addLine(series, TP, "#22c55e", "TP");
+          chart.timeScale().fitContent();
+          meta.textContent =
+            snap.display_label + "\n" +
+            "frozen_input_id: " + snap.frozen_input_id + "\n" +
+            "fingerprint: " + snap.active_state_fingerprint + "\n" +
+            "ACTIVE pools: " + snap.active_pool_count + "\n" +
+            "parity: " + JSON.stringify(snap.parity_validation, null, 2);
+        } catch (err) {
+          meta.innerHTML = '<span class="err">' + (err.message || err) + "</span>";
+        }
+      })();
+    </script>
+</body>
+</html>

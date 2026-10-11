@@ -162,7 +162,7 @@
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndOi"> Open Interest</label>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Research Liquidity Location</label>
                     <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
-                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLiveMicroLldV2"> Live Micro LLD V2</label>
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLiveMicroLldV2" autocomplete="off"> Live Micro LLD V2</label>
                     <select id="researchLiveMicroV2PoolDetail" class="trp-select trp-width" title="Pool Detail 1–10 = Pine pool_detail (Feinheit/Schwelle)" aria-label="Live Micro LLD V2 pool detail">
                         <option value="1">PD 1</option>
                         <option value="2">PD 2</option>
@@ -184,8 +184,7 @@
                     <label class="trp-check trp-dock-ind" title="Stärke Strong"><input type="checkbox" class="research-lmv2-strength" value="Strong" checked> Strong</label>
                     <label class="trp-check trp-dock-ind" title="Stärke Very Strong"><input type="checkbox" class="research-lmv2-strength" value="Very Strong" checked> VS</label>
                     <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
-                    <label class="trp-check trp-dock-ind" title="ClickHouse Phase-1 Test-Pools (TUTUSDT 5m PD10, read-only)"><input type="checkbox" id="researchIndLiveMicroLldV2ChTest"> V2 CH Test Pools</label>
-                    <label class="trp-check trp-dock-ind" title="Engine und CH mit gleichem Phase-1-Fenster (from 2026-09-08)"><input type="checkbox" id="researchLiveMicroV2ChCompare"> V2 Compare</label>
+                    <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
                     <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
@@ -508,8 +507,8 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=lmv2-pd-guard-1"></script>
-    <script src="/static/js/research/research_charts.js?v=lmv2-pd-guard-1"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=lmv2-remaining-3"></script>
+    <script src="/static/js/research/research_charts.js?v=lmv2-remaining-3"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

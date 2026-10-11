@@ -1263,7 +1263,105 @@
     const out = {};
     if (types.length && types.length < 3) out.pool_types = types;
     if (strengths.length && strengths.length < 5) out.strength_classes = strengths;
+    if (liveMicroLldV2RemainingEnabled()) out.include_remaining = true;
     return out;
+  }
+
+  function liveMicroLldV2RemainingEnabled() {
+    const cb = $("researchIndLiveMicroLldV2Remaining");
+    return !!(cb && cb.checked);
+  }
+
+  function restoreLiveMicroLldV2Toggles() {
+    try {
+      const v2 = localStorage.getItem("research.liveMicroLldV2");
+      const rem = localStorage.getItem("research.liveMicroLldV2Remaining");
+      const v2El = $("researchIndLiveMicroLldV2");
+      const remEl = $("researchIndLiveMicroLldV2Remaining");
+      if (v2El && v2 === "1") v2El.checked = true;
+      if (v2El && v2 === "0") v2El.checked = false;
+      if (remEl && rem === "1") remEl.checked = true;
+      if (remEl && rem === "0") remEl.checked = false;
+    } catch (e) { /* ignore */ }
+  }
+
+  function rememberLiveMicroLldV2Toggles() {
+    try {
+      localStorage.setItem("research.liveMicroLldV2", liveMicroLldV2Enabled() ? "1" : "0");
+      localStorage.setItem("research.liveMicroLldV2Remaining", liveMicroLldV2RemainingEnabled() ? "1" : "0");
+    } catch (e) { /* ignore */ }
+  }
+
+  function interleaveRemainingZones(zones) {
+    const base = [];
+    const remaining = {};
+    (zones || []).forEach(function (zone) {
+      if (zone && zone.metadata && zone.metadata.layer === "remaining") {
+        remaining[zone.pool_id] = zone;
+      } else if (zone) {
+        base.push(zone);
+      }
+    });
+    const out = [];
+    base.forEach(function (zone) {
+      out.push(zone);
+      if (remaining[zone.pool_id]) out.push(remaining[zone.pool_id]);
+    });
+    return out;
+  }
+
+  function clientRemainingZones(zones, pane, tfSec) {
+    const candles = (pane && pane.pendingData && pane.pendingData.candles) || [];
+    const sec = tfSec || 900;
+    const extra = [];
+    const consumedIds = {};
+    (zones || []).forEach(function (zone) {
+      if (!zone || (zone.metadata && zone.metadata.layer === "remaining")) return;
+      const bottom = Number(zone.bottom_price);
+      const top = Number(zone.top_price);
+      const start = Number(zone.start_timestamp);
+      const end = Number(zone.end_timestamp);
+      if (!Number.isFinite(bottom) || !Number.isFinite(top) || top <= bottom) return;
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      let penHigh = null;
+      let penLow = null;
+      for (let i = 0; i < candles.length; i++) {
+        const open = Number(candles[i].time);
+        if (!Number.isFinite(open)) continue;
+        const close = open + sec;
+        if (close <= start || close > end) continue;
+        const hi = Number(candles[i].high);
+        const lo = Number(candles[i].low);
+        if (Number.isFinite(hi) && (penHigh == null || hi > penHigh)) penHigh = hi;
+        if (Number.isFinite(lo) && (penLow == null || lo < penLow)) penLow = lo;
+      }
+      const side = String(zone.side || "").toLowerCase();
+      let remBottom = bottom;
+      let remTop = top;
+      let consumed = false;
+      if (side === "upper") {
+        if (penHigh != null && penHigh >= top) consumed = true;
+        else if (penHigh != null && penHigh > bottom) remBottom = penHigh;
+      } else if (side === "lower") {
+        if (penLow != null && penLow <= bottom) consumed = true;
+        else if (penLow != null && penLow < top) remTop = penLow;
+      } else {
+        return;
+      }
+      if (consumed || remTop - remBottom <= 1e-12) {
+        consumedIds[zone.pool_id] = true;
+        return;
+      }
+      extra.push(Object.assign({}, zone, {
+        id: "live-micro-v2-rem:" + zone.pool_id,
+        bottom_price: remBottom,
+        top_price: remTop,
+        lower_price: remBottom,
+        upper_price: remTop,
+        metadata: Object.assign({}, zone.metadata || {}, { layer: "remaining" }),
+      }));
+    });
+    return { extra: extra, consumed: consumedIds };
   }
 
   function liveMicroLldV2FilterCacheKey() {
@@ -1635,6 +1733,7 @@
       " · PD=" + (payload.pool_detail != null ? payload.pool_detail : "?") +
       " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
       " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (payload.remaining_count ? " · remaining=" + payload.remaining_count : "") +
       " (pro sichtbarem Pane/TF)";
   }
 
@@ -1714,18 +1813,57 @@
     }
     if (liveMicroLldV2ShouldAbort(opts, symAtStart, refreshToken)) return null;
     if (!liveMicroLldV2Enabled()) return null;
+    let zones = body.zones || [];
+    let remainingCount = body.remaining_count;
+    if (liveMicroLldV2RemainingEnabled()) {
+      try {
+        let extra = [];
+        const consumed = {};
+        if (remainingCount == null) {
+          const built = clientRemainingZones(zones, target, tfSec);
+          extra = built.extra || [];
+          Object.keys(built.consumed || {}).forEach(function (id) { consumed[id] = true; });
+          remainingCount = extra.length;
+        } else {
+          (zones || []).forEach(function (zone) {
+            if (zone && zone.metadata && zone.metadata.layer === "remaining") extra.push(zone);
+          });
+        }
+        const base = (zones || []).filter(function (zone) {
+          return zone && !(zone.metadata && zone.metadata.layer === "remaining");
+        }).map(function (zone) {
+          return Object.assign({}, zone, {
+            metadata: Object.assign({}, zone.metadata || {}, {
+              remaining_mode: true,
+              consumed: !!consumed[zone.pool_id],
+            }),
+          });
+        });
+        if (remainingCount != null && extra.length) {
+          const alive = {};
+          extra.forEach(function (zone) { alive[zone.pool_id] = true; });
+          base.forEach(function (zone) {
+            if (!alive[zone.pool_id]) zone.metadata.consumed = true;
+          });
+        }
+        zones = interleaveRemainingZones(base.concat(extra));
+      } catch (err) {
+        zones = body.zones || [];
+        try { console.warn("[research] remaining pools", err); } catch (e) { /* ignore */ }
+      }
+    }
     if (SC_HELPERS) {
       syncOverlays(
         target,
         SC_HELPERS.applyLiveMicroLldV2ToOverlays(
           target.pendingOverlays || [],
-          body.zones || [],
+          zones,
           win.from_close_unix,
           win.to_close_unix
         )
       );
     }
-    return body;
+    return Object.assign({}, body, { remaining_count: remainingCount || 0 });
   }
 
   async function refreshLiveMicroLldV2(pane, opts) {
@@ -5001,6 +5139,7 @@
   }
 
   function bindUi() {
+    restoreLiveMicroLldV2Toggles();
     bindHistoryUi();
     restoreHistoryPrefs();
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
@@ -6354,6 +6493,7 @@
     }
     if ($("researchIndLiveMicroLldV2")) {
       $("researchIndLiveMicroLldV2").addEventListener("change", async function () {
+        rememberLiveMicroLldV2Toggles();
         try {
           await refreshLiveMicroLldV2(null, { force: true });
         } catch (err) {
@@ -6383,6 +6523,7 @@
       });
     }
     function onLiveMicroV2FilterChange() {
+      rememberLiveMicroLldV2Toggles();
       state.liveMicroLldV2Cache = {};
       state.liveMicroLldV2ChTestCache = {};
       if (liveMicroLldV2Enabled()) {
@@ -6398,6 +6539,9 @@
     }
     if ($("researchLiveMicroV2PoolDetail")) {
       $("researchLiveMicroV2PoolDetail").addEventListener("change", onLiveMicroV2FilterChange);
+    }
+    if ($("researchIndLiveMicroLldV2Remaining")) {
+      $("researchIndLiveMicroLldV2Remaining").addEventListener("change", onLiveMicroV2FilterChange);
     }
     document.querySelectorAll(".research-lmv2-type, .research-lmv2-strength").forEach(function (el) {
       el.addEventListener("change", onLiveMicroV2FilterChange);
@@ -6656,6 +6800,15 @@
     $("researchSymbol").value = start;
     applyResearchJobSourceNote();
     await switchSymbol(start);
+    if (liveMicroLldV2Enabled()) {
+      try {
+        await refreshLiveMicroLldV2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 boot", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   window.__researchDebug = state;
@@ -6665,5 +6818,15 @@
       if (err && err.name === "AbortError") return;
       setStatus(String(err.message || err), "error");
     });
+  });
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!liveMicroLldV2Enabled() || !state.symbol) return;
+      refreshLiveMicroLldV2(null, { force: true }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 load", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, 400);
   });
 })();

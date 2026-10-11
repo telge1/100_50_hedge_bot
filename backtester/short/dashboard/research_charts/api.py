@@ -616,6 +616,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 pool_detail=pool_detail,
                 pool_types=pool_types if isinstance(pool_types, list) else None,
                 strength_classes=strength_classes if isinstance(strength_classes, list) else None,
+                include_remaining=bool(body.get("include_remaining")),
             )
         except KeyError:
             return _error(404, "unknown_symbol", "no candles for symbol")
@@ -624,6 +625,79 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         except Exception as exc:
             return _error(500, "live_micro_lld_v2_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/historical-lmv2/decision-snapshot")
+    async def api_research_historical_lmv2_decision_snapshot(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Read-only frozen V2 snapshot for chart parity (no engine recompute)."""
+        from .historical_lmv2.decision_snapshot import load_decision_snapshot
+        from .historical_lmv2.errors import (
+            FrozenInputMismatchError,
+            HistoricalLmV2Error,
+            ManifestGateError,
+            RequestFrozenMismatchError,
+            SnapshotMissingError,
+            SnapshotValidationError,
+            UnknownCatalogError,
+        )
+
+        catalog_id = str(body.get("catalog_id") or "").strip()
+        symbol = str(body.get("symbol") or "").strip().upper()
+        timeframe = str(body.get("timeframe") or "15m").strip()
+        try:
+            pool_detail = int(body.get("pool_detail") or 10)
+        except (TypeError, ValueError):
+            return _error(400, "invalid_pool_detail", "pool_detail must be int")
+        decision_close = body.get("decision_close")
+        expected_frozen = str(body.get("expected_frozen_input_id") or "").strip()
+        if not catalog_id or not symbol or not decision_close or not expected_frozen:
+            return _error(
+                400,
+                "missing_fields",
+                "catalog_id, symbol, decision_close, expected_frozen_input_id required",
+            )
+        try:
+            payload = await asyncio.to_thread(
+                load_decision_snapshot,
+                catalog_id=catalog_id,
+                symbol=symbol,
+                timeframe=timeframe,
+                pool_detail=pool_detail,
+                decision_close=str(decision_close),
+                expected_frozen_input_id=expected_frozen,
+            )
+        except UnknownCatalogError as exc:
+            return _error(404, "unknown_catalog", str(exc))
+        except RequestFrozenMismatchError as exc:
+            return _error(409, "frozen_input_mismatch", str(exc))
+        except FrozenInputMismatchError as exc:
+            return _error(409, "snapshot_frozen_mismatch", str(exc))
+        except ManifestGateError as exc:
+            return _error(422, "manifest_gate", str(exc))
+        except SnapshotMissingError as exc:
+            return _error(404, "snapshot_missing", str(exc))
+        except SnapshotValidationError as exc:
+            return _error(422, "snapshot_validation", str(exc))
+        except HistoricalLmV2Error as exc:
+            return _error(422, "historical_lmv2_error", str(exc))
+        except Exception as exc:
+            return _error(500, "decision_snapshot_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.get("/live-charts/historical-lmv2-parity-demo", response_class=HTMLResponse)
+    async def historical_lmv2_parity_demo_page(
+        request: Request,
+        user: dict = Depends(require_auth),
+    ):
+        """Isolated Phase-1 visualization (Trade #4); not linked from main nav."""
+        return HTMLResponse(
+            render_template(
+                "historical_lmv2_parity_demo.html",
+                {"request": request, "user": user},
+            )
+        )
 
     @router.post("/api/research/live-micro-lld-v2-ch-test")
     async def api_research_live_micro_lld_v2_ch_test(

@@ -89,6 +89,14 @@
       Number(meta.early_timing != null ? meta.early_timing : zone.early_timing) === 0;
     var fillRgb = LIVE_MICRO_LLD_V2_STRENGTH_RGB[sc] || "#888888";
     var opacity = liveMicroLldV2ZoneFillOpacity(sc, microLive);
+    var borderWidth = (zone.style && zone.style.lineWidth != null) ? zone.style.lineWidth : 2;
+    if (meta.layer === "remaining") {
+      opacity = 0.55;
+      borderWidth = 1;
+    } else if (meta.remaining_mode) {
+      opacity = 0;
+      borderWidth = 1;
+    }
     var border = liveMicroLldV2ZoneBorderColor(zone.side);
     var style = Object.assign({}, zone.style || {}, {
       color: fillRgb,
@@ -98,7 +106,7 @@
       strength_class: sc,
       style: style,
       border_color: border,
-      border_width: style.lineWidth != null ? style.lineWidth : 2,
+      border_width: borderWidth,
       opacity: opacity,
       metadata: Object.assign({}, meta, { strength_class: sc }),
     });
