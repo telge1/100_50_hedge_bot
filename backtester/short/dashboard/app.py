@@ -3455,6 +3455,7 @@ async def daten_signale_redirect(request: Request, user: dict = Depends(require_
 @app.get("/ema-signale", response_class=HTMLResponse)
 async def ema_signale_page(
     request: Request,
+    mode: str = Query("v2_backtest", description="v2_backtest|ema_live"),
     page: int = Query(0, ge=0, description="Zero-based signal page"),
     page_size: int = Query(50, ge=1, le=500, description="Signals per page"),
     symbol: str | None = Query(None),
@@ -3464,42 +3465,117 @@ async def ema_signale_page(
     end_time: str | None = Query(None, description="End datetime filter (UTC)"),
     user: dict = Depends(require_auth),
 ):
-    """EMA-59 Band Signale aus dem Signal-Generator (thr × 3, 17.09.2026)."""
-    from ema_sg_signals.feed import paginated_live_signals
+    """Ema-Signal: V2 Floor-Guard Backtest (default) oder EMA-59 Live-Feed."""
+    view_mode = (mode or "v2_backtest").strip().lower()
+    if view_mode not in ("v2_backtest", "ema_live"):
+        view_mode = "v2_backtest"
 
-    payload = paginated_live_signals(
-        symbol=symbol,
-        direction=direction,
-        state=state,
-        start_time=start_time,
-        end_time=end_time,
-        page=page,
-        page_size=page_size,
-    )
-    pagination = payload.get("pagination") or {}
-    signals = payload.get("signals") or []
+    if view_mode == "ema_live":
+        from ema_sg_signals.feed import paginated_live_signals
+
+        payload = paginated_live_signals(
+            symbol=symbol,
+            direction=direction,
+            state=state,
+            start_time=start_time,
+            end_time=end_time,
+            page=page,
+            page_size=page_size,
+        )
+        pagination = payload.get("pagination") or {}
+        signals = payload.get("signals") or []
+        return HTMLResponse(render_template(
+            "ema_signale.html",
+            {
+                "request": request,
+                "user": user,
+                "view_mode": "ema_live",
+                "signals": signals,
+                "symbols": payload.get("symbols") or [],
+                "summary": payload.get("page_summary") or {},
+                "pagination": pagination,
+                "feed_ready": bool(payload.get("feed_ready")),
+                "feed_message": payload.get("message") or "",
+                "banner": payload.get("banner") or {},
+                "window_label": payload.get("window_label") or "",
+                "filter_symbol": (symbol or "").strip().upper(),
+                "filter_direction": (direction or "").strip().upper(),
+                "filter_state": (state or "").strip().upper(),
+                "filter_start_time": start_time or "",
+                "filter_end_time": end_time or "",
+                "page_size": pagination.get("page_size") or page_size,
+                "signal_page": pagination.get("page") or 0,
+            },
+        ))
+
     return HTMLResponse(render_template(
         "ema_signale.html",
         {
             "request": request,
             "user": user,
-            "signals": signals,
-            "symbols": payload.get("symbols") or [],
-            "summary": payload.get("page_summary") or {},
-            "pagination": pagination,
-            "feed_ready": bool(payload.get("feed_ready")),
-            "feed_message": payload.get("message") or "",
-            "banner": payload.get("banner") or {},
-            "window_label": payload.get("window_label") or "",
-            "filter_symbol": (symbol or "").strip().upper(),
-            "filter_direction": (direction or "").strip().upper(),
-            "filter_state": (state or "").strip().upper(),
-            "filter_start_time": start_time or "",
-            "filter_end_time": end_time or "",
-            "page_size": pagination.get("page_size") or page_size,
-            "signal_page": pagination.get("page") or 0,
+            "view_mode": "v2_backtest",
+            "signals": [],
+            "symbols": ["DOGEUSDT"],
+            "summary": {},
+            "pagination": {
+                "page": 0,
+                "page_size": page_size,
+                "total_filtered": 0,
+                "has_prev": False,
+                "has_next": False,
+            },
+            "feed_ready": True,
+            "feed_message": "",
+            "banner": {
+                "title": "V2 FLOOR-GUARD SHORT BASELINE",
+                "body": "Historische Original-V2-Pools · Research Smoke",
+            },
+            "window_label": "SMOKE / STATE_WARMUP_NOT_PROVEN",
+            "filter_symbol": "",
+            "filter_direction": "",
+            "filter_state": "",
+            "filter_start_time": "",
+            "filter_end_time": "",
+            "page_size": page_size,
+            "signal_page": page,
         },
     ))
+
+
+@app.get("/api/ema-signale/v2-backtest/runs")
+async def api_ema_signale_v2_runs(user: dict = Depends(require_auth)):
+    from ema_signale_v2_api import api_list_runs
+
+    return api_list_runs()
+
+
+@app.get("/api/ema-signale/v2-backtest/results")
+async def api_ema_signale_v2_results(
+    user: dict = Depends(require_auth),
+    run_id: str = Query(...),
+    variant_key: str = Query(...),
+    page: int = Query(0, ge=0),
+    page_size: int = Query(50, ge=1, le=500),
+):
+    from ema_signale_v2_api import api_results
+
+    try:
+        return api_results(run_id, variant_key, page, page_size)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/ema-signale/v2-backtest/resolve-config")
+async def api_ema_signale_v2_resolve_config(
+    user: dict = Depends(require_auth),
+    pool_detail: int = Query(10, ge=1, le=10),
+    guard_on: bool = Query(False),
+):
+    from ema_signale_v2_api import api_resolve_config
+
+    return api_resolve_config(pool_detail, guard_on)
 
 
 @app.get("/stoch-profite", response_class=HTMLResponse)

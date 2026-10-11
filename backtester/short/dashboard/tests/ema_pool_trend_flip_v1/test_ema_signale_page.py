@@ -95,6 +95,7 @@ def test_ema_signal_template_renders():
     env = Environment(loader=FileSystemLoader(str(DASHBOARD / "templates")))
     html = env.get_template("ema_signale.html").render(
         user={"username": "tester"},
+        view_mode="ema_live",
         signals=[],
         symbols=[],
         summary={"signals": 0, "created": 0, "completed": 0, "cancelled": 0},

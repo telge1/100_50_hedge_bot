@@ -32,9 +32,83 @@
                         {% endif %}
                     </div>
                     <h1>📉 Ema-Signal</h1>
+                    {% if view_mode == 'v2_backtest' %}
+                    <p>V2 Floor-Guard Backtest — historische Original-V2-Pools · Zeiten in <strong>UTC</strong>.</p>
+                    {% else %}
                     <p>Live-Signale aus dem Signal-Generator (EMA 59 Band, Multiplikator 3). Timestamp und Symbol in <strong>UTC</strong>.</p>
+                    {% endif %}
                 </div>
             </div>
+
+            <div class="stoch-filter-bar" style="margin-bottom: 1rem;">
+                <div class="stoch-filter-field">
+                    <label for="emaViewMode">Ansicht</label>
+                    <select class="stoch-filter-select" id="emaViewMode" name="mode">
+                        <option value="v2_backtest" {% if view_mode == 'v2_backtest' %}selected{% endif %}>V2 Floor-Guard Backtest</option>
+                        <option value="ema_live" {% if view_mode == 'ema_live' %}selected{% endif %}>EMA Live</option>
+                    </select>
+                </div>
+            </div>
+
+            {% if view_mode == 'v2_backtest' %}
+            <div class="stoch-feed-banner" id="v2StatusBanner">SMOKE / STATE_WARMUP_NOT_PROVEN</div>
+
+            <div class="stoch-perf" aria-live="polite">
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Trades</div><div class="stoch-perf-value" id="v2KpiTrades">0</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">TP</div><div class="stoch-perf-value stoch-perf-win" id="v2KpiTp">0</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">SL</div><div class="stoch-perf-value stoch-perf-loss" id="v2KpiSl">0</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Horizon</div><div class="stoch-perf-value" id="v2KpiHorizon">0</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Σ PnL %</div><div class="stoch-perf-value" id="v2KpiPnl">–</div></div>
+                </div>
+            </div>
+
+            <form class="stoch-filter-bar" id="v2FilterForm" onsubmit="return false;">
+                <div class="stoch-filter-field">
+                    <label for="v2PoolDetail">15m Pool Detail</label>
+                    <select class="stoch-filter-select" id="v2PoolDetail">
+                        <option value="1">PD1</option>
+                        <option value="5">PD5</option>
+                        <option value="10" selected>PD10</option>
+                    </select>
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="v2GuardOn">4h Floor-Guard</label>
+                    <label><input type="checkbox" id="v2GuardOn"> ON (4h EMA immer ON · E1R OFF)</label>
+                </div>
+                <button class="stoch-btn" id="v2FilterApply" type="button">Anwenden</button>
+                <div class="stoch-filter-pagination">
+                    <button class="stoch-btn stoch-btn-ghost" id="emaPagePrev" type="button">Zurück</button>
+                    <button class="stoch-btn stoch-btn-ghost" id="emaPageNext" type="button">Weiter</button>
+                    <span class="stoch-filter-pagination-info" id="emaPaginationInfo">Lade …</span>
+                </div>
+            </form>
+
+            <div class="stoch-table-wrap">
+                <table class="stoch-table" id="emaSignalsTable">
+                    <thead>
+                        <tr>
+                            <th>Decision-Close (UTC)</th>
+                            <th>Symbol</th>
+                            <th>Dir</th>
+                            <th>Entry</th>
+                            <th>SL</th>
+                            <th>TP</th>
+                            <th>Exit-Zeit</th>
+                            <th>Exit</th>
+                            <th>PnL %</th>
+                            <th>R</th>
+                            <th>PD</th>
+                            <th>Guard</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emaSignalsBody">
+                        <tr><td colspan="12" class="stoch-empty">Lade …</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {% else %}
 
             {% if not feed_ready %}
             <div class="stoch-feed-banner" id="emaFeedBanner">{{ feed_message or "EMA-Artefakt nicht verfügbar" }}</div>
@@ -50,6 +124,7 @@
             </div>
 
             <form class="stoch-filter-bar" id="emaFilterForm" method="get" action="/ema-signale">
+                <input type="hidden" name="mode" value="ema_live">
                 <input type="hidden" name="page" id="emaFilterPage" value="{{ signal_page }}">
                 <div class="stoch-filter-field">
                     <label for="emaFilterSymbol">Symbol</label>
@@ -80,23 +155,11 @@
                 </div>
                 <div class="stoch-filter-field">
                     <label for="emaFilterStart">Von</label>
-                    <input
-                        class="stoch-filter-input"
-                        id="emaFilterStart"
-                        name="start_time"
-                        type="datetime-local"
-                        value="{{ filter_start_time }}"
-                    >
+                    <input class="stoch-filter-input" id="emaFilterStart" name="start_time" type="datetime-local" value="{{ filter_start_time }}">
                 </div>
                 <div class="stoch-filter-field">
                     <label for="emaFilterEnd">Bis</label>
-                    <input
-                        class="stoch-filter-input"
-                        id="emaFilterEnd"
-                        name="end_time"
-                        type="datetime-local"
-                        value="{{ filter_end_time }}"
-                    >
+                    <input class="stoch-filter-input" id="emaFilterEnd" name="end_time" type="datetime-local" value="{{ filter_end_time }}">
                 </div>
                 <div class="stoch-filter-field">
                     <label for="emaPageSize">Blockgröße</label>
@@ -107,7 +170,7 @@
                     </select>
                 </div>
                 <button class="stoch-btn" id="emaFilterApply" type="submit">Anwenden</button>
-                <a class="stoch-btn stoch-btn-ghost" id="emaFilterReset" href="/ema-signale">Zurücksetzen</a>
+                <a class="stoch-btn stoch-btn-ghost" id="emaFilterReset" href="/ema-signale?mode=ema_live">Zurücksetzen</a>
                 <div class="stoch-filter-pagination">
                     <button class="stoch-btn stoch-btn-ghost" id="emaPagePrev" type="button" {% if not pagination.has_prev %}disabled{% endif %}>Zurück</button>
                     <button class="stoch-btn stoch-btn-ghost" id="emaPageNext" type="button" {% if not pagination.has_next %}disabled{% endif %}>Weiter</button>
@@ -158,15 +221,37 @@
                     </tbody>
                 </table>
             </div>
+            {% endif %}
         </div>
     </div>
+
+    <div class="stoch-modal-backdrop" id="emaV2ChartModal" role="dialog" aria-modal="true">
+        <div class="stoch-modal">
+            <div class="stoch-modal-header">
+                <div>
+                    <h2 id="emaV2ChartTitle">V2 Trade Chart</h2>
+                    <p class="stoch-modal-sub" id="emaV2ChartSub"></p>
+                </div>
+                <button type="button" class="stoch-modal-close" id="emaV2ChartClose" aria-label="Schließen">×</button>
+            </div>
+            <div class="stoch-modal-body">
+                <div class="stoch-chart-host" id="emaV2ChartHost"></div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        window.EMA_VIEW_MODE = "{{ view_mode }}";
         window.EMA_SIGNAL_PAGE = {{ signal_page }};
         window.EMA_SIGNAL_PAGE_SIZE = {{ page_size }};
         window.EMA_SIGNAL_HAS_PREV = {{ 'true' if pagination.has_prev else 'false' }};
         window.EMA_SIGNAL_HAS_NEXT = {{ 'true' if pagination.has_next else 'false' }};
     </script>
-    <script src="/static/js/ema_signale.js?v=1"></script>
+    {% if view_mode == 'v2_backtest' %}
+    <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="/static/js/ema_signale_v2_chart.js?v=1"></script>
+    {% endif %}
+    <script src="/static/js/ema_signale.js?v=2"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
