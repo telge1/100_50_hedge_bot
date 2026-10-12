@@ -21,6 +21,9 @@
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
+  const SCANNER_COMMON_NS = "SCANNER_COMMON";
+  const SC_HELPERS =
+    typeof ResearchScannerCommonHelpers !== "undefined" ? ResearchScannerCommonHelpers : null;
   const VP_KEY = "research.volume_profile";
   const OBP_KEY = "research.orderbook_profile";
   const OBL_KEY = "research.orderbook_levels.v3";
@@ -64,6 +67,23 @@
     panes: {},
     pollGen: 0,
     pollTimer: null,
+    scannerCommonPollCoalesce: {
+      timer: null,
+      inflight: false,
+      lastRefreshedClosedOpen: null,
+      pendingPaneId: null,
+      pendingClosedOpen: null,
+    },
+    scannerCommonCache: {},
+    causalLldCache: {},
+    liveMicroLldV2Cache: {},
+    liveMicroLldV2RefreshToken: 0,
+    liveMicroLldV2ChTestCache: {},
+    liveMicroLldV2ChTestRefreshToken: 0,
+    liveMicroLldV2ChCompareStatus: null,
+    historicalLmv2Cache: {},
+    historicalLmv2RefreshToken: 0,
+    scannerCommonReplayRefreshTimer: null,
     formingTimer: null,
     obpRefreshTimer: null,
     oblRefreshTimer: null,
@@ -107,6 +127,15 @@
   const inflightGets = {};
   const inflightPosts = {};
   const PANE_HTTP_LIMIT = 2;
+  /** Cheaper TFs first so 15m pools appear while 1m still computes. */
+  const LIVE_MICRO_LLD_V2_TF_PRIORITY = {
+    "15m": 0,
+    "1h": 1,
+    "30m": 2,
+    "4h": 3,
+    "5m": 4,
+    "1m": 5,
+  };
 
   const $ = (id) => document.getElementById(id);
 
@@ -389,6 +418,9 @@
     state.replayWindow = Object.assign({}, win, { goto_ts_utc: state.replayTargetTs });
     state.replayGen = (state.replayGen || 0) + 1;
     state.gotoTsUtc = state.replayTargetTs;
+    state.liveMicroLldV2Cache = {};
+    state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
     abortInflightPaneLoads();
     stopPoll();
     lockReplayViewOnAllPanes(state.replayWindow);
@@ -400,6 +432,9 @@
     state.replayWindow = null;
     state.replayGen = (state.replayGen || 0) + 1;
     state.gotoTsUtc = null;
+    state.liveMicroLldV2Cache = {};
+    state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
     state.liquidityLocationAsOf = null;
     unlockReplayViewOnAllPanes();
     abortInflightPaneLoads();
@@ -557,7 +592,7 @@
     const iso = serverIso || state.liquidityLocationAsOf;
     if (hint) {
       if (iso) {
-        hint.textContent = "LLD as-of: " + iso;
+        hint.textContent = "Research / OA Pools as-of: " + iso;
         hint.hidden = false;
       } else {
         hint.textContent = "";
@@ -591,6 +626,51 @@
     state.history.pinned = false;
     await reloadVisibleHistory({ sourceAction: "lld-asof-clear" });
     startPoll();
+    if (scannerPoolsCommonEnabled()) {
+      try {
+        await refreshScannerCommonPools(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] scanner-common live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (causalLldLandscapeEnabled()) {
+      try {
+        await refreshCausalLldLandscape(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] causal-lld live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2Enabled()) {
+      try {
+        await refreshLiveMicroLldV2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2ChTestEnabled()) {
+      try {
+        await refreshLiveMicroLldV2ChTest(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2-ch-test live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
     if (statusMsg) setStatus(statusMsg);
   }
 
@@ -683,6 +763,51 @@
     updateGotoSyncHint(win);
     updateHistoryHint({ from: loadRange.from, to: loadRange.to });
     updateReplayExitUi();
+    if (scannerPoolsCommonEnabled()) {
+      try {
+        await refreshScannerCommonPools(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] scanner-common go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (causalLldLandscapeEnabled()) {
+      try {
+        await refreshCausalLldLandscape(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] causal-lld go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2Enabled()) {
+      try {
+        await refreshLiveMicroLldV2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2ChTestEnabled()) {
+      try {
+        await refreshLiveMicroLldV2ChTest(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2-ch-test go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
     setStatus(
       "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
       (lldOn ? " · LLD as-of " + asOfIso : "") +
@@ -994,10 +1119,12 @@
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
       on_visible_range: function (from, to) {
+        if (pane._suppressOverlayViewportFeedback) return;
         scheduleVolumeProfile(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
+        scheduleLiveMicroLldV2ViewportSync(pane);
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
@@ -1034,12 +1161,16 @@
   function syncOverlays(pane, payloads) {
     const chart = api(pane);
     const list = payloads || [];
+    pane.pendingOverlays = list;
     if (!chart) {
-      pane.pendingOverlays = list;
       return;
     }
+    const chartList =
+      SC_HELPERS && SC_HELPERS.filterOverlaysForChartRender
+        ? SC_HELPERS.filterOverlaysForChartRender(list, pane, chart)
+        : list;
     const wanted = {};
-    list.forEach(function (p) {
+    chartList.forEach(function (p) {
       if (p && p.id) wanted[p.id] = p;
     });
     const prev = pane.overlayPayloads || {};
@@ -1047,7 +1178,21 @@
       if (!wanted[id]) chart.removeOverlay(id);
     });
     function overlayFp(p) {
+      if (!p) return "";
       // Avoid JSON.stringify of multi-MB EZM metadata on every sync.
+      if (p.type === "zone") {
+        return [
+          p.type || "",
+          p.start_timestamp != null ? p.start_timestamp : "",
+          p.end_timestamp != null ? p.end_timestamp : "",
+          p.top_price != null ? p.top_price : "",
+          p.bottom_price != null ? p.bottom_price : "",
+          p.opacity != null ? p.opacity : "",
+          p.border_color || "",
+          (p.style && p.style.color) || "",
+          p.visible === false ? "0" : "1",
+        ].join("|");
+      }
       return [
         p.type || "",
         p.shape || "",
@@ -1063,7 +1208,1402 @@
       else if (overlayFp(prev[id]) !== overlayFp(wanted[id])) chart.updateOverlay(wanted[id]);
     });
     pane.overlayPayloads = wanted;
-    pane.pendingOverlays = list;
+    if (chart.layoutOverlays) {
+      const v2OnChart = SC_HELPERS && SC_HELPERS.countLiveMicroLldV2Overlays
+        ? SC_HELPERS.countLiveMicroLldV2Overlays(chartList)
+        : 0;
+      if (v2OnChart > 0 || Object.keys(wanted).length > 120) {
+        pane._suppressOverlayViewportFeedback = true;
+        try {
+          chart.layoutOverlays();
+        } finally {
+          pane._suppressOverlayViewportFeedback = false;
+        }
+      }
+    }
+  }
+
+  function scheduleLiveMicroLldV2ViewportSync(pane) {
+    if (!pane || !SC_HELPERS) return;
+    const v2On = liveMicroLldV2Enabled() && paneSupportsLiveMicroLldV2(pane);
+    const chOn = liveMicroLldV2ChTestEnabled() && paneSupportsLiveMicroLldV2ChTest(pane);
+    const histOn = historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane);
+    if (!v2On && !chOn && !histOn) return;
+    if (!SC_HELPERS.liveMicroLldV2NeedsViewportChartSync(pane.pendingOverlays || [])) return;
+    if (pane.liveMicroLldV2ViewportTimer) clearTimeout(pane.liveMicroLldV2ViewportTimer);
+    pane.liveMicroLldV2ViewportTimer = setTimeout(function () {
+      pane.liveMicroLldV2ViewportTimer = null;
+      syncOverlays(pane, pane.pendingOverlays || []);
+    }, 200);
+  }
+
+  function scannerPoolsCommonEnabled() {
+    const cb = $("researchIndScannerPoolsCommon");
+    return !!(cb && cb.checked);
+  }
+
+  function causalLldLandscapeEnabled() {
+    const cb = $("researchIndCausalLldLandscape");
+    return !!(cb && cb.checked);
+  }
+
+  function liveMicroLldV2Enabled() {
+    const cb = $("researchIndLiveMicroLldV2");
+    return !!(cb && cb.checked);
+  }
+
+  function liveMicroLldV2ChTestEnabled() {
+    const cb = $("researchIndLiveMicroLldV2ChTest");
+    return !!(cb && cb.checked);
+  }
+
+  function liveMicroLldV2ChCompareEnabled() {
+    const cb = $("researchLiveMicroV2ChCompare");
+    return !!(cb && cb.checked);
+  }
+
+  function historicalLmv2PoolsEnabled() {
+    const cb = $("researchIndHistoricalLmv2Pools");
+    return !!(cb && cb.checked);
+  }
+
+  function historicalLmv2ActiveEnabled() {
+    const cb = $("researchIndHistoricalLmv2Active");
+    return cb ? !!cb.checked : true;
+  }
+
+  function historicalLmv2RemainingEnabled() {
+    const cb = $("researchIndHistoricalLmv2Remaining");
+    return !!(cb && cb.checked);
+  }
+
+  function paneSupportsHistoricalLmv2(pane) {
+    if (!pane || !state.symbol) return false;
+    if (String(state.symbol).toUpperCase() !== "DOGEUSDT") return false;
+    if (pane.tf !== "15m") return false;
+    if (liveMicroLldV2PoolDetail() !== 10) return false;
+    return true;
+  }
+
+  function updateHistoricalLmv2UiChrome() {
+    const on = historicalLmv2PoolsEnabled();
+    const aw = $("researchHistoricalLmv2ActiveWrap");
+    const rw = $("researchHistoricalLmv2RemainingWrap");
+    const banner = $("researchHistoricalLmv2Banner");
+    if (aw) aw.hidden = !on;
+    if (rw) rw.hidden = !on;
+    if (banner) banner.hidden = !on;
+    if (on && $("researchLiveMicroV2PoolDetail")) {
+      $("researchLiveMicroV2PoolDetail").value = "10";
+    }
+  }
+
+  function liveMicroLldV2ChTestRunId() {
+    return (SC_HELPERS && SC_HELPERS.LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID) ||
+      "de5f74f6-236f-4dc1-81df-94e15dec1b83";
+  }
+
+  function paneSupportsLiveMicroLldV2ChTest(pane) {
+    if (!pane || pane.tf !== "5m") return false;
+    if (!state.symbol || String(state.symbol).toUpperCase() !== "TUTUSDT") return false;
+    const pd = liveMicroLldV2PoolDetail();
+    return pd >= 1 && pd <= 10;
+  }
+
+  function liveMicroLldV2PoolDetail() {
+    const sel = $("researchLiveMicroV2PoolDetail");
+    const n = sel ? parseInt(sel.value, 10) : 5;
+    return Number.isFinite(n) && n >= 1 && n <= 10 ? n : 5;
+  }
+
+  function liveMicroLldV2FilterPayload() {
+    const types = [];
+    const strengths = [];
+    document.querySelectorAll(".research-lmv2-type:checked").forEach(function (el) {
+      if (el.value) types.push(el.value);
+    });
+    document.querySelectorAll(".research-lmv2-strength:checked").forEach(function (el) {
+      if (el.value) strengths.push(el.value);
+    });
+    const out = {};
+    if (types.length && types.length < 3) out.pool_types = types;
+    if (strengths.length && strengths.length < 5) out.strength_classes = strengths;
+    if (liveMicroLldV2RemainingEnabled()) out.include_remaining = true;
+    return out;
+  }
+
+  function liveMicroLldV2RemainingEnabled() {
+    const cb = $("researchIndLiveMicroLldV2Remaining");
+    return !!(cb && cb.checked);
+  }
+
+  function restoreLiveMicroLldV2Toggles() {
+    try {
+      const v2 = localStorage.getItem("research.liveMicroLldV2");
+      const rem = localStorage.getItem("research.liveMicroLldV2Remaining");
+      const v2El = $("researchIndLiveMicroLldV2");
+      const remEl = $("researchIndLiveMicroLldV2Remaining");
+      if (v2El && v2 === "1") v2El.checked = true;
+      if (v2El && v2 === "0") v2El.checked = false;
+      if (remEl && rem === "1") remEl.checked = true;
+      if (remEl && rem === "0") remEl.checked = false;
+    } catch (e) { /* ignore */ }
+  }
+
+  function rememberLiveMicroLldV2Toggles() {
+    try {
+      localStorage.setItem("research.liveMicroLldV2", liveMicroLldV2Enabled() ? "1" : "0");
+      localStorage.setItem("research.liveMicroLldV2Remaining", liveMicroLldV2RemainingEnabled() ? "1" : "0");
+    } catch (e) { /* ignore */ }
+  }
+
+  function interleaveRemainingZones(zones) {
+    const base = [];
+    const remaining = {};
+    (zones || []).forEach(function (zone) {
+      if (zone && zone.metadata && zone.metadata.layer === "remaining") {
+        remaining[zone.pool_id] = zone;
+      } else if (zone) {
+        base.push(zone);
+      }
+    });
+    const out = [];
+    base.forEach(function (zone) {
+      out.push(zone);
+      if (remaining[zone.pool_id]) out.push(remaining[zone.pool_id]);
+    });
+    return out;
+  }
+
+  function clientRemainingZones(zones, pane, tfSec) {
+    const candles = (pane && pane.pendingData && pane.pendingData.candles) || [];
+    const sec = tfSec || 900;
+    const extra = [];
+    const consumedIds = {};
+    (zones || []).forEach(function (zone) {
+      if (!zone || (zone.metadata && zone.metadata.layer === "remaining")) return;
+      const bottom = Number(zone.bottom_price);
+      const top = Number(zone.top_price);
+      const start = Number(zone.start_timestamp);
+      const end = Number(zone.end_timestamp);
+      if (!Number.isFinite(bottom) || !Number.isFinite(top) || top <= bottom) return;
+      if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+      let penHigh = null;
+      let penLow = null;
+      for (let i = 0; i < candles.length; i++) {
+        const open = Number(candles[i].time);
+        if (!Number.isFinite(open)) continue;
+        const close = open + sec;
+        if (close <= start || close > end) continue;
+        const hi = Number(candles[i].high);
+        const lo = Number(candles[i].low);
+        if (Number.isFinite(hi) && (penHigh == null || hi > penHigh)) penHigh = hi;
+        if (Number.isFinite(lo) && (penLow == null || lo < penLow)) penLow = lo;
+      }
+      const side = String(zone.side || "").toLowerCase();
+      let remBottom = bottom;
+      let remTop = top;
+      let consumed = false;
+      if (side === "upper") {
+        if (penHigh != null && penHigh >= top) consumed = true;
+        else if (penHigh != null && penHigh > bottom) remBottom = penHigh;
+      } else if (side === "lower") {
+        if (penLow != null && penLow <= bottom) consumed = true;
+        else if (penLow != null && penLow < top) remTop = penLow;
+      } else {
+        return;
+      }
+      if (consumed || remTop - remBottom <= 1e-12) {
+        consumedIds[zone.pool_id] = true;
+        return;
+      }
+      extra.push(Object.assign({}, zone, {
+        id: "live-micro-v2-rem:" + zone.pool_id,
+        bottom_price: remBottom,
+        top_price: remTop,
+        lower_price: remBottom,
+        upper_price: remTop,
+        metadata: Object.assign({}, zone.metadata || {}, { layer: "remaining" }),
+      }));
+    });
+    return { extra: extra, consumed: consumedIds };
+  }
+
+  function liveMicroLldV2FilterCacheKey() {
+    const f = liveMicroLldV2FilterPayload();
+    return JSON.stringify(f);
+  }
+
+  function paneSupportsLiveMicroLldV2(pane) {
+    if (!pane || !pane.tf) return false;
+    if (SC_HELPERS && SC_HELPERS.LIVE_MICRO_LLD_V2_TFS) {
+      return !!SC_HELPERS.LIVE_MICRO_LLD_V2_TFS[pane.tf];
+    }
+    return pane.tf === "1m" || pane.tf === "5m" || pane.tf === "15m" || pane.tf === "30m" || pane.tf === "1h" || pane.tf === "4h";
+  }
+
+  function paneForScannerCommon() {
+    if (SC_HELPERS) {
+      return SC_HELPERS.selectPaneForScannerCommon(
+        PANE_IDS,
+        state.panes,
+        visibleIds(),
+        lastClosedBarTime
+      );
+    }
+    let found = null;
+    PANE_IDS.forEach(function (pid) {
+      const p = state.panes[pid];
+      if (p && p.tf === "15m" && p.pendingData && lastClosedBarTime(p) != null) found = p;
+    });
+    return found;
+  }
+
+  function stripScannerCommonOverlays(list) {
+    if (SC_HELPERS) return SC_HELPERS.stripScannerCommonOverlays(list);
+    return (list || []).filter(function (p) {
+      return p && p.namespace !== SCANNER_COMMON_NS;
+    });
+  }
+
+  function mergeScannerCommonOverlays(base, scannerOverlays) {
+    if (SC_HELPERS) return SC_HELPERS.mergeScannerCommonOverlays(base, scannerOverlays);
+    return stripScannerCommonOverlays(base).concat(scannerOverlays || []);
+  }
+
+  function setScannerCommonWaiting(message) {
+    const el = $("researchScannerCommonHint");
+    if (!el) return;
+    if (!scannerPoolsCommonEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message || "Scanner Pools (COMMON): waiting…";
+    try {
+      console.debug("[research] scanner-common:", message || "waiting");
+    } catch (e) { /* ignore */ }
+  }
+
+  function scannerCommonDecisionContext(pane) {
+    const target = pane || paneForScannerCommon();
+    const pid = target && target.id;
+    return {
+      pane: target,
+      tfSec: TF_SEC["15m"] || 900,
+      isHistoricalReplay: isHistoricalReplay(),
+      replayTargetTs: state.replayTargetTs,
+      selectedUnix: pid && state.selectedPane === pid ? state.selectedUnix : null,
+      historyBlocksLive: historyBlocksLive(),
+      nowUnix: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  function liveMicroLldV2DecisionContext(pane) {
+    const target = pane;
+    const pid = target && target.id;
+    const tf = target && target.tf;
+    return {
+      pane: target,
+      tfSec: TF_SEC[tf] || 900,
+      isHistoricalReplay: isHistoricalReplay(),
+      replayTargetTs: state.replayTargetTs,
+      selectedUnix: pid && state.selectedPane === pid ? state.selectedUnix : null,
+      historyBlocksLive: historyBlocksLive(),
+      nowUnix: Math.floor(Date.now() / 1000),
+    };
+  }
+
+  function scannerCommonIsHistoricalMode(pane) {
+    if (SC_HELPERS) {
+      return SC_HELPERS.scannerCommonHistoricalMode(scannerCommonDecisionContext(pane));
+    }
+    return isHistoricalReplay() || historyBlocksLive();
+  }
+
+  function resolveScannerCommonDecisionIso(pane) {
+    const target = pane || paneForScannerCommon();
+    if (!target) return null;
+    let closeUnix = null;
+    if (SC_HELPERS) {
+      closeUnix = SC_HELPERS.resolveScannerCommonDecisionCloseUnix(
+        scannerCommonDecisionContext(target)
+      );
+    } else {
+      const tfSec = TF_SEC["15m"] || 900;
+      const closedOpen = lastClosedBarTime(target);
+      if (closedOpen == null) return null;
+      closeUnix = closedOpen + tfSec;
+    }
+    if (closeUnix == null) return null;
+    return unixToIsoZExact(closeUnix);
+  }
+
+  function scannerCommonDisplayMode() {
+    const sel = $("researchScannerCommonMode");
+    if (sel && sel.value === "timeline") return "timeline";
+    return "snapshot";
+  }
+
+  function updateScannerCommonHint(payload) {
+    const el = $("researchScannerCommonHint");
+    if (!el) return;
+    if (!payload || !scannerPoolsCommonEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const hash = payload.rows_hash ? String(payload.rows_hash).slice(0, 12) : "";
+    const modeLabel = scannerCommonIsHistoricalMode() ? "HIST" : "LIVE";
+    if (scannerCommonDisplayMode() === "timeline" || payload.layer === "scanner_pools_common_timeline_v1") {
+      const segHash = payload.segments_hash ? String(payload.segments_hash).slice(0, 12) : "";
+      el.textContent =
+        "Scanner Pools (COMMON) · Timeline · " + modeLabel +
+        " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+        " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+        " · " + (payload.from_close || "") + " → " + (payload.to_close || "") +
+        (segHash ? " · " + segHash : "");
+      return;
+    }
+    el.textContent =
+      "Scanner Pools (COMMON) · Snapshot · " + modeLabel +
+      " · n=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · decision=" + (payload.decision_close || "") +
+      (hash ? " · " + hash : "");
+  }
+
+  async function refreshScannerCommonTimeline(pane, opts) {
+    const target = pane || paneForScannerCommon();
+    const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    if (!scannerPoolsCommonEnabled()) {
+      if (target) {
+        syncOverlays(target, stripScannerCommonOverlays(target.pendingOverlays || []));
+      }
+      updateScannerCommonHint(null);
+      return;
+    }
+    if (!target || target.tf !== "15m" || !state.symbol) {
+      setScannerCommonWaiting("Scanner Pools (COMMON): waiting for loaded 15m pane");
+      return;
+    }
+    const ctx = scannerCommonDecisionContext(target);
+    ctx.loadedFromUnix = state.history.loadedFrom;
+    let win = null;
+    if (SC_HELPERS) {
+      win = SC_HELPERS.resolveScannerCommonTimelineWindow(ctx);
+    }
+    if (!win) {
+      setScannerCommonWaiting("Scanner Pools (COMMON): timeline window not ready");
+      return;
+    }
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    const histMode = scannerCommonIsHistoricalMode(target);
+    let body = null;
+    const cacheVer = (state.workspace && state.workspace.scanner_common_config_version) || "-";
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.scannerCommonTimelineCacheKey(
+        state.symbol,
+        "15m",
+        fromIso,
+        toIso,
+        cacheVer
+      );
+      if (state.scannerCommonCache && state.scannerCommonCache[cacheKey]) {
+        body = state.scannerCommonCache[cacheKey];
+      }
+    }
+    try {
+      if (!body) {
+        body = await sendJson("/api/research/scanner-pools-common-timeline", "POST", {
+          symbol: state.symbol,
+          timeframe: "15m",
+          from_close: fromIso,
+          to_close: toIso,
+        }, {
+          sourceAction: histMode ? "scanner-common-timeline-hist" : "scanner-common-timeline",
+          pane: target.paneId || target.id,
+          timeframe: "15m",
+          signal: (opts && opts.signal) || undefined,
+        });
+        if (SC_HELPERS && cacheKey && body) {
+          const ver = body.config_version != null ? body.config_version : cacheVer;
+          cacheKey = SC_HELPERS.scannerCommonTimelineCacheKey(
+            state.symbol,
+            "15m",
+            fromIso,
+            toIso,
+            ver
+          );
+          state.scannerCommonCache[cacheKey] = body;
+        }
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      throw err;
+    }
+    if (gen !== state.loadGen) return;
+    syncOverlays(
+      target,
+      SC_HELPERS
+        ? SC_HELPERS.applyScannerCommonTimelineToOverlays(
+          target.pendingOverlays || [],
+          body.zones || [],
+          win.from_close_unix,
+          win.to_close_unix
+        )
+        : mergeScannerCommonOverlays(
+          stripScannerCommonOverlays(target.pendingOverlays || []),
+          body.zones || []
+        )
+    );
+    updateScannerCommonHint(body);
+    if (SC_HELPERS && target && !histMode) {
+      const closedOpen = SC_HELPERS.lastClosedBarOpenOnPane(
+        target,
+        ctx.tfSec,
+        SC_HELPERS.resolveScannerCommonAsOfUnix(ctx)
+      );
+      state.scannerCommonPollCoalesce = SC_HELPERS.markScannerCommonPollRefreshed(
+        state.scannerCommonPollCoalesce,
+        closedOpen
+      );
+    }
+  }
+
+  function updateCausalLldHint(payload) {
+    const el = $("researchCausalLldHint");
+    if (!el) return;
+    if (!payload || !causalLldLandscapeEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const modeLabel = scannerCommonIsHistoricalMode() ? "HIST" : "LIVE";
+    const hash = payload.segments_hash ? String(payload.segments_hash).slice(0, 12) : "";
+    el.textContent =
+      "Causal LLD · " + modeLabel +
+      " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      " · " + (payload.from_close || "") + " → " + (payload.to_close || "") +
+      (hash ? " · " + hash : "");
+  }
+
+  async function refreshCausalLldLandscape(pane, opts) {
+    const target = pane || paneForScannerCommon();
+    const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    if (!causalLldLandscapeEnabled()) {
+      if (target && SC_HELPERS) {
+        syncOverlays(
+          target,
+          SC_HELPERS.stripCausalLldLandscapeOverlays(target.pendingOverlays || [])
+        );
+      }
+      updateCausalLldHint(null);
+      return;
+    }
+    if (!target || target.tf !== "15m" || !state.symbol) {
+      return;
+    }
+    const ctx = scannerCommonDecisionContext(target);
+    ctx.loadedFromUnix = state.history.loadedFrom;
+    const win = SC_HELPERS ? SC_HELPERS.resolveScannerCommonTimelineWindow(ctx) : null;
+    if (!win) return;
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    const histMode = scannerCommonIsHistoricalMode(target);
+    let body = null;
+    const cacheVer = (state.workspace && state.workspace.scanner_common_config_version) || "-";
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.causalLldLandscapeCacheKey(
+        state.symbol,
+        "15m",
+        fromIso,
+        toIso,
+        cacheVer
+      );
+      if (state.causalLldCache && state.causalLldCache[cacheKey]) {
+        body = state.causalLldCache[cacheKey];
+      }
+    }
+    try {
+      if (!body) {
+        body = await sendJson("/api/research/causal-lld-timeline", "POST", {
+          symbol: state.symbol,
+          timeframe: "15m",
+          from_close: fromIso,
+          to_close: toIso,
+        }, {
+          sourceAction: histMode ? "causal-lld-timeline-hist" : "causal-lld-timeline",
+          pane: target.paneId || target.id,
+          timeframe: "15m",
+          signal: (opts && opts.signal) || undefined,
+        });
+        if (SC_HELPERS && cacheKey && body) {
+          const ver = body.config_version != null ? body.config_version : cacheVer;
+          cacheKey = SC_HELPERS.causalLldLandscapeCacheKey(
+            state.symbol,
+            "15m",
+            fromIso,
+            toIso,
+            ver
+          );
+          state.causalLldCache[cacheKey] = body;
+        }
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      throw err;
+    }
+    if (gen !== state.loadGen) return;
+    if (SC_HELPERS) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyCausalLldLandscapeToOverlays(
+          target.pendingOverlays || [],
+          body.zones || [],
+          win.from_close_unix,
+          win.to_close_unix
+        )
+      );
+    }
+    updateCausalLldHint(body);
+  }
+
+  function setLiveMicroLldV2HintLoading(targets) {
+    const el = $("researchLiveMicroLldV2Hint");
+    if (!el || !liveMicroLldV2Enabled()) return;
+    el.hidden = false;
+    const tfs = (targets || []).map(function (p) { return p.tf; }).filter(Boolean);
+    el.textContent = "Live Micro LLD V2 · Lade Pools…" + (tfs.length ? " (" + tfs.join(", ") + ")" : "");
+  }
+
+  function updateLiveMicroLldV2Hint(payload) {
+    const el = $("researchLiveMicroLldV2Hint");
+    if (!el) return;
+    if (!payload || !liveMicroLldV2Enabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const tfLabel = payload.timeframe || "?";
+    el.textContent =
+      "Live Micro LLD V2 · " + tfLabel +
+      " · PD=" + (payload.pool_detail != null ? payload.pool_detail : "?") +
+      " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (payload.remaining_count ? " · remaining=" + payload.remaining_count : "") +
+      " (pro sichtbarem Pane/TF)";
+  }
+
+  function liveMicroLldV2ShouldAbort(opts, symAtStart, refreshToken) {
+    if (state.symbol !== symAtStart) return true;
+    if (refreshToken != null && refreshToken !== state.liveMicroLldV2RefreshToken) return true;
+    if (opts && opts.gen != null && opts.gen !== state.loadGen) return true;
+    return false;
+  }
+
+  function sortLiveMicroLldV2Targets(targets) {
+    return targets.slice().sort(function (a, b) {
+      const pa = LIVE_MICRO_LLD_V2_TF_PRIORITY[a.tf];
+      const pb = LIVE_MICRO_LLD_V2_TF_PRIORITY[b.tf];
+      const ra = pa != null ? pa : 99;
+      const rb = pb != null ? pb : 99;
+      if (ra !== rb) return ra - rb;
+      return String(a.id || "").localeCompare(String(b.id || ""));
+    });
+  }
+
+  async function refreshLiveMicroLldV2OnePane(target, opts, ctx) {
+    const symAtStart = ctx.symAtStart;
+    const refreshToken = ctx.refreshToken;
+    const poolDetail = ctx.poolDetail;
+    const filterExtra = ctx.filterExtra;
+    const filterKey = ctx.filterKey;
+    const tfSec = TF_SEC[target.tf] || 900;
+    const microCtx = liveMicroLldV2DecisionContext(target);
+    const compareOn =
+      liveMicroLldV2ChCompareEnabled() &&
+      symAtStart === "TUTUSDT" &&
+      target.tf === "5m" &&
+      poolDetail === 10;
+    let win = null;
+    if (SC_HELPERS) {
+      if (compareOn && SC_HELPERS.resolveLiveMicroLldV2ChTestComparisonWindow) {
+        win = SC_HELPERS.resolveLiveMicroLldV2ChTestComparisonWindow(microCtx);
+      } else {
+        win = SC_HELPERS.resolveLiveMicroLldV2RequestWindow(target, tfSec, ctx.weeks, microCtx);
+      }
+    }
+    if (!win) return null;
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    let body = null;
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.liveMicroLldV2CacheKey(
+        symAtStart,
+        target.tf,
+        fromIso,
+        toIso,
+        poolDetail,
+        filterKey
+      );
+      if (state.liveMicroLldV2Cache && state.liveMicroLldV2Cache[cacheKey]) {
+        body = state.liveMicroLldV2Cache[cacheKey];
+      }
+    }
+    if (!body) {
+      body = await sendJson("/api/research/live-micro-lld-v2", "POST", Object.assign({
+        symbol: symAtStart,
+        timeframe: target.tf,
+        from_close: fromIso,
+        to_close: toIso,
+        pool_detail: poolDetail,
+      }, filterExtra), {
+        sourceAction: "live-micro-lld-v2",
+        pane: target.paneId || target.id,
+        timeframe: target.tf,
+        signal: (opts && opts.signal) || undefined,
+      });
+      if (SC_HELPERS && cacheKey && body) {
+        state.liveMicroLldV2Cache[cacheKey] = body;
+      }
+    }
+    if (liveMicroLldV2ShouldAbort(opts, symAtStart, refreshToken)) return null;
+    if (!liveMicroLldV2Enabled()) return null;
+    let zones = body.zones || [];
+    let remainingCount = body.remaining_count;
+    if (liveMicroLldV2RemainingEnabled()) {
+      try {
+        let extra = [];
+        const consumed = {};
+        if (remainingCount == null) {
+          const built = clientRemainingZones(zones, target, tfSec);
+          extra = built.extra || [];
+          Object.keys(built.consumed || {}).forEach(function (id) { consumed[id] = true; });
+          remainingCount = extra.length;
+        } else {
+          (zones || []).forEach(function (zone) {
+            if (zone && zone.metadata && zone.metadata.layer === "remaining") extra.push(zone);
+          });
+        }
+        const base = (zones || []).filter(function (zone) {
+          return zone && !(zone.metadata && zone.metadata.layer === "remaining");
+        }).map(function (zone) {
+          return Object.assign({}, zone, {
+            metadata: Object.assign({}, zone.metadata || {}, {
+              remaining_mode: true,
+              consumed: !!consumed[zone.pool_id],
+            }),
+          });
+        });
+        if (remainingCount != null && extra.length) {
+          const alive = {};
+          extra.forEach(function (zone) { alive[zone.pool_id] = true; });
+          base.forEach(function (zone) {
+            if (!alive[zone.pool_id]) zone.metadata.consumed = true;
+          });
+        }
+        zones = interleaveRemainingZones(base.concat(extra));
+      } catch (err) {
+        zones = body.zones || [];
+        try { console.warn("[research] remaining pools", err); } catch (e) { /* ignore */ }
+      }
+    }
+    if (SC_HELPERS) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyLiveMicroLldV2ToOverlays(
+          target.pendingOverlays || [],
+          zones,
+          win.from_close_unix,
+          win.to_close_unix
+        )
+      );
+    }
+    return Object.assign({}, body, { remaining_count: remainingCount || 0 });
+  }
+
+  async function refreshLiveMicroLldV2(pane, opts) {
+    if (!liveMicroLldV2Enabled()) {
+      const stripTargets = pane
+        ? [pane]
+        : visibleIds().map(function (pid) { return state.panes[pid]; });
+      stripTargets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripLiveMicroLldV2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      updateLiveMicroLldV2Hint(null);
+      return;
+    }
+    const targets = [];
+    if (pane && paneSupportsLiveMicroLldV2(pane)) {
+      targets.push(pane);
+    } else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsLiveMicroLldV2(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !state.symbol) return;
+    const symAtStart = state.symbol;
+    const refreshToken = (state.liveMicroLldV2RefreshToken || 0) + 1;
+    state.liveMicroLldV2RefreshToken = refreshToken;
+    const sorted = sortLiveMicroLldV2Targets(targets);
+    setLiveMicroLldV2HintLoading(sorted);
+    const ctx = {
+      symAtStart: symAtStart,
+      refreshToken: refreshToken,
+      weeks: Math.max(1, Math.min(52, Number(state.history && state.history.weeks) || 12)),
+      poolDetail: liveMicroLldV2PoolDetail(),
+      filterExtra: liveMicroLldV2FilterPayload(),
+      filterKey: liveMicroLldV2FilterCacheKey(),
+    };
+    let lastBody = null;
+    try {
+      if (sorted.length === 1) {
+        lastBody = await refreshLiveMicroLldV2OnePane(sorted[0], opts, ctx);
+      } else {
+        const bodies = await mapLimit(sorted, PANE_HTTP_LIMIT, function (target) {
+          return refreshLiveMicroLldV2OnePane(target, opts, ctx).catch(function (err) {
+            if (err && err.name === "AbortError") return null;
+            throw err;
+          });
+        });
+        bodies.forEach(function (b) {
+          if (b) lastBody = b;
+        });
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      const el = $("researchLiveMicroLldV2Hint");
+      if (el && liveMicroLldV2Enabled()) {
+        el.hidden = false;
+        el.textContent = "Live Micro LLD V2 · Fehler: " + (err.message || err);
+      }
+      throw err;
+    }
+    if (liveMicroLldV2ShouldAbort(opts, symAtStart, refreshToken)) return;
+    updateLiveMicroLldV2Hint(lastBody);
+  }
+
+  function liveMicroLldV2ChTestShouldAbort(opts, symAtStart, refreshToken) {
+    if (state.symbol !== symAtStart) return true;
+    if (refreshToken != null && refreshToken !== state.liveMicroLldV2ChTestRefreshToken) return true;
+    if (opts && opts.gen != null && opts.gen !== state.loadGen) return true;
+    return false;
+  }
+
+  async function postLiveMicroLldV2ChTest(payload, meta) {
+    const url = "/api/research/live-micro-lld-v2-ch-test";
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+      signal: meta && meta.signal,
+    });
+    const body = await res.json().catch(function () { return {}; });
+    if (res.status === 422 && body && body.error === "OUT_OF_COVERAGE") {
+      return { _outOfCoverage: true, coverage: body.coverage, message: body.message };
+    }
+    if (res.status === 404 && body && body.error === "CONFIG_NOT_AVAILABLE") {
+      return { _configNotAvailable: true, message: body.message, details: body.details };
+    }
+    if (res.status === 409 && body && body.error === "AMBIGUOUS_RUN") {
+      return { _ambiguousRun: true, message: body.message, details: body.details };
+    }
+    if (!res.ok) throw httpError(res, body, url);
+    return body;
+  }
+
+  function updateLiveMicroLldV2ChTestHint(payload, extra) {
+    const el = $("researchLiveMicroLldV2ChTestHint");
+    if (!el) return;
+    if (extra && extra._outOfCoverage) {
+      el.hidden = false;
+      el.textContent = "V2 CH Test Pools · OUT_OF_COVERAGE · " + (extra.message || "");
+      return;
+    }
+    if (!payload || !liveMicroLldV2ChTestEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const cmp = state.liveMicroLldV2ChCompareStatus;
+    el.textContent =
+      "V2 CH Test Pools · 5m PD" + (payload.pool_detail != null ? payload.pool_detail : liveMicroLldV2PoolDetail()) +
+      " · run=" + String(payload.run_id || "").slice(0, 8) +
+      "… · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (liveMicroLldV2ChCompareEnabled()
+        ? " · COMPARE " + (cmp && cmp.status ? cmp.status : "")
+        : "");
+  }
+
+  async function refreshLiveMicroLldV2ChTestOnePane(target, opts, ctx) {
+    const symAtStart = ctx.symAtStart;
+    const refreshToken = ctx.refreshToken;
+    const filterExtra = ctx.filterExtra;
+    const filterKey = ctx.filterKey;
+    const tfSec = TF_SEC[target.tf] || 300;
+    const microCtx = liveMicroLldV2DecisionContext(target);
+    const compareOn = liveMicroLldV2ChCompareEnabled();
+    let win = SC_HELPERS
+      ? SC_HELPERS.resolveLiveMicroLldV2ChTestRequestWindow(
+        target,
+        tfSec,
+        ctx.weeks,
+        microCtx,
+        compareOn
+      )
+      : null;
+    if (!win) {
+      updateLiveMicroLldV2ChTestHint(null, { _outOfCoverage: true, message: "window not in CH coverage" });
+      syncOverlays(
+        target,
+        SC_HELPERS
+          ? SC_HELPERS.stripLiveMicroLldV2ChTestOverlays(target.pendingOverlays || [])
+          : (target.pendingOverlays || [])
+      );
+      return null;
+    }
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    let body = null;
+    let cacheKey = null;
+    const poolDetail = liveMicroLldV2PoolDetail();
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.liveMicroLldV2ChTestCacheKey(
+        symAtStart,
+        target.tf,
+        fromIso,
+        toIso,
+        poolDetail,
+        filterKey
+      );
+      if (state.liveMicroLldV2ChTestCache && state.liveMicroLldV2ChTestCache[cacheKey]) {
+        body = state.liveMicroLldV2ChTestCache[cacheKey];
+      }
+    }
+    if (compareOn) {
+      try {
+        const guard = await sendJson("/api/research/live-micro-lld-v2-compare-guard", "POST", {
+          symbol: symAtStart,
+          timeframe: target.tf,
+          from_close: fromIso,
+          to_close: toIso,
+          pool_detail: poolDetail,
+        }, { sourceAction: "live-micro-lld-v2-compare-guard" });
+        state.liveMicroLldV2ChCompareStatus = guard;
+        if (guard && guard.status && guard.status !== "PASS") {
+          updateLiveMicroLldV2ChTestHint(null, {
+            _outOfCoverage: true,
+            message: guard.status + ": " + (guard.reason || ""),
+          });
+        }
+      } catch (err) {
+        state.liveMicroLldV2ChCompareStatus = { status: "NOT_VERIFIED", reason: String(err) };
+      }
+    } else {
+      state.liveMicroLldV2ChCompareStatus = null;
+    }
+
+    if (!body) {
+      const req = Object.assign({
+        symbol: symAtStart,
+        timeframe: target.tf,
+        from_close: fromIso,
+        to_close: toIso,
+        pool_detail: poolDetail,
+      }, filterExtra);
+      body = await postLiveMicroLldV2ChTest(
+        req,
+        {
+          sourceAction: "live-micro-lld-v2-ch-test",
+          pane: target.paneId || target.id,
+          timeframe: target.tf,
+          signal: (opts && opts.signal) || undefined,
+        }
+      );
+      if (body && (body._outOfCoverage || body._configNotAvailable || body._ambiguousRun)) {
+        updateLiveMicroLldV2ChTestHint(null, body._outOfCoverage ? body : {
+          _outOfCoverage: true,
+          message: body.message || "CH test unavailable",
+        });
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripLiveMicroLldV2ChTestOverlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+        return null;
+      }
+      if (SC_HELPERS && cacheKey && body) {
+        state.liveMicroLldV2ChTestCache[cacheKey] = body;
+      }
+    }
+    if (liveMicroLldV2ChTestShouldAbort(opts, symAtStart, refreshToken)) return null;
+    if (!liveMicroLldV2ChTestEnabled()) return null;
+    if (SC_HELPERS) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyLiveMicroLldV2ChTestToOverlays(
+          target.pendingOverlays || [],
+          body.zones || [],
+          win.from_close_unix,
+          win.to_close_unix
+        )
+      );
+    }
+    return body;
+  }
+
+  async function refreshLiveMicroLldV2ChTest(pane, opts) {
+    if (!liveMicroLldV2ChTestEnabled()) {
+      const stripTargets = pane
+        ? [pane]
+        : visibleIds().map(function (pid) { return state.panes[pid]; });
+      stripTargets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripLiveMicroLldV2ChTestOverlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      updateLiveMicroLldV2ChTestHint(null);
+      return;
+    }
+    const targets = [];
+    if (pane && paneSupportsLiveMicroLldV2ChTest(pane)) {
+      targets.push(pane);
+    } else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsLiveMicroLldV2ChTest(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !state.symbol) {
+      updateLiveMicroLldV2ChTestHint(null, {
+        _outOfCoverage: true,
+        message: "requires TUTUSDT 5m pane and PD10",
+      });
+      return;
+    }
+    const symAtStart = state.symbol;
+    const refreshToken = (state.liveMicroLldV2ChTestRefreshToken || 0) + 1;
+    state.liveMicroLldV2ChTestRefreshToken = refreshToken;
+    const ctx = {
+      symAtStart: symAtStart,
+      refreshToken: refreshToken,
+      weeks: Math.max(1, Math.min(52, Number(state.history && state.history.weeks) || 12)),
+      filterExtra: liveMicroLldV2FilterPayload(),
+      filterKey: liveMicroLldV2FilterCacheKey(),
+    };
+    let lastBody = null;
+    try {
+      for (let i = 0; i < targets.length; i += 1) {
+        const b = await refreshLiveMicroLldV2ChTestOnePane(targets[i], opts, ctx);
+        if (b) lastBody = b;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      const el = $("researchLiveMicroLldV2ChTestHint");
+      if (el && liveMicroLldV2ChTestEnabled()) {
+        el.hidden = false;
+        el.textContent = "V2 CH Test Pools · Fehler: " + (err.message || err);
+      }
+      throw err;
+    }
+    if (liveMicroLldV2ChTestShouldAbort(opts, symAtStart, refreshToken)) return;
+    updateLiveMicroLldV2ChTestHint(lastBody);
+  }
+
+  function historicalLmv2ShouldAbort(opts, symAtStart, refreshToken) {
+    if (state.symbol !== symAtStart) return true;
+    if (refreshToken != null && refreshToken !== state.historicalLmv2RefreshToken) return true;
+    if (opts && opts.gen != null && opts.gen !== state.loadGen) return true;
+    return false;
+  }
+
+  function updateHistoricalLmv2Hint(payload, extra) {
+    const el = $("researchHistoricalLmv2Hint");
+    if (!el) return;
+    if (extra && extra._outOfCoverage) {
+      el.hidden = false;
+      el.textContent = "Historical LLD V2 · " + (extra.message || "OUT_OF_PILOT_SCOPE");
+      return;
+    }
+    if (!payload || !historicalLmv2PoolsEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent =
+      "Historical LLD V2 · PD10 · closes=" + (payload.pilot_close_count != null ? payload.pilot_close_count : "?") +
+      " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (payload.remaining_segment_count_full != null
+        ? " · rem_full=" + payload.remaining_segment_count_full
+        : "") +
+      (payload.remaining_truncated ? " · DISPLAY remaining capped" : "");
+  }
+
+  async function refreshHistoricalLmv2OnePane(target, opts, ctx) {
+    const symAtStart = ctx.symAtStart;
+    const refreshToken = ctx.refreshToken;
+    const tfSec = TF_SEC[target.tf] || 900;
+    const microCtx = liveMicroLldV2DecisionContext(target);
+    const win = SC_HELPERS
+      ? SC_HELPERS.resolveHistoricalLmv2RequestWindow(target, tfSec, microCtx)
+      : null;
+    if (!win) {
+      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "outside pilot window or no closed bar" });
+      syncOverlays(
+        target,
+        SC_HELPERS
+          ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+          : (target.pendingOverlays || [])
+      );
+      return null;
+    }
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    const asOfUnix = SC_HELPERS
+      ? SC_HELPERS.resolveHistoricalLmv2AsOfCloseUnix(microCtx)
+      : win.to_close_unix;
+    const asOfIso = unixToIsoZExact(asOfUnix);
+    const layersKey = (historicalLmv2ActiveEnabled() ? "A" : "") + (historicalLmv2RemainingEnabled() ? "R" : "");
+    let body = null;
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.historicalLmv2CacheKey(symAtStart, target.tf, fromIso, toIso, asOfIso, layersKey);
+      if (state.historicalLmv2Cache && state.historicalLmv2Cache[cacheKey]) {
+        body = state.historicalLmv2Cache[cacheKey];
+      }
+    }
+    if (!body) {
+      body = await sendJson("/api/research/historical-lld-v2-pools", "POST", {
+        symbol: symAtStart,
+        timeframe: target.tf,
+        pool_detail: 10,
+        from_close: fromIso,
+        to_close: toIso,
+        as_of_close: asOfIso,
+        include_active: historicalLmv2ActiveEnabled(),
+        include_remaining: historicalLmv2RemainingEnabled(),
+        remaining_limit: 6500,
+      }, {
+        sourceAction: "historical-lld-v2-pools",
+        pane: target.paneId || target.id,
+        timeframe: target.tf,
+        signal: (opts && opts.signal) || undefined,
+      });
+      if (!body || body.success === false) {
+        updateHistoricalLmv2Hint(null, {
+          _outOfCoverage: true,
+          message: (body && body.message) || "request failed",
+        });
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+        return null;
+      }
+      if (SC_HELPERS && cacheKey && body) {
+        state.historicalLmv2Cache[cacheKey] = body;
+      }
+    }
+    if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return null;
+    if (!historicalLmv2PoolsEnabled()) return null;
+    if (SC_HELPERS) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyHistoricalLmv2ToOverlays(
+          target.pendingOverlays || [],
+          body.zones || [],
+          win.from_close_unix,
+          win.to_close_unix
+        )
+      );
+    }
+    return body;
+  }
+
+  async function refreshHistoricalLmv2(pane, opts) {
+    updateHistoricalLmv2UiChrome();
+    if (!historicalLmv2PoolsEnabled()) {
+      const stripTargets = pane
+        ? [pane]
+        : visibleIds().map(function (pid) { return state.panes[pid]; });
+      stripTargets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      updateHistoricalLmv2Hint(null);
+      return;
+    }
+    const targets = [];
+    if (pane && paneSupportsHistoricalLmv2(pane)) {
+      targets.push(pane);
+    } else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsHistoricalLmv2(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !state.symbol) {
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message: "requires DOGEUSDT 15m PD10 in pilot window",
+      });
+      return;
+    }
+    const symAtStart = state.symbol;
+    const refreshToken = (state.historicalLmv2RefreshToken || 0) + 1;
+    state.historicalLmv2RefreshToken = refreshToken;
+    const ctx = { symAtStart: symAtStart, refreshToken: refreshToken };
+    let lastBody = null;
+    try {
+      for (let i = 0; i < targets.length; i += 1) {
+        const b = await refreshHistoricalLmv2OnePane(targets[i], opts, ctx);
+        if (b) lastBody = b;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      targets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      const el = $("researchHistoricalLmv2Hint");
+      if (el && historicalLmv2PoolsEnabled()) {
+        el.hidden = false;
+        el.textContent = "Historical LLD V2 · Fehler: " + (err.message || err);
+      }
+      throw err;
+    }
+    if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return;
+    updateHistoricalLmv2Hint(lastBody);
+  }
+
+  function renderEndUnixForScannerPane(pane) {
+    const candles = (pane.pendingData && pane.pendingData.candles) || [];
+    if (!candles.length) return null;
+    const tfSec = TF_SEC[pane.tf] || 900;
+    const last = candles[candles.length - 1];
+    const open = Number(last.time);
+    if (!Number.isFinite(open)) return null;
+    return open + tfSec;
+  }
+
+  async function refreshScannerCommonPools(pane, opts) {
+    if (scannerCommonDisplayMode() === "timeline") {
+      return refreshScannerCommonTimeline(pane, opts);
+    }
+    const target = pane || paneForScannerCommon();
+    const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    if (!scannerPoolsCommonEnabled()) {
+      if (target) {
+        syncOverlays(target, stripScannerCommonOverlays(target.pendingOverlays || []));
+      }
+      updateScannerCommonHint(null);
+      return;
+    }
+    if (!target || target.tf !== "15m" || !state.symbol) {
+      setScannerCommonWaiting("Scanner Pools (COMMON): waiting for loaded 15m pane");
+      return;
+    }
+    const decisionIso = resolveScannerCommonDecisionIso(target);
+    if (!decisionIso) {
+      setScannerCommonWaiting(
+        "Scanner Pools (COMMON): waiting for closed 15m bar" +
+          (target.id ? " (" + target.id + ")" : "")
+      );
+      return;
+    }
+    const histMode = scannerCommonIsHistoricalMode(target);
+    const decisionCloseUnix = Math.floor(Date.parse(decisionIso) / 1000);
+    const renderEnd = histMode
+      ? decisionCloseUnix
+      : renderEndUnixForScannerPane(target);
+    let body = null;
+    const cacheVer = (state.workspace && state.workspace.scanner_common_config_version) || "-";
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.scannerCommonCacheKey(
+        state.symbol,
+        "15m",
+        decisionIso,
+        cacheVer
+      );
+      if (state.scannerCommonCache && state.scannerCommonCache[cacheKey]) {
+        body = state.scannerCommonCache[cacheKey];
+      }
+    }
+    try {
+      if (!body) {
+        body = await sendJson("/api/research/scanner-pools-common", "POST", {
+          symbol: state.symbol,
+          timeframe: "15m",
+          decision_close: decisionIso,
+          render_end: renderEnd,
+        }, {
+          sourceAction: histMode ? "scanner-common-pools-hist" : "scanner-common-pools",
+          pane: target.paneId || target.id,
+          timeframe: "15m",
+          signal: (opts && opts.signal) || undefined,
+        });
+        if (SC_HELPERS && cacheKey && body) {
+          const ver = body.config_version != null ? body.config_version : cacheVer;
+          cacheKey = SC_HELPERS.scannerCommonCacheKey(
+            state.symbol,
+            "15m",
+            decisionIso,
+            ver
+          );
+          state.scannerCommonCache[cacheKey] = body;
+        }
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      throw err;
+    }
+    if (gen !== state.loadGen) return;
+    syncOverlays(
+      target,
+      mergeScannerCommonOverlays(target.pendingOverlays || [], body.overlays || [])
+    );
+    updateScannerCommonHint(body);
+    if (SC_HELPERS && target && !histMode) {
+      const ctx = scannerCommonDecisionContext(target);
+      const closedOpen = SC_HELPERS.lastClosedBarOpenOnPane(
+        target,
+        ctx.tfSec,
+        SC_HELPERS.resolveScannerCommonAsOfUnix(ctx)
+      );
+      state.scannerCommonPollCoalesce = SC_HELPERS.markScannerCommonPollRefreshed(
+        state.scannerCommonPollCoalesce,
+        closedOpen
+      );
+    }
+  }
+
+  const SCANNER_COMMON_POLL_DEBOUNCE_MS = 80;
+
+  function flushScannerCommonPollRefresh() {
+    const co = state.scannerCommonPollCoalesce;
+    if (!co || co.inflight || (!scannerPoolsCommonEnabled() && !causalLldLandscapeEnabled())) return;
+    const pid = co.pendingPaneId;
+    const closedOpen = co.pendingClosedOpen;
+    if (!pid || closedOpen == null) return;
+    const pane = state.panes[pid];
+    if (!pane || pane.tf !== "15m") {
+      co.pendingPaneId = null;
+      co.pendingClosedOpen = null;
+      return;
+    }
+    const target = paneForScannerCommon();
+    if (!target || target.id !== pane.id) {
+      co.pendingPaneId = null;
+      co.pendingClosedOpen = null;
+      return;
+    }
+    if (lastClosedBarTime(pane) !== closedOpen) {
+      co.pendingPaneId = null;
+      co.pendingClosedOpen = null;
+      return;
+    }
+    co.inflight = true;
+    co.pendingPaneId = null;
+    co.pendingClosedOpen = null;
+    const jobs = [];
+    if (scannerPoolsCommonEnabled()) {
+      jobs.push(refreshScannerCommonPools(pane, { gen: state.loadGen }));
+    }
+    if (causalLldLandscapeEnabled()) {
+      jobs.push(refreshCausalLldLandscape(pane, { gen: state.loadGen }));
+    }
+    Promise.all(jobs)
+      .catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] research pool poll refresh", err); } catch (e) { /* ignore */ }
+        }
+      })
+      .finally(function () {
+        co.inflight = false;
+        if (co.pendingPaneId != null && co.pendingClosedOpen != null) {
+          flushScannerCommonPollRefresh();
+        }
+      });
+  }
+
+  function scheduleLiveMicroLldV2RefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
+    if (!pane || !liveMicroLldV2Enabled() || !paneSupportsLiveMicroLldV2(pane)) return;
+    if (isHistoricalReplay() || historyBlocksLive()) return;
+    if (prevClosedOpen == null || nextClosedOpen == null) return;
+    if (Number(prevClosedOpen) === Number(nextClosedOpen)) return;
+    void refreshLiveMicroLldV2(pane, { gen: state.loadGen }).catch(function (err) {
+      if (!(err && err.name === "AbortError")) {
+        try { console.warn("[research] live-micro-lld-v2 poll refresh", err); } catch (e) { /* ignore */ }
+      }
+    });
+  }
+
+  function scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
+    if (!pane || !SC_HELPERS) return;
+    if (isHistoricalReplay()) return;
+    const target = paneForScannerCommon();
+    const should = SC_HELPERS.shouldScheduleScannerCommonPollRefresh({
+      checkboxEnabled: scannerPoolsCommonEnabled() || causalLldLandscapeEnabled(),
+      paneTf: pane.tf,
+      isCommonTargetPane: !!(target && target.id === pane.id),
+      hasLoadedCandles: !!(pane.pendingData && pane.pendingData.candles && pane.pendingData.candles.length),
+      prevClosedOpen: prevClosedOpen,
+      nextClosedOpen: nextClosedOpen,
+      isHistoricalReplay: isHistoricalReplay(),
+    });
+    if (!should) return;
+    const co = state.scannerCommonPollCoalesce;
+    const decision = SC_HELPERS.coalesceScannerCommonPollSchedule(
+      co,
+      pane.id,
+      nextClosedOpen
+    );
+    state.scannerCommonPollCoalesce = decision.bucket;
+    if (!decision.schedule) return;
+    if (co.timer) clearTimeout(co.timer);
+    co.timer = setTimeout(function () {
+      co.timer = null;
+      flushScannerCommonPollRefresh();
+    }, SCANNER_COMMON_POLL_DEBOUNCE_MS);
   }
 
   function buildTools() {
@@ -2608,6 +4148,7 @@
         else chart.clearPreview();
       }
     });
+    updateLldModalGuardsFromWorkspace(snap);
     refreshStatusLine();
   }
 
@@ -2704,6 +4245,29 @@
       if (chart) chart.setSelectedMarker(floorUtc(unix, state.panes[pid].tf));
     });
     refreshStatusLine();
+    if (isHistoricalReplay() && (scannerPoolsCommonEnabled() || causalLldLandscapeEnabled())) {
+      const commonPane = paneForScannerCommon();
+      if (commonPane && commonPane.id === paneId) {
+        if (state.scannerCommonReplayRefreshTimer) {
+          clearTimeout(state.scannerCommonReplayRefreshTimer);
+        }
+        state.scannerCommonReplayRefreshTimer = setTimeout(function () {
+          state.scannerCommonReplayRefreshTimer = null;
+          const jobs = [];
+          if (scannerPoolsCommonEnabled()) {
+            jobs.push(refreshScannerCommonPools(commonPane, { force: true }));
+          }
+          if (causalLldLandscapeEnabled()) {
+            jobs.push(refreshCausalLldLandscape(commonPane, { force: true }));
+          }
+          Promise.all(jobs).catch(function (err) {
+            if (!(err && err.name === "AbortError")) {
+              try { console.warn("[research] research pool replay click", err); } catch (e) { /* ignore */ }
+            }
+          });
+        }, 80);
+      }
+    }
   }
 
   function candleFingerprint(candles) {
@@ -2733,6 +4297,123 @@
     return null;
   }
 
+  /** Seconds between last closed bar close and wall clock (live mode). */
+  function paneClosedTipLagSec(pane) {
+    const step = TF_SEC[pane.tf] || 60;
+    const last = lastClosedBarTime(pane);
+    if (last == null) return null;
+    return Math.floor(Date.now() / 1000) - (last + step);
+  }
+
+  function pollLimitForPaneLag(pane) {
+    const step = TF_SEC[pane.tf] || 60;
+    const lag = paneClosedTipLagSec(pane);
+    if (lag == null || lag <= step * 2) return 50;
+    return Math.min(4000, Math.ceil(lag / step) + 20);
+  }
+
+  function mergePollCandlesIntoPane(pane, incoming, packed) {
+    const step = TF_SEC[pane.tf] || 60;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const oldTip = (pane.pendingData.candles || [])[(pane.pendingData.candles || []).length - 1] || null;
+    const byTime = {};
+    (pane.pendingData.candles || []).forEach(function (c) { byTime[c.time] = c; });
+    incoming.forEach(function (c) { byTime[c.time] = c; });
+    if (oldTip && Number(oldTip.time) + step > nowSec) {
+      const t = Number(oldTip.time);
+      const cur = byTime[t];
+      if (!cur) {
+        byTime[t] = oldTip;
+      } else {
+        byTime[t] = Object.assign({}, cur, {
+          high: Math.max(Number(cur.high), Number(oldTip.high)),
+          low: Math.min(Number(cur.low), Number(oldTip.low)),
+          close: Number(oldTip.close),
+        });
+      }
+    }
+    const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (t) { return byTime[t]; });
+    const prevClosedOpen = lastClosedBarTime(pane);
+    pane.pendingData = Object.assign({}, pane.pendingData, { candles: merged });
+    pane.lastTimes = new Set(merged.map(function (c) { return c.time; }));
+    pane.candleFp = candleFingerprint(merged);
+    pane.closedFp = closedCandleFingerprint(merged, pane.tf);
+    const nextClosedOpen = lastClosedBarTime(pane);
+    scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
+    scheduleLiveMicroLldV2RefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
+    const chart = api(pane);
+    if (chart) {
+      chart.setData(pane.pendingData, {
+        preserveView: true,
+        skipDefaultView: isHistoricalReplay(),
+      });
+      if (isHistoricalReplay()) enforceReplayViewOnAllPanes();
+    }
+    if (packed && packed.forming) {
+      applyFormingToPane(pane, packed.forming);
+    }
+    return nextClosedOpen;
+  }
+
+  async function ensurePaneCaughtUp(pane, opts) {
+    if (!pane || !state.symbol || isHistoricalReplay() || historyBlocksLive()) return;
+    if (opts && opts.indicatorsOnly) return;
+    const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    const lag = paneClosedTipLagSec(pane);
+    const step = TF_SEC[pane.tf] || 60;
+    if (lag == null || lag <= step * 2) return;
+    const last = lastClosedBarTime(pane);
+    if (last == null || !pane.pendingData) return;
+    const pollLimit = pollLimitForPaneLag(pane);
+    const paneId = pane.id || pane.paneId;
+    const url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+      "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
+    const packed = await getJson(url, {
+      sourceAction: "gap-backfill",
+      pane: paneId,
+      timeframe: pane.tf,
+      start: last,
+    });
+    if (gen !== state.loadGen) return;
+    const incoming = packed.candles || [];
+    if (!incoming.length) return;
+    mergePollCandlesIntoPane(pane, incoming, packed);
+    const times = (pane.pendingData.candles || []).map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+    if (times.length) {
+      state.history.loadedFrom = Math.min.apply(null, times);
+      state.history.loadedTo = Math.max.apply(null, times);
+      updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+    }
+    if (liveMicroLldV2Enabled() && paneSupportsLiveMicroLldV2(pane)) {
+      try {
+        await refreshLiveMicroLldV2(pane, { force: true, gen: gen });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 after gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2ChTestEnabled() && paneSupportsLiveMicroLldV2ChTest(pane)) {
+      try {
+        await refreshLiveMicroLldV2ChTest(pane, { force: true, gen: gen });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2-ch-test after gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane)) {
+      try {
+        await refreshHistoricalLmv2(pane, { force: true, gen: gen });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 after gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+  }
+
   function applyPaneBundle(pane, packed, opts) {
     const payload = {
       symbol: packed.symbol,
@@ -2756,7 +4437,17 @@
     pane.pendingLldEma = packed.lld_ema || (packed.liquidity && packed.liquidity.ema) || {
       fast: [], slow: [], fast_visible: false, slow_visible: false,
     };
-    pane.pendingOverlays = packed.overlays || [];
+    pane.pendingOverlays = SC_HELPERS
+      ? SC_HELPERS.mergePaneOverlaysPreservingScannerCommon(
+        packed.overlays || [],
+        pane.pendingOverlays || [],
+        scannerPoolsCommonEnabled(),
+        causalLldLandscapeEnabled(),
+        liveMicroLldV2Enabled(),
+        liveMicroLldV2ChTestEnabled(),
+        historicalLmv2PoolsEnabled()
+      )
+      : packed.overlays || [];
     pane.el.querySelector(".trp-pane-symbol").textContent = packed.symbol || state.symbol;
     pane.el.querySelector(".trp-pane-status").textContent =
       (packed.candles || []).length + " · " + (packed.cache || "load");
@@ -2842,6 +4533,54 @@
       skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
       skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
     });
+    if (!(opts && opts.indicatorsOnly)) {
+      void ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] pane gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (pane.tf === "15m") {
+      if (scannerPoolsCommonEnabled()) {
+        void refreshScannerCommonPools(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] scanner-common pools", err); } catch (e) { /* ignore */ }
+          }
+        });
+      } else {
+        syncOverlays(pane, stripScannerCommonOverlays(pane.pendingOverlays || []));
+      }
+      if (causalLldLandscapeEnabled()) {
+        void refreshCausalLldLandscape(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] causal-lld landscape", err); } catch (e) { /* ignore */ }
+          }
+        });
+      } else if (SC_HELPERS) {
+        syncOverlays(pane, SC_HELPERS.stripCausalLldLandscapeOverlays(pane.pendingOverlays || []));
+      }
+    }
+    if (paneSupportsLiveMicroLldV2(pane)) {
+      void refreshLiveMicroLldV2(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (paneSupportsLiveMicroLldV2ChTest(pane)) {
+      void refreshLiveMicroLldV2ChTest(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2-ch-test", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (paneSupportsHistoricalLmv2(pane)) {
+      void refreshHistoricalLmv2(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
     if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
     // Soft follow-lock only — do not yank visible range here (GO TO jump owns the camera).
     if (!(opts && opts.jumpToUnix != null)) {
@@ -2899,6 +4638,51 @@
         sourceAction: sourceAction || "indicator-apply",
       });
     });
+    if (scannerPoolsCommonEnabled()) {
+      try {
+        await refreshScannerCommonPools();
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] scanner-common after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (causalLldLandscapeEnabled()) {
+      try {
+        await refreshCausalLldLandscape(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] causal-lld after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2Enabled()) {
+      try {
+        await refreshLiveMicroLldV2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (liveMicroLldV2ChTestEnabled()) {
+      try {
+        await refreshLiveMicroLldV2ChTest(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2-ch-test after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   async function loadOverlays(paneId) {
@@ -2981,7 +4765,10 @@
       pollForming(gen);
     }, FORMING_MS);
     // Immediate first tick so price moves without waiting for the interval.
-    if (!document.hidden) pollForming(gen);
+    if (!document.hidden) {
+      pollForming(gen);
+      pollIncremental(gen);
+    }
     // Do not re-enable followLive here — pan/zoom stays until Zentrieren.
     if (state.obp && state.obp.enabled) startOrderbookProfileRefresh();
     if (state.obl && state.obl.enabled) startOrderbookLevelsRefresh();
@@ -3236,10 +5023,11 @@
     if (historyBlocksLive()) return;
     const last = lastClosedBarTime(pane);
     if (last == null || !pane.pendingData) return;
+    const pollLimit = pollLimitForPaneLag(pane);
     let url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
-      "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=50";
+      "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
     const packed = await getJson(url, {
-      sourceAction: "poll",
+      sourceAction: pollLimit > 50 ? "poll-gap" : "poll",
       pane: paneId,
       timeframe: pane.tf,
       start: last,
@@ -3247,48 +5035,20 @@
     if (gen !== state.pollGen || pane.el.querySelector(".trp-pane-symbol").textContent !== state.symbol) return;
     const incoming = packed.candles || [];
     if (!incoming.length) return;
-    const step = TF_SEC[pane.tf] || 60;
-    const nowSec = Math.floor(Date.now() / 1000);
-    const oldTip = (pane.pendingData.candles || [])[(pane.pendingData.candles || []).length - 1] || null;
-    const byTime = {};
-    (pane.pendingData.candles || []).forEach(function (c) { byTime[c.time] = c; });
-    incoming.forEach(function (c) { byTime[c.time] = c; });
-    // Keep unfinished live tip if poll returned only lagged CH bars.
-    if (oldTip && Number(oldTip.time) + step > nowSec) {
-      const t = Number(oldTip.time);
-      const cur = byTime[t];
-      if (!cur) {
-        byTime[t] = oldTip;
-      } else {
-        byTime[t] = Object.assign({}, cur, {
-          high: Math.max(Number(cur.high), Number(oldTip.high)),
-          low: Math.min(Number(cur.low), Number(oldTip.low)),
-          close: Number(oldTip.close),
-        });
-      }
-    }
-    const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; }).map(function (t) { return byTime[t]; });
-    const nextClosed = closedCandleFingerprint(merged, pane.tf);
-    if (nextClosed === pane.closedFp) {
-      // Still refresh live tip from poll payload if server stamped forming.
+    const nextClosedFp = (function () {
+      const byTime = {};
+      (pane.pendingData.candles || []).forEach(function (c) { byTime[c.time] = c; });
+      incoming.forEach(function (c) { byTime[c.time] = c; });
+      const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; })
+        .map(function (t) { return byTime[t]; });
+      return closedCandleFingerprint(merged, pane.tf);
+    })();
+    if (nextClosedFp === pane.closedFp) {
       if (packed.live_tip && packed.forming) applyFormingToPane(pane, packed.forming);
       return;
     }
-    pane.pendingData = Object.assign({}, pane.pendingData, { candles: merged });
-    pane.lastTimes = new Set(merged.map(function (c) { return c.time; }));
-    pane.candleFp = candleFingerprint(merged);
-    pane.closedFp = nextClosed;
-    const chart = api(pane);
-    if (chart) {
-      chart.setData(pane.pendingData, {
-        preserveView: true,
-        skipDefaultView: isHistoricalReplay(),
-      });
-      if (isHistoricalReplay()) enforceReplayViewOnAllPanes();
-    }
-    if (packed.forming) {
-      applyFormingToPane(pane, packed.forming);
-    } else {
+    mergePollCandlesIntoPane(pane, incoming, packed);
+    if (!packed.forming) {
       try {
         const formingBody = await getJson(
           "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol),
@@ -3333,6 +5093,9 @@
     const gen = ++state.loadGen;
     state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
     state.symbol = next;
+    state.scannerCommonCache = {};
+    state.causalLldCache = {};
+    state.liveMicroLldV2Cache = {};
     try { localStorage.setItem(SYMBOL_KEY, next); } catch (e) {}
     const sel = $("researchSymbol");
     if (sel && sel.value !== next) sel.value = next;
@@ -3509,6 +5272,40 @@
     $("stochDColor").value = cfg.d_color;
   }
 
+  function fillScannerEngineLocked(engine) {
+    const e = engine || {};
+    const src = $("lldScannerEngineSource");
+    if (src) src.textContent = e.source === "COMMON_FROZEN" ? "COMMON / FROZEN" : (e.source || "—");
+    if ($("lldScannerEngineVersion")) $("lldScannerEngineVersion").textContent = String(e.config_version != null ? e.config_version : "—");
+    if ($("lldScannerEngineEnabled")) $("lldScannerEngineEnabled").textContent = String(e.enabled != null ? e.enabled : "—");
+    if ($("lldScannerEngineAmountBase")) $("lldScannerEngineAmountBase").textContent = String(e.amount_base != null ? e.amount_base : "—");
+    if ($("lldScannerEngineAmountEff")) $("lldScannerEngineAmountEff").textContent = String(e.amount_effective != null ? e.amount_effective : "—");
+    if ($("lldScannerEngineHigh")) $("lldScannerEngineHigh").textContent = String(e.highest_len != null ? e.highest_len : "—");
+    if ($("lldScannerEngineLow")) $("lldScannerEngineLow").textContent = String(e.lowest_len != null ? e.lowest_len : "—");
+  }
+
+  function updateLldModalGuardsFromWorkspace(ws) {
+    const snap = ws || state.workspace || {};
+    const drift = $("lldWorkspaceFrozenDrift");
+    if (drift) {
+      const parity = snap.workspace_frozen_parity;
+      drift.hidden = parity !== false;
+    }
+    const banner = $("lldScannerCommonActiveBanner");
+    if (banner) {
+      banner.hidden = !scannerPoolsCommonEnabled();
+    }
+  }
+
+  async function refreshScannerPoolEngineLocked() {
+    try {
+      const body = await getJson("/api/research/scanner-pool-engine", { sourceAction: "scanner-pool-engine" });
+      if (body && body.locked) fillScannerEngineLocked(body);
+    } catch (err) {
+      try { console.warn("[research] scanner-pool-engine", err); } catch (e) { /* ignore */ }
+    }
+  }
+
   function fillLld(cfg) {
     $("lldAmount").value = cfg.amount;
     $("lldHistoryWeeks").value = String(state.history.weeks || 12);
@@ -3613,6 +5410,7 @@
   }
 
   function bindUi() {
+    restoreLiveMicroLldV2Toggles();
     bindHistoryUi();
     restoreHistoryPrefs();
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
@@ -4945,6 +6743,104 @@
       }, { sourceAction: "lld-toggle" }));
       await refreshIndicatorsVisible("lld-toggle");
     });
+    if ($("researchIndScannerPoolsCommon")) {
+      $("researchIndScannerPoolsCommon").addEventListener("change", async function () {
+        updateLldModalGuardsFromWorkspace(state.workspace);
+        try {
+          await refreshScannerCommonPools();
+        } catch (err) {
+          setStatus("Scanner Pools (COMMON): " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    if ($("researchIndCausalLldLandscape")) {
+      $("researchIndCausalLldLandscape").addEventListener("change", async function () {
+        try {
+          await refreshCausalLldLandscape(null, { force: true });
+        } catch (err) {
+          setStatus("Causal LLD Landscape: " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    if ($("researchIndLiveMicroLldV2")) {
+      $("researchIndLiveMicroLldV2").addEventListener("change", async function () {
+        rememberLiveMicroLldV2Toggles();
+        try {
+          await refreshLiveMicroLldV2(null, { force: true });
+        } catch (err) {
+          setStatus("Live Micro LLD V2: " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    if ($("researchIndLiveMicroLldV2ChTest")) {
+      $("researchIndLiveMicroLldV2ChTest").addEventListener("change", async function () {
+        try {
+          await refreshLiveMicroLldV2ChTest(null, { force: true });
+        } catch (err) {
+          setStatus("V2 CH Test Pools: " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    if ($("researchIndHistoricalLmv2Pools")) {
+      $("researchIndHistoricalLmv2Pools").addEventListener("change", async function () {
+        state.historicalLmv2Cache = {};
+        updateHistoricalLmv2UiChrome();
+        try {
+          await refreshHistoricalLmv2(null, { force: true });
+        } catch (err) {
+          setStatus("Historical LLD V2 Pools: " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    function onHistoricalLmv2LayerChange() {
+      state.historicalLmv2Cache = {};
+      if (historicalLmv2PoolsEnabled()) {
+        refreshHistoricalLmv2(null, { force: true }).catch(function (err) {
+          setStatus("Historical LLD V2 Pools: " + (err && err.message ? err.message : err), "error");
+        });
+      }
+    }
+    if ($("researchIndHistoricalLmv2Active")) {
+      $("researchIndHistoricalLmv2Active").addEventListener("change", onHistoricalLmv2LayerChange);
+    }
+    if ($("researchIndHistoricalLmv2Remaining")) {
+      $("researchIndHistoricalLmv2Remaining").addEventListener("change", onHistoricalLmv2LayerChange);
+    }
+    function onLiveMicroV2FilterChange() {
+      rememberLiveMicroLldV2Toggles();
+      state.liveMicroLldV2Cache = {};
+      state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
+      if (liveMicroLldV2Enabled()) {
+        refreshLiveMicroLldV2(null, { force: true }).catch(function (err) {
+          setStatus("Live Micro LLD V2: " + (err && err.message ? err.message : err), "error");
+        });
+      }
+      if (liveMicroLldV2ChTestEnabled()) {
+        refreshLiveMicroLldV2ChTest(null, { force: true }).catch(function (err) {
+          setStatus("V2 CH Test Pools: " + (err && err.message ? err.message : err), "error");
+        });
+      }
+    }
+    if ($("researchLiveMicroV2PoolDetail")) {
+      $("researchLiveMicroV2PoolDetail").addEventListener("change", onLiveMicroV2FilterChange);
+    }
+    if ($("researchIndLiveMicroLldV2Remaining")) {
+      $("researchIndLiveMicroLldV2Remaining").addEventListener("change", onLiveMicroV2FilterChange);
+    }
+    document.querySelectorAll(".research-lmv2-type, .research-lmv2-strength").forEach(function (el) {
+      el.addEventListener("change", onLiveMicroV2FilterChange);
+    });
+    if ($("researchScannerCommonMode")) {
+      $("researchScannerCommonMode").addEventListener("change", async function () {
+        if (!scannerPoolsCommonEnabled()) return;
+        try {
+          await refreshScannerCommonPools({ force: true });
+        } catch (err) {
+          setStatus("Scanner Pools (COMMON): " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
     $("trpEmaSettings").addEventListener("click", function () {
       renderEmaRows(((state.workspace || {}).ema || {}).lines || []);
       openModal("modalEma");
@@ -4953,9 +6849,11 @@
       fillStoch((state.workspace || {}).stochastic || {});
       openModal("modalStoch");
     });
-    $("trpLldSettings").addEventListener("click", function () {
+    $("trpLldSettings").addEventListener("click", async function () {
       $("lldLicense").textContent = (state.workspace || {}).license_notice || "";
       fillLld((state.workspace || {}).liquidity || {});
+      updateLldModalGuardsFromWorkspace(state.workspace);
+      await refreshScannerPoolEngineLocked();
       openModal("modalLld");
     });
     $("emaAdd").addEventListener("click", function () {
@@ -5187,6 +7085,15 @@
     $("researchSymbol").value = start;
     applyResearchJobSourceNote();
     await switchSymbol(start);
+    if (liveMicroLldV2Enabled()) {
+      try {
+        await refreshLiveMicroLldV2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 boot", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   window.__researchDebug = state;
@@ -5196,5 +7103,15 @@
       if (err && err.name === "AbortError") return;
       setStatus(String(err.message || err), "error");
     });
+  });
+  window.addEventListener("load", function () {
+    setTimeout(function () {
+      if (!liveMicroLldV2Enabled() || !state.symbol) return;
+      refreshLiveMicroLldV2(null, { force: true }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] live-micro-lld-v2 load", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, 400);
   });
 })();

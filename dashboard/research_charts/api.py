@@ -19,6 +19,30 @@ from .boundary import (
 )
 from .clickhouse_source import SOURCE_NAME
 from .collector_control import POLL_INTERVAL_MS, fetch_forming_candle, live_status_for_symbol
+from .chart_scanner_pools_v1 import chart_scanner_pool_snapshot
+from .chart_scanner_pool_timeline_v1 import chart_scanner_pool_timeline
+from .chart_causal_lld_timeline_v1 import chart_causal_lld_timeline
+from .chart_live_micro_lld_v2 import SUPPORTED_TIMEFRAMES as LIVE_MICRO_LLD_V2_TFS
+from .chart_live_micro_lld_v2 import chart_live_micro_lld_v2
+from .chart_live_micro_lld_v2_ch_test import chart_live_micro_lld_v2_ch_test
+from .chart_historical_lmv2_pools import (
+    HistoricalLmv2PilotError,
+    chart_historical_lmv2_pools,
+)
+from .live_micro_lld_v2_ch_test.compare_guard import evaluate_compare_guard
+from .live_micro_lld_v2_ch_test.errors import (
+    AmbiguousRunError,
+    ChTestError,
+    ConfigNotAvailableError,
+    OutOfCoverageError,
+)
+from .live_micro_lld_v2_ch_test.identity import all_preset_matrix
+from .live_micro_lld_v2_ch_test.run_resolve import RunSelector
+from .scanner_settings_guard_v1 import (
+    READ_ONLY_SCANNER_ENGINE_MSG,
+    reject_scanner_engine_settings_keys,
+    scanner_pool_engine_payload,
+)
 from .service import (
     DEFAULT_PANE_TIMEFRAMES,
     candle_objects,
@@ -461,6 +485,365 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "pane_load_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
 
+    @router.post("/api/research/scanner-pools-common")
+    async def api_research_scanner_pools_common(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """15m scanner pools from COMMON causal source (read-only, no workspace LLD)."""
+        tf = str(body.get("timeframe") or "15m")
+        if tf != "15m":
+            return _error(400, "invalid_timeframe", "scanner common pools are 15m only")
+        decision_close = body.get("decision_close")
+        if not decision_close:
+            return _error(400, "decision_close_required", "decision_close (ISO) is required")
+        render_end = body.get("render_end")
+        try:
+            render_end_unix = int(render_end) if render_end is not None else None
+        except (TypeError, ValueError):
+            return _error(400, "invalid_render_end", "render_end must be unix seconds")
+        try:
+            payload = await asyncio.to_thread(
+                chart_scanner_pool_snapshot,
+                str(body.get("symbol") or ""),
+                str(decision_close),
+                timeframe=tf,
+                render_end_unix=render_end_unix,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", "no candles for symbol")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "scanner_pools_common_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/scanner-pools-common-timeline")
+    async def api_research_scanner_pools_common_timeline(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Historical COMMON pool lifecycle zones for a 15m decision-close window."""
+        tf = str(body.get("timeframe") or "15m")
+        if tf != "15m":
+            return _error(400, "invalid_timeframe", "scanner common timeline is 15m only")
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(
+                400,
+                "from_to_required",
+                "from_close and to_close (ISO) are required",
+            )
+        try:
+            payload = await asyncio.to_thread(
+                chart_scanner_pool_timeline,
+                str(body.get("symbol") or ""),
+                str(from_close),
+                str(to_close),
+                timeframe=tf,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", "no candles for symbol")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "scanner_pools_common_timeline_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/causal-lld-timeline")
+    async def api_research_causal_lld_timeline(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Dense causal LLD landscape (ui_selected membership, prefix-safe)."""
+        tf = str(body.get("timeframe") or "15m")
+        if tf != "15m":
+            return _error(400, "invalid_timeframe", "causal lld landscape is 15m only")
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(
+                400,
+                "from_to_required",
+                "from_close and to_close (ISO) are required",
+            )
+        try:
+            payload = await asyncio.to_thread(
+                chart_causal_lld_timeline,
+                str(body.get("symbol") or ""),
+                str(from_close),
+                str(to_close),
+                timeframe=tf,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", "no candles for symbol")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "causal_lld_timeline_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/live-micro-lld-v2")
+    async def api_research_live_micro_lld_v2(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Pine pool_ralf Live Micro LLD V2 (research-only, per-TF native)."""
+        tf = str(body.get("timeframe") or "15m")
+        if tf not in LIVE_MICRO_LLD_V2_TFS:
+            return _error(
+                400,
+                "invalid_timeframe",
+                f"live micro lld v2 supports {sorted(LIVE_MICRO_LLD_V2_TFS)}",
+            )
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(
+                400,
+                "from_to_required",
+                "from_close and to_close (ISO) are required",
+            )
+        pool_detail = int(body.get("pool_detail") or 5)
+        if pool_detail < 1 or pool_detail > 10:
+            return _error(400, "invalid_pool_detail", "pool_detail must be 1..10")
+        pool_types = body.get("pool_types")
+        strength_classes = body.get("strength_classes")
+        try:
+            payload = await asyncio.to_thread(
+                chart_live_micro_lld_v2,
+                str(body.get("symbol") or ""),
+                str(from_close),
+                str(to_close),
+                timeframe=tf,
+                pool_detail=pool_detail,
+                pool_types=pool_types if isinstance(pool_types, list) else None,
+                strength_classes=strength_classes if isinstance(strength_classes, list) else None,
+            )
+        except KeyError:
+            return _error(404, "unknown_symbol", "no candles for symbol")
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "live_micro_lld_v2_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/historical-lmv2/decision-snapshot")
+    async def api_research_historical_lmv2_decision_snapshot(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Read-only frozen V2 snapshot for chart parity (no engine recompute)."""
+        from .historical_lmv2.decision_snapshot import load_decision_snapshot
+        from .historical_lmv2.errors import (
+            FrozenInputMismatchError,
+            HistoricalLmV2Error,
+            ManifestGateError,
+            RequestFrozenMismatchError,
+            SnapshotMissingError,
+            SnapshotValidationError,
+            UnknownCatalogError,
+        )
+
+        catalog_id = str(body.get("catalog_id") or "").strip()
+        symbol = str(body.get("symbol") or "").strip().upper()
+        timeframe = str(body.get("timeframe") or "15m").strip()
+        try:
+            pool_detail = int(body.get("pool_detail") or 10)
+        except (TypeError, ValueError):
+            return _error(400, "invalid_pool_detail", "pool_detail must be int")
+        decision_close = body.get("decision_close")
+        expected_frozen = str(body.get("expected_frozen_input_id") or "").strip()
+        if not catalog_id or not symbol or not decision_close or not expected_frozen:
+            return _error(
+                400,
+                "missing_fields",
+                "catalog_id, symbol, decision_close, expected_frozen_input_id required",
+            )
+        try:
+            payload = await asyncio.to_thread(
+                load_decision_snapshot,
+                catalog_id=catalog_id,
+                symbol=symbol,
+                timeframe=timeframe,
+                pool_detail=pool_detail,
+                decision_close=str(decision_close),
+                expected_frozen_input_id=expected_frozen,
+            )
+        except UnknownCatalogError as exc:
+            return _error(404, "unknown_catalog", str(exc))
+        except RequestFrozenMismatchError as exc:
+            return _error(409, "frozen_input_mismatch", str(exc))
+        except FrozenInputMismatchError as exc:
+            return _error(409, "snapshot_frozen_mismatch", str(exc))
+        except ManifestGateError as exc:
+            return _error(422, "manifest_gate", str(exc))
+        except SnapshotMissingError as exc:
+            return _error(404, "snapshot_missing", str(exc))
+        except SnapshotValidationError as exc:
+            return _error(422, "snapshot_validation", str(exc))
+        except HistoricalLmV2Error as exc:
+            return _error(422, "historical_lmv2_error", str(exc))
+        except Exception as exc:
+            return _error(500, "decision_snapshot_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/live-micro-lld-v2-ch-test")
+    async def api_research_live_micro_lld_v2_ch_test(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Read-only CH test pools (no engine run, no CH writes)."""
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(
+                400,
+                "from_to_required",
+                "from_close and to_close (ISO) are required",
+            )
+        pool_detail = int(body.get("pool_detail") or 10)
+        run_id = body.get("run_id")
+        pool_types = body.get("pool_types")
+        strength_classes = body.get("strength_classes")
+        try:
+            payload = await asyncio.to_thread(
+                chart_live_micro_lld_v2_ch_test,
+                str(body.get("symbol") or ""),
+                str(from_close),
+                str(to_close),
+                timeframe=str(body.get("timeframe") or "5m"),
+                run_id=str(run_id) if run_id else None,
+                pool_detail=pool_detail,
+                pool_types=pool_types if isinstance(pool_types, list) else None,
+                strength_classes=strength_classes if isinstance(strength_classes, list) else None,
+            )
+        except OutOfCoverageError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": str(exc),
+                    "coverage": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=422,
+            )
+        except ConfigNotAvailableError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": str(exc),
+                    "details": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=404,
+            )
+        except AmbiguousRunError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": str(exc),
+                    "details": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=409,
+            )
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "live_micro_lld_v2_ch_test_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/historical-lld-v2-pools")
+    async def api_research_historical_lld_v2_pools(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Phase 5D pilot: read-only historical ACTIVE/Remaining from CH (20 closes max)."""
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(400, "from_to_required", "from_close and to_close (ISO) are required")
+        try:
+            payload = await asyncio.to_thread(
+                chart_historical_lmv2_pools,
+                str(body.get("symbol") or "DOGEUSDT"),
+                str(from_close),
+                str(to_close),
+                timeframe=str(body.get("timeframe") or "15m"),
+                pool_detail=int(body.get("pool_detail") or 10),
+                as_of_close=body.get("as_of_close"),
+                include_active=bool(body.get("include_active", True)),
+                include_remaining=bool(body.get("include_remaining", False)),
+                price_min=float(body["price_min"]) if body.get("price_min") is not None else None,
+                price_max=float(body["price_max"]) if body.get("price_max") is not None else None,
+                remaining_limit=int(body.get("remaining_limit") or 6500),
+            )
+        except HistoricalLmv2PilotError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": exc.message,
+                    "details": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=422,
+            )
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "historical_lld_v2_pools_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.get("/api/research/live-micro-lld-v2-preset-matrix")
+    async def api_research_live_micro_lld_v2_preset_matrix(
+        user: dict = Depends(require_auth),
+    ):
+        return {"success": True, "presets": all_preset_matrix()}
+
+    @router.get("/api/research/live-micro-lld-v2-ch-test/runs")
+    async def api_research_live_micro_lld_v2_ch_test_runs(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("TUTUSDT"),
+        timeframe: str = Query("5m"),
+        pool_detail: int = Query(10),
+    ):
+        rows = await asyncio.to_thread(
+            RunSelector().list_runs,
+            str(symbol),
+            str(timeframe),
+            int(pool_detail),
+        )
+        return {"success": True, "runs": rows}
+
+    @router.post("/api/research/live-micro-lld-v2-compare-guard")
+    async def api_research_live_micro_lld_v2_compare_guard(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(400, "from_to_required", "from_close and to_close required")
+        try:
+            verdict = await asyncio.to_thread(
+                evaluate_compare_guard,
+                symbol=str(body.get("symbol") or "TUTUSDT"),
+                timeframe=str(body.get("timeframe") or "5m"),
+                pool_detail=int(body.get("pool_detail") or 10),
+                from_close=str(from_close),
+                to_close=str(to_close),
+                run_id=str(body.get("run_id")) if body.get("run_id") else None,
+            )
+        except Exception as exc:
+            return _error(500, "compare_guard_failed", str(exc))
+        return {"success": True, **verdict}
+
     @router.post("/api/research/liquidity-location")
     async def api_research_liquidity_location(
         user: dict = Depends(require_auth),
@@ -662,6 +1045,11 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     async def api_research_workspace(user: dict = Depends(require_auth)):
         return get_workspace().snapshot()
 
+    @router.get("/api/research/scanner-pool-engine")
+    async def api_research_scanner_pool_engine(user: dict = Depends(require_auth)):
+        """Frozen COMMON scanner pool engine (read-only; not workspace LLD)."""
+        return {"success": True, **scanner_pool_engine_payload()}
+
     @router.get("/api/research/settings/defaults")
     async def api_research_settings_defaults(user: dict = Depends(require_auth)):
         return {"success": True, **get_workspace().settings_defaults()}
@@ -672,6 +1060,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         try:
+            reject_scanner_engine_settings_keys(body)
             return get_workspace().apply_settings(
                 ema=body.get("ema"),
                 stochastic=body.get("stochastic"),
@@ -682,7 +1071,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 orderbook_levels=body.get("orderbook_levels"),
             )
         except ValueError as exc:
-            return _error(400, "invalid_settings", str(exc))
+            code = "scanner_engine_read_only" if str(exc) == READ_ONLY_SCANNER_ENGINE_MSG else "invalid_settings"
+            return _error(400, code, str(exc))
 
     @router.post("/api/research/indicator-enabled")
     async def api_research_indicator_enabled(
@@ -690,6 +1080,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         try:
+            reject_scanner_engine_settings_keys(body)
             return get_workspace().set_indicator_enabled(
                 str(body.get("name") or ""), bool(body.get("enabled"))
             )
