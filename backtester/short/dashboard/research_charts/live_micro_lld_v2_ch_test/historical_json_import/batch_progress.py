@@ -33,6 +33,9 @@ class BatchProgressReport:
     errors: list[str] = field(default_factory=list)
     started_at: str = ""
     finished_at: str = ""
+    timing_seconds: dict[str, float] = field(default_factory=dict)
+    resource_check_seconds: float | None = None
+    error_cause: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +51,9 @@ class BatchProgressReport:
             "errors": self.errors,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
+            "timing_seconds": self.timing_seconds,
+            "resource_check_seconds": self.resource_check_seconds,
+            "error_cause": self.error_cause,
         }
 
 
@@ -76,4 +82,11 @@ def load_progress_report(path: Path) -> BatchProgressReport:
         errors=list(data.get("errors") or []),
         started_at=str(data.get("started_at") or ""),
         finished_at=str(data.get("finished_at") or ""),
+        timing_seconds=dict(data.get("timing_seconds") or {}),
+        resource_check_seconds=(
+            float(data["resource_check_seconds"])
+            if data.get("resource_check_seconds") is not None
+            else None
+        ),
+        error_cause=str(data.get("error_cause") or ""),
     )

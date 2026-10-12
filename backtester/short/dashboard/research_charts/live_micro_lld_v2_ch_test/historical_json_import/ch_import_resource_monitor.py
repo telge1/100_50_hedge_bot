@@ -113,19 +113,31 @@ def check_wall_clock_limits(
     """
     errors: list[str] = []
     batch_cap = os.environ.get("HISTORICAL_IMPORT_MAX_BATCH_WALL_SECONDS")
-    if batch_cap and batch_seconds is not None:
-        cap = float(batch_cap)
-        if batch_seconds > cap:
+    if batch_cap:
+        if batch_seconds is None:
             errors.append(
-                f"batch wall {batch_seconds:.1f}s > "
-                f"HISTORICAL_IMPORT_MAX_BATCH_WALL_SECONDS={cap}"
+                "batch wall timing missing while "
+                "HISTORICAL_IMPORT_MAX_BATCH_WALL_SECONDS is set"
             )
+        else:
+            cap = float(batch_cap)
+            if batch_seconds > cap:
+                errors.append(
+                    f"batch wall {batch_seconds:.1f}s > "
+                    f"HISTORICAL_IMPORT_MAX_BATCH_WALL_SECONDS={cap}"
+                )
     read_cap = os.environ.get("HISTORICAL_IMPORT_MAX_READBACK_WALL_SECONDS")
-    if read_cap and readback_seconds is not None:
-        cap = float(read_cap)
-        if readback_seconds > cap:
+    if read_cap:
+        if readback_seconds is None:
             errors.append(
-                f"readback wall {readback_seconds:.1f}s > "
-                f"HISTORICAL_IMPORT_MAX_READBACK_WALL_SECONDS={cap}"
+                "readback wall timing missing while "
+                "HISTORICAL_IMPORT_MAX_READBACK_WALL_SECONDS is set"
             )
+        else:
+            cap = float(read_cap)
+            if readback_seconds > cap:
+                errors.append(
+                    f"readback wall {readback_seconds:.1f}s > "
+                    f"HISTORICAL_IMPORT_MAX_READBACK_WALL_SECONDS={cap}"
+                )
     return errors

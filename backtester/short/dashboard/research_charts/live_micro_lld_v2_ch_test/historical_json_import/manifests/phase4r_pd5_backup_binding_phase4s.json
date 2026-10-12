@@ -1,0 +1,21 @@
+{
+  "phase": "4S",
+  "scope_fingerprint": "83ff82bff5c9cd2a6319eb8c4345b401e78570521396604940c530e8ed3693a9",
+  "manifest_v1": "phase4r_april_15mpd5_full_v1.json",
+  "manifest_v1_backup_recovery_id": "be78daa2-c816-4b68-b490-75941f2cf82e",
+  "manifest_v2": "phase4r_april_15mpd5_full_v2.json",
+  "operational_backup_recovery_id": "c2ca53e1-fbce-44dd-ac18-879733481aeb",
+  "backup_tag": "lmv2_phase4s_post_4q_20261011T110802Z",
+  "backup_status": "BACKUP_CREATED",
+  "restore_test_database": "signal_generator_lmv2_restore_phase4s_post_4q_20261011T110802Z",
+  "restore_status": "RESTORED",
+  "env_for_write_verification": "HISTORICAL_IMPORT_VERIFIED_BACKUP_RECOVERY_ID=c2ca53e1-fbce-44dd-ac18-879733481aeb",
+  "run_state_backup_provenance_example": {
+    "manifest_backup_recovery_id": "c2ca53e1-fbce-44dd-ac18-879733481aeb",
+    "verified_backup_recovery_id": "c2ca53e1-fbce-44dd-ac18-879733481aeb",
+    "backup_status": "BACKUP_CREATED",
+    "backup_name": "File('backups/lmv2_phase4s_post_4q_20261011T110802Z/lmv2_five_tables')",
+    "manifest_differs_from_verified": false
+  },
+  "pd10_manifest": "unchanged \u2014 phase4r_april_15mpd10_full_v1.json until post-PD5 backup decision"
+}

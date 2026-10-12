@@ -35,6 +35,7 @@ from .historical_import_lock import (
 from .import_recovery import ImportPartialState, classify_partial_import
 from .pilot_overlap import pilot_snapshot_ids_from_catalog
 from .write_guards import require_valid_test_run_uuid
+from .backup_provenance import BackupProvenanceError, verify_and_record_backup_provenance
 from .productive_prewrite_gate import (
     ProductivePrewriteGateError,
     assert_productive_env_gates,
@@ -354,6 +355,26 @@ class ControlledMonthlyImportOrchestrator:
                 stopped_reason="productive pre-write gate",
             )
 
+        try:
+            backup_provenance = verify_and_record_backup_provenance(manifest)
+        except BackupProvenanceError as exc:
+            errors.append(str(exc))
+            return ControlledOrchestratorResult(
+                run_id=manifest.run_id,
+                status="preflight_failed",
+                manifest_path=str(manifest_path) if manifest_path else None,
+                stems=list(stems),
+                snapshot_ids=snapshot_ids,
+                expected_writes=expected,
+                batch_specs=[_spec_summary(s) for s in specs],
+                ch_preflight=ch_preflight,
+                resource_baseline_before=baseline_before,
+                resource_baseline_after=None,
+                resume_states=resume_states,
+                errors=errors,
+                stopped_reason="backup provenance",
+            )
+
         batch_results: list[BatchOrchestratorResult] = []
         completed = int(prior.get("batches_completed") or 0) if prior else 0
         try:
@@ -383,6 +404,9 @@ class ControlledMonthlyImportOrchestrator:
                     if errors:
                         break
                     completed += 1
+                    import time as _time
+
+                    t_rc0 = _time.monotonic()
                     limit_after = check_optional_limits(
                         collect_resource_baseline(
                             self.catalog_root,
@@ -390,6 +414,14 @@ class ControlledMonthlyImportOrchestrator:
                             scope_snapshot_ids=scope_ids,
                         )
                     )
+                    rc_sec = _time.monotonic() - t_rc0
+                    prog_path = self.progress_dir / f"{spec.batch_id}.json"
+                    if prog_path.is_file():
+                        from .batch_progress import load_progress_report, write_progress_report
+
+                        prog = load_progress_report(prog_path)
+                        prog.resource_check_seconds = rc_sec
+                        write_progress_report(prog_path, prog)
                     if limit_after:
                         errors.extend(limit_after)
                         break
@@ -429,6 +461,7 @@ class ControlledMonthlyImportOrchestrator:
                 "test_run_id": run_uuid,
                 "status": final_status,
                 "errors": errors,
+                "backup_provenance": backup_provenance.to_dict(),
                 "finished_at": utc_now_iso(),
             },
         )

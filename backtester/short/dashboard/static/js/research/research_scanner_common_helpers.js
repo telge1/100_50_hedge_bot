@@ -18,6 +18,14 @@
   var CAUSAL_LLD_LANDSCAPE_NS = "CAUSAL_LLD_LANDSCAPE";
   var LIVE_MICRO_LLD_V2_NS = "LIVE_MICRO_LLD_V2";
   var LIVE_MICRO_LLD_V2_CH_TEST_NS = "LIVE_MICRO_LLD_V2_CH_TEST";
+  var HISTORICAL_LMV2_NS = "HISTORICAL_LMV2_POOLS";
+  var HISTORICAL_LMV2_PILOT_FROM_UNIX = Math.floor(
+    Date.parse("2026-08-01T00:00:00.000Z") / 1000
+  );
+  var HISTORICAL_LMV2_PILOT_TO_UNIX = Math.floor(
+    Date.parse("2026-08-01T04:45:00.000Z") / 1000
+  );
+  var HISTORICAL_LMV2_TF_SEC = 900;
   var LIVE_MICRO_LLD_V2_TFS = { "1m": true, "5m": true, "15m": true, "30m": true, "1h": true, "4h": true };
   var LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID = "de5f74f6-236f-4dc1-81df-94e15dec1b83";
   var LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX = Math.floor(
@@ -132,8 +140,16 @@
     return !!(p && p.namespace === LIVE_MICRO_LLD_V2_CH_TEST_NS);
   }
 
+  function isHistoricalLmv2Overlay(p) {
+    return !!(p && p.namespace === HISTORICAL_LMV2_NS);
+  }
+
   function isLiveMicroPoolOverlay(p) {
-    return isLiveMicroLldV2Overlay(p) || isLiveMicroLldV2ChTestOverlay(p);
+    return (
+      isLiveMicroLldV2Overlay(p) ||
+      isLiveMicroLldV2ChTestOverlay(p) ||
+      isHistoricalLmv2Overlay(p)
+    );
   }
 
   function isScannerCommonFamilyOverlay(p) {
@@ -145,7 +161,8 @@
       isScannerCommonFamilyOverlay(p) ||
       isCausalLldLandscapeOverlay(p) ||
       isLiveMicroLldV2Overlay(p) ||
-      isLiveMicroLldV2ChTestOverlay(p)
+      isLiveMicroLldV2ChTestOverlay(p) ||
+      isHistoricalLmv2Overlay(p)
     );
   }
 
@@ -270,32 +287,43 @@
     });
   }
 
+  function stripHistoricalLmv2Overlays(list) {
+    return (list || []).filter(function (p) {
+      return p && !isHistoricalLmv2Overlay(p);
+    });
+  }
+
   function mergePaneOverlaysPreservingScannerCommon(
     newPaneOverlays,
     previousPendingOverlays,
     keepCommon,
     keepCausal,
     keepLiveMicroV2,
-    keepLiveMicroChTest
+    keepLiveMicroChTest,
+    keepHistoricalLmv2
   ) {
     var base = newPaneOverlays || [];
     var keepC = !!keepCommon;
     var keepL = !!keepCausal;
     var keepV2 = !!keepLiveMicroV2;
     var keepCh = !!keepLiveMicroChTest;
-    if (!keepC && !keepL && !keepV2 && !keepCh) return base;
+    var keepHist = !!keepHistoricalLmv2;
+    if (!keepC && !keepL && !keepV2 && !keepCh && !keepHist) return base;
     var preserved = (previousPendingOverlays || []).filter(function (p) {
       return (
         (keepC && isScannerCommonFamilyOverlay(p)) ||
         (keepL && isCausalLldLandscapeOverlay(p)) ||
         (keepV2 && isLiveMicroLldV2Overlay(p)) ||
-        (keepCh && isLiveMicroLldV2ChTestOverlay(p))
+        (keepCh && isLiveMicroLldV2ChTestOverlay(p)) ||
+        (keepHist && isHistoricalLmv2Overlay(p))
       );
     });
     if (!preserved.length) return base;
     return stripScannerCommonOverlays(
       stripCausalLldLandscapeOverlays(
-        stripLiveMicroLldV2ChTestOverlays(stripLiveMicroLldV2Overlays(base))
+        stripHistoricalLmv2Overlays(
+          stripLiveMicroLldV2ChTestOverlays(stripLiveMicroLldV2Overlays(base))
+        )
       )
     ).concat(preserved);
   }
@@ -345,6 +373,110 @@
     var clipped = clipZonesForWindow(zones, fromCloseUnix, toCloseUnix);
     var styled = (clipped || []).map(normalizeLiveMicroLldV2ChTestZoneForRender);
     return base.concat(styled);
+  }
+
+  function clipUnixToHistoricalPilot(fromUnix, toUnix) {
+    var covFrom = HISTORICAL_LMV2_PILOT_FROM_UNIX;
+    var covTo = HISTORICAL_LMV2_PILOT_TO_UNIX;
+    var from = Math.max(Math.floor(Number(fromUnix) || 0), covFrom);
+    var to = Math.min(Math.floor(Number(toUnix) || 0), covTo);
+    if (to < covFrom || from > covTo || from > to) return null;
+    return { from_close_unix: from, to_close_unix: to };
+  }
+
+  function resolveHistoricalLmv2AsOfCloseUnix(ctx) {
+    return resolveLiveMicroLldV2DecisionCloseUnix(ctx || {});
+  }
+
+  function resolveHistoricalLmv2RequestWindow(pane, tfSec, ctx) {
+    ctx = ctx || {};
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var decisionClose = resolveHistoricalLmv2AsOfCloseUnix(ctx);
+    if (decisionClose == null) return null;
+    var toClose = Math.min(Math.floor(Number(decisionClose)), HISTORICAL_LMV2_PILOT_TO_UNIX);
+    var paneBase = resolvePaneCloseWindow(pane, sec);
+    var fromClose = paneBase && Number.isFinite(paneBase.from_close_unix)
+      ? Number(paneBase.from_close_unix)
+      : toClose - sec * 4;
+    fromClose = Math.max(fromClose, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    return clipUnixToHistoricalPilot(fromClose, toClose);
+  }
+
+  function normalizeHistoricalLmv2ZoneForRender(zone) {
+    if (!zone || zone.namespace !== HISTORICAL_LMV2_NS) return zone;
+    var meta = zone.metadata || {};
+    var asLive = normalizeLiveMicroLldV2ZoneForRender(
+      Object.assign({}, zone, { namespace: LIVE_MICRO_LLD_V2_NS })
+    );
+    var border = "dotted";
+    if (meta.layer === "remaining") {
+      border = "dashed";
+    }
+    return Object.assign({}, asLive, {
+      namespace: HISTORICAL_LMV2_NS,
+      id: zone.id,
+      border_style: border,
+      metadata: Object.assign({}, meta, {
+        visibility_mode: "RESEARCH_HISTORICAL",
+        live_availability: "NOT_VERIFIED",
+      }),
+    });
+  }
+
+  function cullHistoricalZonesForRender(zones, pane) {
+    var list = zones || [];
+    var active = [];
+    var remaining = [];
+    list.forEach(function (z) {
+      if (!z) return;
+      if (z.metadata && z.metadata.layer === "remaining") remaining.push(z);
+      else active.push(z);
+    });
+    var maxActive = LIVE_MICRO_LLD_V2_MAX_CHART_ZONES;
+    if (active.length > maxActive) {
+      active = active.slice(0, maxActive);
+    }
+    var remCap = Math.max(200, LIVE_MICRO_LLD_V2_MAX_CHART_ZONES * 2);
+    if (remaining.length > 0 && remaining[0].metadata && remaining[0].metadata.visibility_mode === "RESEARCH_HISTORICAL") {
+      remCap = 8000;
+    }
+    if (remaining.length > remCap) {
+      remaining = remaining.slice(0, remCap);
+      remaining.forEach(function (z) {
+        if (!z.metadata) z.metadata = {};
+        z.metadata.display_viewport_culled = true;
+      });
+    }
+    return active.concat(remaining);
+  }
+
+  function applyHistoricalLmv2ToOverlays(
+    pendingOverlays,
+    zones,
+    fromCloseUnix,
+    toCloseUnix
+  ) {
+    var base = stripHistoricalLmv2Overlays(pendingOverlays || []);
+    var clipped = clipZonesForWindow(zones, fromCloseUnix, toCloseUnix);
+    var culled = cullHistoricalZonesForRender(clipped);
+    var styled = (culled || []).map(normalizeHistoricalLmv2ZoneForRender);
+    return base.concat(styled);
+  }
+
+  function historicalLmv2CacheKey(symbol, timeframe, fromIso, toIso, asOfIso, layersKey) {
+    return (
+      String(symbol || "") +
+      "\x1f" +
+      String(timeframe || "") +
+      "\x1fhistorical_lmv2\x1f" +
+      String(fromIso || "") +
+      "\x1f" +
+      String(toIso || "") +
+      "\x1f" +
+      String(asOfIso || "") +
+      "\x1f" +
+      String(layersKey || "-")
+    );
   }
 
   function zoneIntersectsTimeAndPrice(zone, timeLo, timeHi, priceLo, priceHi) {
@@ -956,6 +1088,9 @@
     CAUSAL_LLD_LANDSCAPE_NS: CAUSAL_LLD_LANDSCAPE_NS,
     LIVE_MICRO_LLD_V2_NS: LIVE_MICRO_LLD_V2_NS,
     LIVE_MICRO_LLD_V2_CH_TEST_NS: LIVE_MICRO_LLD_V2_CH_TEST_NS,
+    HISTORICAL_LMV2_NS: HISTORICAL_LMV2_NS,
+    HISTORICAL_LMV2_PILOT_FROM_UNIX: HISTORICAL_LMV2_PILOT_FROM_UNIX,
+    HISTORICAL_LMV2_PILOT_TO_UNIX: HISTORICAL_LMV2_PILOT_TO_UNIX,
     LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID: LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID,
     LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX: LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX,
     LIVE_MICRO_LLD_V2_CH_TEST_COV_TO_UNIX: LIVE_MICRO_LLD_V2_CH_TEST_COV_TO_UNIX,
@@ -965,12 +1100,14 @@
     isCausalLldLandscapeOverlay: isCausalLldLandscapeOverlay,
     isLiveMicroLldV2Overlay: isLiveMicroLldV2Overlay,
     isLiveMicroLldV2ChTestOverlay: isLiveMicroLldV2ChTestOverlay,
+    isHistoricalLmv2Overlay: isHistoricalLmv2Overlay,
     isScannerCommonFamilyOverlay: isScannerCommonFamilyOverlay,
     isResearchPoolLayerOverlay: isResearchPoolLayerOverlay,
     stripScannerCommonOverlays: stripScannerCommonOverlays,
     stripCausalLldLandscapeOverlays: stripCausalLldLandscapeOverlays,
     stripLiveMicroLldV2Overlays: stripLiveMicroLldV2Overlays,
     stripLiveMicroLldV2ChTestOverlays: stripLiveMicroLldV2ChTestOverlays,
+    stripHistoricalLmv2Overlays: stripHistoricalLmv2Overlays,
     normalizeScannerCommonZone: normalizeScannerCommonZone,
     selectPaneForScannerCommon: selectPaneForScannerCommon,
     scannerCommonOverlayToZone: scannerCommonOverlayToZone,
@@ -999,6 +1136,12 @@
     applyCausalLldLandscapeToOverlays: applyCausalLldLandscapeToOverlays,
     applyLiveMicroLldV2ToOverlays: applyLiveMicroLldV2ToOverlays,
     applyLiveMicroLldV2ChTestToOverlays: applyLiveMicroLldV2ChTestToOverlays,
+    applyHistoricalLmv2ToOverlays: applyHistoricalLmv2ToOverlays,
+    clipUnixToHistoricalPilot: clipUnixToHistoricalPilot,
+    resolveHistoricalLmv2RequestWindow: resolveHistoricalLmv2RequestWindow,
+    resolveHistoricalLmv2AsOfCloseUnix: resolveHistoricalLmv2AsOfCloseUnix,
+    historicalLmv2CacheKey: historicalLmv2CacheKey,
+    normalizeHistoricalLmv2ZoneForRender: normalizeHistoricalLmv2ZoneForRender,
     filterOverlaysForChartRender: filterOverlaysForChartRender,
     countLiveMicroLldV2Overlays: countLiveMicroLldV2Overlays,
     countLiveMicroLldV2ChTestOverlays: countLiveMicroLldV2ChTestOverlays,

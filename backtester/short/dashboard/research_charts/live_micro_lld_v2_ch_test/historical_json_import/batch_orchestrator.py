@@ -58,8 +58,26 @@ class BatchOrchestrator:
         write_lock_held: bool = False,
     ) -> BatchOrchestratorResult:
         errors: list[str] = []
+        started_at = utc_now_iso()
+        t_batch = time.monotonic()
+        t_v0 = time.monotonic()
         vr = validate_batch(self.catalog_root, spec, test_run_id=test_run_id)
+        validate_sec = time.monotonic() - t_v0
         if vr["errors"]:
+            timing = {
+                "validate": validate_sec,
+                "write": 0.0,
+                "readback": 0.0,
+                "total": validate_sec,
+            }
+            self._write_failed_progress(
+                spec,
+                vr,
+                started_at=started_at,
+                timing=timing,
+                error_cause="validate_failed",
+                errors=vr["errors"],
+            )
             return BatchOrchestratorResult(
                 spec.batch_id,
                 "validate_failed",
@@ -67,6 +85,7 @@ class BatchOrchestrator:
                 None,
                 None,
                 vr["errors"],
+                timing,
             )
         if mode == "validate_only":
             return BatchOrchestratorResult(spec.batch_id, "validated", vr, None, None, [])
@@ -75,7 +94,13 @@ class BatchOrchestrator:
             assert_productive_env_gates()
         except ProductivePrewriteGateError as exc:
             errors.append(str(exc))
-            return BatchOrchestratorResult(spec.batch_id, "blocked", vr, None, None, errors)
+            timing = {
+                "validate": validate_sec,
+                "write": 0.0,
+                "readback": 0.0,
+                "total": validate_sec,
+            }
+            return BatchOrchestratorResult(spec.batch_id, "blocked", vr, None, None, errors, timing)
 
         import uuid
 
@@ -102,15 +127,25 @@ class BatchOrchestrator:
             require_sidecar=True,
         )
         readback_sec = time.monotonic() - t1
+        total_sec = time.monotonic() - t_batch
         timing = {
+            "validate": validate_sec,
             "write": write_sec,
             "readback": readback_sec,
-            "total": write_sec + readback_sec,
+            "total": total_sec,
         }
         bad_p = [r for r in rb["parity"] if not r.ok]
         bad_s = [r for r in rb["sidecar"] if not r.ok]
         if bad_p or bad_s:
             errors.append(f"readback parity failures={len(bad_p)} sidecar={len(bad_s)}")
+            self._write_failed_progress(
+                spec,
+                vr,
+                started_at=started_at,
+                timing=timing,
+                error_cause="readback_failed",
+                errors=errors,
+            )
             return BatchOrchestratorResult(
                 spec.batch_id,
                 "readback_failed",
@@ -143,8 +178,9 @@ class BatchOrchestrator:
             ],
             summary=vr["summary"],
             errors=errors,
-            started_at=utc_now_iso(),
+            started_at=started_at,
             finished_at=utc_now_iso(),
+            timing_seconds=timing,
         )
         write_progress_report(prog_path, prog)
         ok, crit_errs = batch_success_criteria_met(
@@ -165,6 +201,39 @@ class BatchOrchestrator:
             expected_in_batch=len(spec.stems),
         )
         status = "readback_ok" if ok and not errors else "failed"
+        if status != "readback_ok":
+            prog.error_cause = "success_criteria_failed"
+            prog.timing_seconds = timing
+            write_progress_report(prog_path, prog)
         return BatchOrchestratorResult(
             spec.batch_id, status, vr, write_out, rb, errors, timing
         )
+
+    def _write_failed_progress(
+        self,
+        spec: BatchSpec,
+        vr: dict[str, Any],
+        *,
+        started_at: str,
+        timing: dict[str, float],
+        error_cause: str,
+        errors: list[str],
+    ) -> None:
+        prog_path = self.progress_dir / f"{spec.batch_id}.json"
+        prog = BatchProgressReport(
+            batch_id=spec.batch_id,
+            pipeline_line_id=spec.pipeline_line_id,
+            combo_folder=spec.combo_folder,
+            month=spec.month,
+            import_batch_id=spec.import_batch_id,
+            status="failed",
+            closes_planned=len(spec.stems),
+            closes=[],
+            summary=vr.get("summary") or {},
+            errors=errors,
+            started_at=started_at,
+            finished_at=utc_now_iso(),
+            timing_seconds=timing,
+            error_cause=error_cause,
+        )
+        write_progress_report(prog_path, prog)

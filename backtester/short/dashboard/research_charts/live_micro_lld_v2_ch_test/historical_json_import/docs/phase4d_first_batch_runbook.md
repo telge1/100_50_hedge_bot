@@ -31,7 +31,9 @@
    Run `execute_batch_import` for `first_regulatory_batch_spec` (April 2026, 4h_PD10, 50 stems).
 
 6. **CH readback incl. sidecar (read-only queries)**
-   `run_batch_readback_gate(..., require_sidecar=True, batch_spec=spec)`.
+   `run_batch_readback_gate(..., require_sidecar=True, batch_spec=spec)` (fail-closed parity is internal; do not pass ``fail_closed``).
+
+   For multi-batch post-checks use ``post_import_verification.verify_manifest_file(catalog_root, manifest_path)``.
 
 7. **Progress vs CH**
    `reconcile_progress_with_ch`; publish count on production line must be 50.

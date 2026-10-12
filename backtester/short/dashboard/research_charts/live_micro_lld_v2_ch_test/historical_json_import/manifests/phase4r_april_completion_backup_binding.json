@@ -1,0 +1,9 @@
+{
+  "phase": "4R",
+  "note": "backup_recovery_id is pre-4Q placeholder; new post-4Q five-table backup required before write freigabe",
+  "last_verified_backup_pre_4q": "be78daa2-c816-4b68-b490-75941f2cf82e",
+  "manifests": {
+    "15m_PD5": "phase4r_april_15mpd5_full_v1.json",
+    "15m_PD10": "phase4r_april_15mpd10_full_v1.json"
+  }
+}

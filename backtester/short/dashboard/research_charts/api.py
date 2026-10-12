@@ -25,6 +25,10 @@ from .chart_causal_lld_timeline_v1 import chart_causal_lld_timeline
 from .chart_live_micro_lld_v2 import SUPPORTED_TIMEFRAMES as LIVE_MICRO_LLD_V2_TFS
 from .chart_live_micro_lld_v2 import chart_live_micro_lld_v2
 from .chart_live_micro_lld_v2_ch_test import chart_live_micro_lld_v2_ch_test
+from .chart_historical_lmv2_pools import (
+    HistoricalLmv2PilotError,
+    chart_historical_lmv2_pools,
+)
 from .live_micro_lld_v2_ch_test.compare_guard import evaluate_compare_guard
 from .live_micro_lld_v2_ch_test.errors import (
     AmbiguousRunError,
@@ -766,6 +770,48 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(400, str(exc), str(exc))
         except Exception as exc:
             return _error(500, "live_micro_lld_v2_ch_test_failed", str(exc))
+        return {"success": True, "message": FEED_MESSAGE, **payload}
+
+    @router.post("/api/research/historical-lld-v2-pools")
+    async def api_research_historical_lld_v2_pools(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Phase 5D pilot: read-only historical ACTIVE/Remaining from CH (20 closes max)."""
+        from_close = body.get("from_close")
+        to_close = body.get("to_close")
+        if not from_close or not to_close:
+            return _error(400, "from_to_required", "from_close and to_close (ISO) are required")
+        try:
+            payload = await asyncio.to_thread(
+                chart_historical_lmv2_pools,
+                str(body.get("symbol") or "DOGEUSDT"),
+                str(from_close),
+                str(to_close),
+                timeframe=str(body.get("timeframe") or "15m"),
+                pool_detail=int(body.get("pool_detail") or 10),
+                as_of_close=body.get("as_of_close"),
+                include_active=bool(body.get("include_active", True)),
+                include_remaining=bool(body.get("include_remaining", False)),
+                price_min=float(body["price_min"]) if body.get("price_min") is not None else None,
+                price_max=float(body["price_max"]) if body.get("price_max") is not None else None,
+                remaining_limit=int(body.get("remaining_limit") or 6500),
+            )
+        except HistoricalLmv2PilotError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": exc.message,
+                    "details": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=422,
+            )
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "historical_lld_v2_pools_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
 
     @router.get("/api/research/live-micro-lld-v2-preset-matrix")

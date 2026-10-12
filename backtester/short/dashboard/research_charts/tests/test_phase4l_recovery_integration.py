@@ -41,6 +41,7 @@ from research_charts.live_micro_lld_v2_ch_test.historical_json_import.recovery_o
     close_resume_allowed_for_write,
     find_blocked_close_resumes,
 )
+from research_charts.tests.historical_import_test_stubs import stub_backup_provenance_verification
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.batch_resume import (
     assess_close_resume_states,
 )
@@ -203,6 +204,7 @@ def test_orchestrator_write_path_allows_catalog_resume(monkeypatch):
         "research_charts.live_micro_lld_v2_ch_test.historical_json_import.controlled_monthly_orchestrator.check_wall_clock_limits",
         lambda *a, **k: [],
     )
+    stub_backup_provenance_verification(monkeypatch)
 
     res = orch._run(
         manifest,

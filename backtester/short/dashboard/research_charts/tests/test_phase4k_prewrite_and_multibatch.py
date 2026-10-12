@@ -48,6 +48,7 @@ from research_charts.live_micro_lld_v2_ch_test.historical_json_import.productive
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.provenance_sidecar import (
     ProvenanceSidecarConflictError,
 )
+from research_charts.tests.historical_import_test_stubs import stub_backup_provenance_verification
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.write_guards import (
     InvalidTestRunIdError,
 )
@@ -204,12 +205,14 @@ def test_orchestrator_stops_after_readback_failure(both_gates, monkeypatch):
             BatchOrchestratorResult,
         )
 
+        timing = {"validate": 0.1, "write": 1.0, "readback": 0.5, "total": 1.6}
         if calls["n"] == 1:
             return BatchOrchestratorResult(
-                "b1", "readback_failed", {}, None, None, ["fail"]
+                "b1", "readback_failed", {}, None, None, ["fail"], timing
             )
-        return BatchOrchestratorResult("b2", "readback_ok", {}, [], {}, [])
+        return BatchOrchestratorResult("b2", "readback_ok", {}, [], {}, [], timing)
 
+    stub_backup_provenance_verification(monkeypatch)
     monkeypatch.setattr(orch._batch, "run_batch", fake_run_batch)
     monkeypatch.setattr(
         "research_charts.live_micro_lld_v2_ch_test.historical_json_import.controlled_monthly_orchestrator.load_scope_layer_map_for_snapshots",

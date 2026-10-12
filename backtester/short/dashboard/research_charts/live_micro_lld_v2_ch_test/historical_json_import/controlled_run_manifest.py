@@ -274,3 +274,270 @@ def build_phase4k_april_15mpd1_500_manifest(catalog_root: Path) -> ControlledRun
         scope_fingerprint=fp,
         batch_import_ids=batch_ids,
     )
+
+
+def build_phase4o_april_15mpd1_stems500_2880_manifest(catalog_root: Path) -> ControlledRunManifest:
+    """April 2026 15m_PD1 stems[500:2880] — remainder of month (2380 closes, 48×50 batches)."""
+    from .historical_batch_config import StrategyCombo
+
+    combo = StrategyCombo("15m", 1)
+    month = "2026-04"
+    stem_slice = StemSlice(500, 2880)
+    all_stems = tuple(iter_stems(catalog_root, month=month, combo_folder=combo.folder))
+    stems = stem_slice.resolve(all_stems)
+    if len(all_stems) != 2880:
+        raise BatchImportError(
+            f"April 15m_PD1 catalog stem count {len(all_stems)} != expected 2880"
+        )
+    run_id = "00000000-0000-4000-8000-000000004c01"
+    fp = compute_scope_fingerprint(
+        approved_month=month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        stems=stems,
+    )
+    prefix = "phase4o_apr2026_15mpd1_v1"
+    batch_count = (len(stems) + 49) // 50
+    batch_ids = tuple(f"{prefix}_batch{b:02d}" for b in range(1, batch_count + 1))
+    return ControlledRunManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        run_id=run_id,
+        approved_month=month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        max_snapshots=2380,
+        max_batches=48,
+        batch_size=50,
+        import_batch_id=prefix,
+        backup_recovery_id="923fc087-9e6b-47f1-bbaf-37d765b1182a",
+        scope_fingerprint=fp,
+        batch_import_ids=batch_ids,
+    )
+
+
+def _build_april_full_combo_manifest(
+    catalog_root: Path,
+    *,
+    combo_folder: str,
+    pool_detail: int,
+    run_id: str,
+    import_prefix: str,
+    backup_recovery_id: str,
+) -> ControlledRunManifest:
+    from .historical_batch_config import StrategyCombo
+
+    combo = StrategyCombo("15m" if combo_folder.startswith("15m") else "4h", pool_detail)
+    if combo.folder != combo_folder:
+        raise BatchImportError(f"combo_folder mismatch {combo_folder} vs {combo.folder}")
+    month = "2026-04"
+    all_stems = tuple(iter_stems(catalog_root, month=month, combo_folder=combo.folder))
+    stem_slice = StemSlice(0, len(all_stems))
+    stems = stem_slice.resolve(all_stems)
+    fp = compute_scope_fingerprint(
+        approved_month=month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        stems=stems,
+    )
+    batch_size = 50
+    batch_count = (len(stems) + batch_size - 1) // batch_size
+    batch_ids = tuple(f"{import_prefix}_batch{b:02d}" for b in range(1, batch_count + 1))
+    return ControlledRunManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        run_id=run_id,
+        approved_month=month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        max_snapshots=len(stems),
+        max_batches=batch_count,
+        batch_size=batch_size,
+        import_batch_id=import_prefix,
+        backup_recovery_id=backup_recovery_id,
+        scope_fingerprint=fp,
+        batch_import_ids=batch_ids,
+    )
+
+
+def build_phase4r_april_15mpd5_full_manifest(catalog_root: Path) -> ControlledRunManifest:
+    """April 2026 full month 15m_PD5 — 2880 closes (58×50 batches, last batch 30)."""
+    return _build_april_full_combo_manifest(
+        catalog_root,
+        combo_folder="15m_PD5",
+        pool_detail=5,
+        run_id="00000000-0000-4000-8000-000000004d01",
+        import_prefix="phase4r_apr2026_15mpd5_v1",
+        backup_recovery_id="be78daa2-c816-4b68-b490-75941f2cf82e",
+    )
+
+
+def build_phase4r_april_15mpd10_full_manifest(catalog_root: Path) -> ControlledRunManifest:
+    """April 2026 full month 15m_PD10 production line (distinct from Aug pilot ledger)."""
+    return _build_april_full_combo_manifest(
+        catalog_root,
+        combo_folder="15m_PD10",
+        pool_detail=10,
+        run_id="00000000-0000-4000-8000-000000004e01",
+        import_prefix="phase4r_apr2026_15mpd10_v1",
+        backup_recovery_id="be78daa2-c816-4b68-b490-75941f2cf82e",
+    )
+
+
+def _build_month_full_combo_manifest(
+    catalog_root: Path,
+    *,
+    approved_month: str,
+    combo_folder: str,
+    pool_detail: int,
+    run_id: str,
+    import_prefix: str,
+    backup_recovery_id: str,
+) -> ControlledRunManifest:
+    from .historical_batch_config import StrategyCombo
+
+    combo = StrategyCombo("15m" if combo_folder.startswith("15m") else "4h", pool_detail)
+    if combo.folder != combo_folder:
+        raise BatchImportError(f"combo_folder mismatch {combo_folder} vs {combo.folder}")
+    all_stems = tuple(iter_stems(catalog_root, month=approved_month, combo_folder=combo.folder))
+    stem_slice = StemSlice(0, len(all_stems))
+    stems = stem_slice.resolve(all_stems)
+    fp = compute_scope_fingerprint(
+        approved_month=approved_month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        stems=stems,
+    )
+    batch_size = 50
+    batch_count = (len(stems) + batch_size - 1) // batch_size
+    batch_ids = tuple(f"{import_prefix}_batch{b:02d}" for b in range(1, batch_count + 1))
+    return ControlledRunManifest(
+        schema_version=MANIFEST_SCHEMA_VERSION,
+        run_id=run_id,
+        approved_month=approved_month,
+        combo_folder=combo.folder,
+        pipeline_line_id=combo.pipeline_line_id(),
+        stem_slice=stem_slice,
+        max_snapshots=len(stems),
+        max_batches=batch_count,
+        batch_size=batch_size,
+        import_batch_id=import_prefix,
+        backup_recovery_id=backup_recovery_id,
+        scope_fingerprint=fp,
+        batch_import_ids=batch_ids,
+    )
+
+
+MAY_2026_COMBO_RUN_IDS: dict[str, str] = {
+    "15m_PD1": "00000000-0000-4000-8000-000000005101",
+    "15m_PD5": "00000000-0000-4000-8000-000000005102",
+    "15m_PD10": "00000000-0000-4000-8000-000000005103",
+    "4h_PD10": "00000000-0000-4000-8000-000000005104",
+}
+
+
+def build_phase4w_may2026_combo_manifest(
+    catalog_root: Path,
+    combo_folder: str,
+    *,
+    backup_recovery_id: str,
+) -> ControlledRunManifest:
+    """May 2026 full month for one strategy combo (frozen catalog stems[0:N])."""
+    pool_detail = int(combo_folder.split("_PD")[1])
+    prefix = f"phase4w_may2026_{combo_folder.lower()}_v1"
+    return _build_month_full_combo_manifest(
+        catalog_root,
+        approved_month="2026-05",
+        combo_folder=combo_folder,
+        pool_detail=pool_detail,
+        run_id=MAY_2026_COMBO_RUN_IDS[combo_folder],
+        import_prefix=prefix,
+        backup_recovery_id=backup_recovery_id,
+    )
+
+
+JUNE_2026_COMBO_RUN_IDS: dict[str, str] = {
+    "15m_PD1": "00000000-0000-4000-8000-000000005201",
+    "15m_PD5": "00000000-0000-4000-8000-000000005202",
+    "15m_PD10": "00000000-0000-4000-8000-000000005203",
+    "4h_PD10": "00000000-0000-4000-8000-000000005204",
+}
+
+
+def build_phase4y_june2026_combo_manifest(
+    catalog_root: Path,
+    combo_folder: str,
+    *,
+    backup_recovery_id: str,
+) -> ControlledRunManifest:
+    """June 2026 full month for one strategy combo (frozen catalog stems[0:N])."""
+    return build_phase4z_month_combo_manifest(
+        catalog_root,
+        "2026-06",
+        combo_folder,
+        backup_recovery_id=backup_recovery_id,
+        import_prefix="phase4y_jun2026",
+    )
+
+
+PHASE4Z_MONTH_SLUG: dict[str, str] = {
+    "2026-06": "jun2026",
+    "2026-07": "jul2026",
+    "2026-08": "aug2026",
+    "2026-09": "sep2026",
+}
+
+PHASE4Z_MONTH_RUN_ID_BASE: dict[str, str] = {
+    "2026-06": "520",
+    "2026-07": "530",
+    "2026-08": "540",
+    "2026-09": "550",
+}
+
+PHASE4Z_COMBO_RUN_SUFFIX: dict[str, int] = {
+    "15m_PD1": 1,
+    "15m_PD5": 2,
+    "15m_PD10": 3,
+    "4h_PD10": 4,
+}
+
+
+def phase4z_combo_run_id(approved_month: str, combo_folder: str) -> str:
+    base = int(PHASE4Z_MONTH_RUN_ID_BASE[approved_month])
+    suffix = PHASE4Z_COMBO_RUN_SUFFIX[combo_folder]
+    tail = base * 10 + suffix
+    return f"00000000-0000-4000-8000-{tail:012d}"
+
+
+def build_phase4z_month_combo_manifest(
+    catalog_root: Path,
+    approved_month: str,
+    combo_folder: str,
+    *,
+    backup_recovery_id: str,
+    import_prefix: str | None = None,
+) -> ControlledRunManifest:
+    """Frozen full-month manifest for Jun–Sep 2026 overnight import."""
+    pool_detail = int(combo_folder.split("_PD")[1])
+    slug = PHASE4Z_MONTH_SLUG[approved_month]
+    prefix = import_prefix or f"phase4z_{slug}_{combo_folder.lower()}_v1"
+    return _build_month_full_combo_manifest(
+        catalog_root,
+        approved_month=approved_month,
+        combo_folder=combo_folder,
+        pool_detail=pool_detail,
+        run_id=phase4z_combo_run_id(approved_month, combo_folder),
+        import_prefix=prefix,
+        backup_recovery_id=backup_recovery_id,
+    )
+
+
+def write_manifest_json(path: Path, manifest: ControlledRunManifest) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(manifest.canonical_dict(), indent=2) + "\n",
+        encoding="utf-8",
+    )

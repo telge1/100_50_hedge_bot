@@ -185,6 +185,11 @@
                     <label class="trp-check trp-dock-ind" title="Stärke Very Strong"><input type="checkbox" class="research-lmv2-strength" value="Very Strong" checked> VS</label>
                     <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
                     <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
+                    <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Phase 5D pilot, Aug 2026)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Remaining</label>
+                    <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
+                    <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
@@ -507,8 +512,8 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=lmv2-remaining-3"></script>
-    <script src="/static/js/research/research_charts.js?v=lmv2-remaining-3"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5f-1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase5f-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

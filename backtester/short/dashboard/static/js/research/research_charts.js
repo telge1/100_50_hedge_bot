@@ -81,6 +81,8 @@
     liveMicroLldV2ChTestCache: {},
     liveMicroLldV2ChTestRefreshToken: 0,
     liveMicroLldV2ChCompareStatus: null,
+    historicalLmv2Cache: {},
+    historicalLmv2RefreshToken: 0,
     scannerCommonReplayRefreshTimer: null,
     formingTimer: null,
     obpRefreshTimer: null,
@@ -418,6 +420,7 @@
     state.gotoTsUtc = state.replayTargetTs;
     state.liveMicroLldV2Cache = {};
     state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
     abortInflightPaneLoads();
     stopPoll();
     lockReplayViewOnAllPanes(state.replayWindow);
@@ -431,6 +434,7 @@
     state.gotoTsUtc = null;
     state.liveMicroLldV2Cache = {};
     state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
     state.liquidityLocationAsOf = null;
     unlockReplayViewOnAllPanes();
     abortInflightPaneLoads();
@@ -658,6 +662,15 @@
         }
       }
     }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
     if (statusMsg) setStatus(statusMsg);
   }
 
@@ -783,6 +796,15 @@
       } catch (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] live-micro-lld-v2-ch-test go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 go-to", err); } catch (e) { /* ignore */ }
         }
       }
     }
@@ -1097,6 +1119,7 @@
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
       on_visible_range: function (from, to) {
+        if (pane._suppressOverlayViewportFeedback) return;
         scheduleVolumeProfile(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
@@ -1190,7 +1213,12 @@
         ? SC_HELPERS.countLiveMicroLldV2Overlays(chartList)
         : 0;
       if (v2OnChart > 0 || Object.keys(wanted).length > 120) {
-        chart.layoutOverlays();
+        pane._suppressOverlayViewportFeedback = true;
+        try {
+          chart.layoutOverlays();
+        } finally {
+          pane._suppressOverlayViewportFeedback = false;
+        }
       }
     }
   }
@@ -1199,7 +1227,8 @@
     if (!pane || !SC_HELPERS) return;
     const v2On = liveMicroLldV2Enabled() && paneSupportsLiveMicroLldV2(pane);
     const chOn = liveMicroLldV2ChTestEnabled() && paneSupportsLiveMicroLldV2ChTest(pane);
-    if (!v2On && !chOn) return;
+    const histOn = historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane);
+    if (!v2On && !chOn && !histOn) return;
     if (!SC_HELPERS.liveMicroLldV2NeedsViewportChartSync(pane.pendingOverlays || [])) return;
     if (pane.liveMicroLldV2ViewportTimer) clearTimeout(pane.liveMicroLldV2ViewportTimer);
     pane.liveMicroLldV2ViewportTimer = setTimeout(function () {
@@ -1231,6 +1260,42 @@
   function liveMicroLldV2ChCompareEnabled() {
     const cb = $("researchLiveMicroV2ChCompare");
     return !!(cb && cb.checked);
+  }
+
+  function historicalLmv2PoolsEnabled() {
+    const cb = $("researchIndHistoricalLmv2Pools");
+    return !!(cb && cb.checked);
+  }
+
+  function historicalLmv2ActiveEnabled() {
+    const cb = $("researchIndHistoricalLmv2Active");
+    return cb ? !!cb.checked : true;
+  }
+
+  function historicalLmv2RemainingEnabled() {
+    const cb = $("researchIndHistoricalLmv2Remaining");
+    return !!(cb && cb.checked);
+  }
+
+  function paneSupportsHistoricalLmv2(pane) {
+    if (!pane || !state.symbol) return false;
+    if (String(state.symbol).toUpperCase() !== "DOGEUSDT") return false;
+    if (pane.tf !== "15m") return false;
+    if (liveMicroLldV2PoolDetail() !== 10) return false;
+    return true;
+  }
+
+  function updateHistoricalLmv2UiChrome() {
+    const on = historicalLmv2PoolsEnabled();
+    const aw = $("researchHistoricalLmv2ActiveWrap");
+    const rw = $("researchHistoricalLmv2RemainingWrap");
+    const banner = $("researchHistoricalLmv2Banner");
+    if (aw) aw.hidden = !on;
+    if (rw) rw.hidden = !on;
+    if (banner) banner.hidden = !on;
+    if (on && $("researchLiveMicroV2PoolDetail")) {
+      $("researchLiveMicroV2PoolDetail").value = "10";
+    }
   }
 
   function liveMicroLldV2ChTestRunId() {
@@ -2167,6 +2232,186 @@
     }
     if (liveMicroLldV2ChTestShouldAbort(opts, symAtStart, refreshToken)) return;
     updateLiveMicroLldV2ChTestHint(lastBody);
+  }
+
+  function historicalLmv2ShouldAbort(opts, symAtStart, refreshToken) {
+    if (state.symbol !== symAtStart) return true;
+    if (refreshToken != null && refreshToken !== state.historicalLmv2RefreshToken) return true;
+    if (opts && opts.gen != null && opts.gen !== state.loadGen) return true;
+    return false;
+  }
+
+  function updateHistoricalLmv2Hint(payload, extra) {
+    const el = $("researchHistoricalLmv2Hint");
+    if (!el) return;
+    if (extra && extra._outOfCoverage) {
+      el.hidden = false;
+      el.textContent = "Historical LLD V2 · " + (extra.message || "OUT_OF_PILOT_SCOPE");
+      return;
+    }
+    if (!payload || !historicalLmv2PoolsEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent =
+      "Historical LLD V2 · PD10 · closes=" + (payload.pilot_close_count != null ? payload.pilot_close_count : "?") +
+      " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
+      " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (payload.remaining_segment_count_full != null
+        ? " · rem_full=" + payload.remaining_segment_count_full
+        : "") +
+      (payload.remaining_truncated ? " · DISPLAY remaining capped" : "");
+  }
+
+  async function refreshHistoricalLmv2OnePane(target, opts, ctx) {
+    const symAtStart = ctx.symAtStart;
+    const refreshToken = ctx.refreshToken;
+    const tfSec = TF_SEC[target.tf] || 900;
+    const microCtx = liveMicroLldV2DecisionContext(target);
+    const win = SC_HELPERS
+      ? SC_HELPERS.resolveHistoricalLmv2RequestWindow(target, tfSec, microCtx)
+      : null;
+    if (!win) {
+      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "outside pilot window or no closed bar" });
+      syncOverlays(
+        target,
+        SC_HELPERS
+          ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+          : (target.pendingOverlays || [])
+      );
+      return null;
+    }
+    const fromIso = unixToIsoZExact(win.from_close_unix);
+    const toIso = unixToIsoZExact(win.to_close_unix);
+    const asOfUnix = SC_HELPERS
+      ? SC_HELPERS.resolveHistoricalLmv2AsOfCloseUnix(microCtx)
+      : win.to_close_unix;
+    const asOfIso = unixToIsoZExact(asOfUnix);
+    const layersKey = (historicalLmv2ActiveEnabled() ? "A" : "") + (historicalLmv2RemainingEnabled() ? "R" : "");
+    let body = null;
+    let cacheKey = null;
+    if (SC_HELPERS && !(opts && opts.force)) {
+      cacheKey = SC_HELPERS.historicalLmv2CacheKey(symAtStart, target.tf, fromIso, toIso, asOfIso, layersKey);
+      if (state.historicalLmv2Cache && state.historicalLmv2Cache[cacheKey]) {
+        body = state.historicalLmv2Cache[cacheKey];
+      }
+    }
+    if (!body) {
+      body = await sendJson("/api/research/historical-lld-v2-pools", "POST", {
+        symbol: symAtStart,
+        timeframe: target.tf,
+        pool_detail: 10,
+        from_close: fromIso,
+        to_close: toIso,
+        as_of_close: asOfIso,
+        include_active: historicalLmv2ActiveEnabled(),
+        include_remaining: historicalLmv2RemainingEnabled(),
+        remaining_limit: 6500,
+      }, {
+        sourceAction: "historical-lld-v2-pools",
+        pane: target.paneId || target.id,
+        timeframe: target.tf,
+        signal: (opts && opts.signal) || undefined,
+      });
+      if (!body || body.success === false) {
+        updateHistoricalLmv2Hint(null, {
+          _outOfCoverage: true,
+          message: (body && body.message) || "request failed",
+        });
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+        return null;
+      }
+      if (SC_HELPERS && cacheKey && body) {
+        state.historicalLmv2Cache[cacheKey] = body;
+      }
+    }
+    if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return null;
+    if (!historicalLmv2PoolsEnabled()) return null;
+    if (SC_HELPERS) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyHistoricalLmv2ToOverlays(
+          target.pendingOverlays || [],
+          body.zones || [],
+          win.from_close_unix,
+          win.to_close_unix
+        )
+      );
+    }
+    return body;
+  }
+
+  async function refreshHistoricalLmv2(pane, opts) {
+    updateHistoricalLmv2UiChrome();
+    if (!historicalLmv2PoolsEnabled()) {
+      const stripTargets = pane
+        ? [pane]
+        : visibleIds().map(function (pid) { return state.panes[pid]; });
+      stripTargets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      updateHistoricalLmv2Hint(null);
+      return;
+    }
+    const targets = [];
+    if (pane && paneSupportsHistoricalLmv2(pane)) {
+      targets.push(pane);
+    } else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsHistoricalLmv2(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !state.symbol) {
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message: "requires DOGEUSDT 15m PD10 in pilot window",
+      });
+      return;
+    }
+    const symAtStart = state.symbol;
+    const refreshToken = (state.historicalLmv2RefreshToken || 0) + 1;
+    state.historicalLmv2RefreshToken = refreshToken;
+    const ctx = { symAtStart: symAtStart, refreshToken: refreshToken };
+    let lastBody = null;
+    try {
+      for (let i = 0; i < targets.length; i += 1) {
+        const b = await refreshHistoricalLmv2OnePane(targets[i], opts, ctx);
+        if (b) lastBody = b;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") return;
+      targets.forEach(function (target) {
+        if (!target) return;
+        syncOverlays(
+          target,
+          SC_HELPERS
+            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
+            : (target.pendingOverlays || [])
+        );
+      });
+      const el = $("researchHistoricalLmv2Hint");
+      if (el && historicalLmv2PoolsEnabled()) {
+        el.hidden = false;
+        el.textContent = "Historical LLD V2 · Fehler: " + (err.message || err);
+      }
+      throw err;
+    }
+    if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return;
+    updateHistoricalLmv2Hint(lastBody);
   }
 
   function renderEndUnixForScannerPane(pane) {
@@ -4158,6 +4403,15 @@
         }
       }
     }
+    if (historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane)) {
+      try {
+        await refreshHistoricalLmv2(pane, { force: true, gen: gen });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 after gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   function applyPaneBundle(pane, packed, opts) {
@@ -4190,7 +4444,8 @@
         scannerPoolsCommonEnabled(),
         causalLldLandscapeEnabled(),
         liveMicroLldV2Enabled(),
-        liveMicroLldV2ChTestEnabled()
+        liveMicroLldV2ChTestEnabled(),
+        historicalLmv2PoolsEnabled()
       )
       : packed.overlays || [];
     pane.el.querySelector(".trp-pane-symbol").textContent = packed.symbol || state.symbol;
@@ -4319,6 +4574,13 @@
         }
       });
     }
+    if (paneSupportsHistoricalLmv2(pane)) {
+      void refreshHistoricalLmv2(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
     if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
     // Soft follow-lock only — do not yank visible range here (GO TO jump owns the camera).
     if (!(opts && opts.jumpToUnix != null)) {
@@ -4409,6 +4671,15 @@
       } catch (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] live-micro-lld-v2-ch-test after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (historicalLmv2PoolsEnabled()) {
+      try {
+        await refreshHistoricalLmv2(null, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 after indicators", err); } catch (e) { /* ignore */ }
         }
       }
     }
@@ -6510,22 +6781,36 @@
         }
       });
     }
-    if ($("researchLiveMicroV2ChCompare")) {
-      $("researchLiveMicroV2ChCompare").addEventListener("change", async function () {
-        state.liveMicroLldV2Cache = {};
-        state.liveMicroLldV2ChTestCache = {};
+    if ($("researchIndHistoricalLmv2Pools")) {
+      $("researchIndHistoricalLmv2Pools").addEventListener("change", async function () {
+        state.historicalLmv2Cache = {};
+        updateHistoricalLmv2UiChrome();
         try {
-          if (liveMicroLldV2Enabled()) await refreshLiveMicroLldV2(null, { force: true });
-          if (liveMicroLldV2ChTestEnabled()) await refreshLiveMicroLldV2ChTest(null, { force: true });
+          await refreshHistoricalLmv2(null, { force: true });
         } catch (err) {
-          setStatus("V2 Compare: " + (err && err.message ? err.message : err), "error");
+          setStatus("Historical LLD V2 Pools: " + (err && err.message ? err.message : err), "error");
         }
       });
+    }
+    function onHistoricalLmv2LayerChange() {
+      state.historicalLmv2Cache = {};
+      if (historicalLmv2PoolsEnabled()) {
+        refreshHistoricalLmv2(null, { force: true }).catch(function (err) {
+          setStatus("Historical LLD V2 Pools: " + (err && err.message ? err.message : err), "error");
+        });
+      }
+    }
+    if ($("researchIndHistoricalLmv2Active")) {
+      $("researchIndHistoricalLmv2Active").addEventListener("change", onHistoricalLmv2LayerChange);
+    }
+    if ($("researchIndHistoricalLmv2Remaining")) {
+      $("researchIndHistoricalLmv2Remaining").addEventListener("change", onHistoricalLmv2LayerChange);
     }
     function onLiveMicroV2FilterChange() {
       rememberLiveMicroLldV2Toggles();
       state.liveMicroLldV2Cache = {};
       state.liveMicroLldV2ChTestCache = {};
+    state.historicalLmv2Cache = {};
       if (liveMicroLldV2Enabled()) {
         refreshLiveMicroLldV2(null, { force: true }).catch(function (err) {
           setStatus("Live Micro LLD V2: " + (err && err.message ? err.message : err), "error");

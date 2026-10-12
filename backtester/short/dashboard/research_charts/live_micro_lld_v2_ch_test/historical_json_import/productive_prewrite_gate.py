@@ -93,7 +93,7 @@ def assess_scope_ch_states(
             publish_any=int(layers.get("publish_any", 0)),
             sidecar_any=int(layers.get("sidecar_any", 0)),
             published_on_target_line=on_line,
-            is_pilot_overlap=sid in pilot_snapshot_ids and sid in published_on_line,
+            is_pilot_overlap=sid in pilot_snapshot_ids,
         )
         cat_n = int(layers.get("catalog", 0))
         side_n = int(layers.get("sidecar_any", 0))

@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "approved_month": "2026-05",
+  "backup_recovery_id": "ebfdfb7d-ba12-4c2a-af6b-ff9c5ca57b02",
+  "combo_order": [
+    "15m_PD1",
+    "15m_PD5",
+    "15m_PD10",
+    "4h_PD10"
+  ],
+  "manifests": [
+    {
+      "combo_folder": "15m_PD1",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4w_may2026_15m_pd1_full_v1.json"
+    },
+    {
+      "combo_folder": "15m_PD5",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4w_may2026_15m_pd5_full_v1.json"
+    },
+    {
+      "combo_folder": "15m_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4w_may2026_15m_pd10_full_v1.json"
+    },
+    {
+      "combo_folder": "4h_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4w_may2026_4h_pd10_full_v1.json"
+    }
+  ],
+  "resource_limits": {
+    "HISTORICAL_IMPORT_MIN_FREE_BYTES": "53687091200",
+    "HISTORICAL_IMPORT_MAX_ORPHAN_MEMBER_SNAPSHOTS": "0",
+    "HISTORICAL_IMPORT_MAX_BATCH_WALL_SECONDS": "120",
+    "HISTORICAL_IMPORT_MAX_READBACK_WALL_SECONDS": "60"
+  },
+  "write_gates_required": [
+    "HISTORICAL_JSON_IMPORT_ALLOW_WRITE=1",
+    "HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE=1",
+    "HISTORICAL_IMPORT_VERIFIED_BACKUP_RECOVERY_ID=ebfdfb7d-ba12-4c2a-af6b-ff9c5ca57b02"
+  ]
+}

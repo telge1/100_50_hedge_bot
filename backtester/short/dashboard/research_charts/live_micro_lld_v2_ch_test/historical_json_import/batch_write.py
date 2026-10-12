@@ -54,8 +54,11 @@ def execute_batch_import(
         load_scope_layer_map_for_snapshots,
     )
     from .ch_import_state import ch_client_and_db, fetch_published_snapshot_ids
+    from .pilot_overlap import pilot_snapshot_ids_from_catalog
 
-    layer_map = load_scope_layer_map_for_snapshots(vr.get("snapshot_ids") or [])
+    snapshot_ids = vr.get("snapshot_ids") or []
+    layer_map = load_scope_layer_map_for_snapshots(snapshot_ids)
+    pilot_ids = pilot_snapshot_ids_from_catalog(catalog_root)
     client, db = ch_client_and_db()
     try:
         published = fetch_published_snapshot_ids(
@@ -64,10 +67,11 @@ def execute_batch_import(
     finally:
         client.close()
     scope_checks = assess_scope_ch_states(
-        vr.get("snapshot_ids") or [],
+        snapshot_ids,
         pipeline_line_id=spec.pipeline_line_id,
         published_on_line=published,
         layer_by_snapshot=layer_map,
+        pilot_snapshot_ids=pilot_ids,
     )
     run_id = run_productive_prewrite_gate(
         test_run_id=run_id,
