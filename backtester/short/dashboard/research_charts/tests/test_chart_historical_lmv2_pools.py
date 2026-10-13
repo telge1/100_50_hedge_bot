@@ -69,6 +69,74 @@ def test_rejects_outside_released_window():
     assert exc.value.code == "OUT_OF_PILOT_SCOPE"
 
 
+def test_rejects_invalid_historical_pool_detail():
+    from research_charts.chart_historical_lmv2_pools import HistoricalLmv2PilotError
+
+    with pytest.raises(HistoricalLmv2PilotError) as exc:
+        chart_historical_lmv2_pools(
+            "DOGEUSDT",
+            PILOT_FROM,
+            PILOT_FROM,
+            pool_detail=7,
+        )
+    assert exc.value.code == "INVALID_HISTORICAL_PD"
+
+
+@pytest.mark.integration
+def test_default_pool_detail_is_pd10_line():
+    payload = chart_historical_lmv2_pools(
+        "DOGEUSDT",
+        "2026-09-01T12:00:00Z",
+        "2026-09-01T12:00:00Z",
+        include_active=True,
+        include_remaining=False,
+    )
+    assert payload["pool_detail"] == 10
+    assert payload["pipeline_line_id"].endswith("15mpd10_v1")
+    contract = payload.get("historical_pd_contract") or {}
+    assert contract.get("pool_detail") == 10
+
+
+@pytest.mark.integration
+def test_pd1_smoke_active_count_sep01_noon():
+    from research_charts.historical_pool_state_v1 import load_historical_pool_state_at_close
+
+    iso = "2026-09-01T12:00:00Z"
+    payload = chart_historical_lmv2_pools(
+        "DOGEUSDT",
+        iso,
+        iso,
+        pool_detail=1,
+        include_active=True,
+        include_remaining=False,
+    )
+    st = load_historical_pool_state_at_close(iso, pool_detail=1)
+    assert payload["pool_detail"] == 1
+    assert payload["pipeline_line_id"].endswith("15mpd1_v1")
+    assert len(st.active_members) == 167
+    assert payload["publications"][0]["snapshot_id"] == st.snapshot_id
+
+
+@pytest.mark.integration
+def test_pd5_smoke_active_count_sep01_noon():
+    from research_charts.historical_pool_state_v1 import load_historical_pool_state_at_close
+
+    iso = "2026-09-01T12:00:00Z"
+    payload = chart_historical_lmv2_pools(
+        "DOGEUSDT",
+        iso,
+        iso,
+        pool_detail=5,
+        include_active=True,
+        include_remaining=False,
+    )
+    st = load_historical_pool_state_at_close(iso, pool_detail=5)
+    assert payload["pool_detail"] == 5
+    assert payload["pipeline_line_id"].endswith("15mpd5_v1")
+    assert len(st.active_members) == 179
+    assert payload["publications"][0]["snapshot_id"] == st.snapshot_id
+
+
 @pytest.mark.integration
 def test_aug2_midnight_single_close_in_released_window():
     payload = chart_historical_lmv2_pools(

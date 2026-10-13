@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=history-6">
+    <link rel="stylesheet" href="/static/css/research.css?v=phase5z-1">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -121,7 +121,34 @@
             <div class="research-selected" id="researchSelected">hover —  ·  sel —</div>
             <div class="trp-chart-dock" id="researchChartDock">
                 <div class="trp-dock-bar" id="researchDockBar">
+                    <span id="researchLegacyLiveMicroWrap" class="research-ui-legacy-hidden" hidden aria-hidden="true">
+                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLiveMicroLldV2" autocomplete="off"> Live Micro LLD V2</label>
+                    <select id="researchLiveMicroV2PoolDetail" class="trp-select trp-width" title="Pool Detail 1–10 = Pine pool_detail (Feinheit/Schwelle)" aria-label="Live Micro LLD V2 pool detail">
+                        <option value="1">PD 1</option>
+                        <option value="2">PD 2</option>
+                        <option value="3">PD 3</option>
+                        <option value="4">PD 4</option>
+                        <option value="5" selected>PD 5</option>
+                        <option value="6">PD 6</option>
+                        <option value="7">PD 7</option>
+                        <option value="8">PD 8</option>
+                        <option value="9">PD 9</option>
+                        <option value="10">PD 10</option>
+                    </select>
+                    <span class="trp-muted trp-dock-ind" title="Nur Anzeige-Filter (Engine unverändert)">Filter:</span>
+                    <label class="trp-check trp-dock-ind" title="Normal Pools"><input type="checkbox" class="research-lmv2-type" value="normal" checked> Normal</label>
+                    <label class="trp-check trp-dock-ind" title="Micro Pools"><input type="checkbox" class="research-lmv2-type" value="micro" checked> Micro</label>
+                    <label class="trp-check trp-dock-ind" title="Reclaim (Pine default aus)"><input type="checkbox" class="research-lmv2-type" value="reclaim" checked> Reclaim</label>
+                    <label class="trp-check trp-dock-ind" title="Stärke Weak"><input type="checkbox" class="research-lmv2-strength" value="Weak" checked> Weak</label>
+                    <label class="trp-check trp-dock-ind" title="Stärke Medium"><input type="checkbox" class="research-lmv2-strength" value="Medium" checked> Md</label>
+                    <label class="trp-check trp-dock-ind" title="Stärke Strong"><input type="checkbox" class="research-lmv2-strength" value="Strong" checked> Strong</label>
+                    <label class="trp-check trp-dock-ind" title="Stärke Very Strong"><input type="checkbox" class="research-lmv2-strength" value="Very Strong" checked> VS</label>
+                    <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
+                    <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
+                    </span>
+                    <div class="trp-dock-row trp-dock-row-time" id="researchDockRowTime">
                     <div class="trp-resize-n" id="researchHeightHandle" title="Leiste nach oben/unten ziehen"></div>
+                    <span class="trp-dock-row-label">Zeit</span>
                     <span class="trp-field-label">HISTORY</span>
                     <select id="researchHistoryPreset" class="trp-select" title="Candle-History on demand (UTC)">
                         <option value="rolling">Rolling (~17d)</option>
@@ -156,56 +183,60 @@
                         <button type="button" class="trp-layout-btn" data-layout="4">4</button>
                     </div>
                     <div class="trp-tools" id="trpTools"></div>
-                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
+                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
+                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                    </div>
+                    <div class="trp-dock-row trp-dock-row-historical" id="researchDockRowHistorical">
+                    <span class="trp-dock-row-label">Hist. Pools</span>
+                    <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Original publications, Apr–Sep 2026)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
+                    <span id="researchHistoricalLmv2PreloadModeWrap" class="trp-dock-ind" hidden>
+                        <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
+                    </span>
+                    <span id="researchHistoricalLmv2PdWrap" class="trp-dock-ind" hidden title="Historical LMV2 pool detail (Original CH publications only)">
+                        <span class="trp-muted">Historical PD:</span>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchHistoricalLmv2PoolDetail" value="1" autocomplete="off"> PD1</label>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchHistoricalLmv2PoolDetail" value="5" autocomplete="off"> PD5</label>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchHistoricalLmv2PoolDetail" value="10" checked autocomplete="off"> PD10</label>
+                    </span>
+                    <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
+                    <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint research-ui-legacy-hidden" hidden aria-hidden="true"></span>
+                    <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
+                    <button type="button" class="trp-text-btn" id="researchLldAsOfClear" hidden title="Replay beenden / Live pools">Zurück zu Live</button>
+                    </div>
+                    <div class="trp-dock-row trp-dock-row-historical-load" id="researchDockRowHistoricalLoad">
+                    <span class="trp-dock-row-label">Laden</span>
+                    <span id="researchHistoricalLmv2StaticRangeWrap" class="trp-dock-ind" hidden>
+                        <span class="trp-muted">Von UTC</span>
+                        <input type="text" id="researchStaticTimelineFrom" class="trp-input trp-width" placeholder="2026-09-23 00:00 UTC" aria-label="Static timeline from" autocomplete="off">
+                        <span class="trp-muted">Bis UTC</span>
+                        <input type="text" id="researchStaticTimelineTo" class="trp-input trp-width" placeholder="2026-09-30 00:00 UTC" aria-label="Static timeline to" autocomplete="off">
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelineLoad" title="Selected range übernehmen und static windows laden (max 3 Tage/Request)">Load static</button>
+                    </span>
+                    <span id="researchHistoricalLmv2PreloadWrap" class="trp-dock-ind" hidden>
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreload" title="Serial static windows for selected From/To (pilot max 7 days)">Preload historical pools</button>
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreloadCancel" title="Cancel running preload">Cancel preload</button>
+                        <span id="researchHistoricalLmv2PreloadHint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    </span>
+                    <span id="researchHistoricalLmv2LoadStatus" class="research-historical-load-status" hidden aria-live="polite"></span>
+                    </div>
+                    <div class="trp-dock-row trp-dock-row-indicators" id="researchDockRowIndicators">
+                    <span class="trp-dock-row-label">Indikatoren</span>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndStoch"> Stochastic</label>
                     <button type="button" class="trp-text-btn" id="trpStochSettings" title="Stochastic Settings">⚙</button>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndOi"> Open Interest</label>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Research Liquidity Location</label>
                     <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
-                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLiveMicroLldV2" autocomplete="off"> Live Micro LLD V2</label>
-                    <select id="researchLiveMicroV2PoolDetail" class="trp-select trp-width" title="Pool Detail 1–10 = Pine pool_detail (Feinheit/Schwelle)" aria-label="Live Micro LLD V2 pool detail">
-                        <option value="1">PD 1</option>
-                        <option value="2">PD 2</option>
-                        <option value="3">PD 3</option>
-                        <option value="4">PD 4</option>
-                        <option value="5" selected>PD 5</option>
-                        <option value="6">PD 6</option>
-                        <option value="7">PD 7</option>
-                        <option value="8">PD 8</option>
-                        <option value="9">PD 9</option>
-                        <option value="10">PD 10</option>
-                    </select>
-                    <span class="trp-muted trp-dock-ind" title="Nur Anzeige-Filter (Engine unverändert)">Filter:</span>
-                    <label class="trp-check trp-dock-ind" title="Normal Pools"><input type="checkbox" class="research-lmv2-type" value="normal" checked> Normal</label>
-                    <label class="trp-check trp-dock-ind" title="Micro Pools"><input type="checkbox" class="research-lmv2-type" value="micro" checked> Micro</label>
-                    <label class="trp-check trp-dock-ind" title="Reclaim (Pine default aus)"><input type="checkbox" class="research-lmv2-type" value="reclaim" checked> Reclaim</label>
-                    <label class="trp-check trp-dock-ind" title="Stärke Weak"><input type="checkbox" class="research-lmv2-strength" value="Weak" checked> Weak</label>
-                    <label class="trp-check trp-dock-ind" title="Stärke Medium"><input type="checkbox" class="research-lmv2-strength" value="Medium" checked> Md</label>
-                    <label class="trp-check trp-dock-ind" title="Stärke Strong"><input type="checkbox" class="research-lmv2-strength" value="Strong" checked> Strong</label>
-                    <label class="trp-check trp-dock-ind" title="Stärke Very Strong"><input type="checkbox" class="research-lmv2-strength" value="Very Strong" checked> VS</label>
-                    <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
-                    <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
-                    <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Phase 5I, DOGE 15m PD10, 2026-08-01 UTC)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
-                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
-                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Remaining</label>
-                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
-                    <span id="researchHistoricalLmv2StaticRangeWrap" class="trp-dock-ind" hidden>
-                        <input type="text" id="researchStaticTimelineFrom" class="trp-input trp-width" placeholder="From UTC e.g. 2026-04-01 00:00 UTC" aria-label="Static timeline from" autocomplete="off">
-                        <input type="text" id="researchStaticTimelineTo" class="trp-input trp-width" placeholder="To UTC e.g. 2026-04-03 23:45 UTC" aria-label="Static timeline to" autocomplete="off">
-                        <button type="button" class="trp-text-btn" id="researchStaticTimelineLoad" title="Explicit 3-day (max) static window">Load static</button>
-                    </span>
-                    <span id="researchHistoricalLmv2PreloadWrap" class="trp-dock-ind" hidden>
-                        <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
-                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreload" title="Serial static windows for selected From/To (pilot max 7 days)">Preload historical pools</button>
-                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreloadCancel" title="Cancel running preload">Cancel preload</button>
-                        <span id="researchHistoricalLmv2PreloadHint" class="trp-muted research-lld-asof-hint" hidden></span>
-                    </span>
-                    <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
-                    <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
-                    <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
-                    <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
-                    <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
-                    <button type="button" class="trp-text-btn" id="researchLldAsOfClear" hidden title="Replay beenden / Live pools">Zurück zu Live</button>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchVpEnabled"> Volume Profile</label>
                     <select id="researchVpRows" class="trp-select trp-width" title="Rows" aria-label="Volume Profile Rows">
@@ -256,14 +287,7 @@
                     <input type="number" id="researchPtbMin" class="trp-select trp-width" min="0" step="500" value="5000" title="Min. Notional (USDT Quote)" aria-label="Min Notional USDT" style="width:5.5rem">
                     <label class="trp-muted trp-dock-ind" for="researchPtbMax" title="Höchstens N größte Bubbles im Fenster (gegen Überlagerung)">Max</label>
                     <input type="number" id="researchPtbMax" class="trp-select trp-width" min="5" max="500" step="5" value="80" title="Max. Anzahl Bubbles" aria-label="Max Bubbles" style="width:4rem">
-                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
-                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
-                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-                    </select>
-                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
-                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
-                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
-                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                    </div>
                 </div>
                 <div class="trp-workspace layout-1" id="researchWorkspace"></div>
             </div>
@@ -524,8 +548,8 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5p-1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase5p-1"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5z-1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase5z-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

@@ -164,7 +164,11 @@ def _expected_15m_closes_in_range(from_dt: datetime, to_dt: datetime) -> int:
     return int((to_dt - from_dt).total_seconds() // step_sec) + 1
 
 
-def research_chart_data_bounds(published: Sequence[datetime]) -> dict[str, Any]:
+def research_chart_data_bounds(
+    published: Sequence[datetime],
+    *,
+    pipeline_line_id: str = PIPELINE_LINE_ID,
+) -> dict[str, Any]:
     """Released chart window derived from CH publications (fail-closed on gaps in Aug–Sep)."""
     aug_sep = _closes_in_nominal_research_window(published)
     october = _closes_in_october_nominal(published)
@@ -201,7 +205,7 @@ def research_chart_data_bounds(published: Sequence[datetime]) -> dict[str, Any]:
     else:
         oct_status = "NOT_VERIFIED"
     return {
-        "pipeline_line_id": PIPELINE_LINE_ID,
+        "pipeline_line_id": pipeline_line_id,
         "released_from": _iso_z(RESEARCH_CHART_RELEASED_FROM),
         "released_to_nominal": _iso_z(RESEARCH_CHART_RELEASED_TO_NOMINAL),
         "released_to": _iso_z(released_to) if aug_sep_gapless else _iso_z(released_to),
@@ -375,6 +379,10 @@ def remaining_fingerprint(rem: dict[str, Any]) -> str:
 
 
 class LineFilteredPublicationSource(ClickHousePublicationSource):
+    def __init__(self, client, database: str, *, pipeline_line_id: str = PIPELINE_LINE_ID):
+        super().__init__(client, database)
+        self._pipeline_line_id = pipeline_line_id
+
     def find(self, *, symbol: str, timeframe: str, pool_detail: int, decision_close: datetime):
         hits = super().find(
             symbol=symbol,
@@ -382,15 +390,19 @@ class LineFilteredPublicationSource(ClickHousePublicationSource):
             pool_detail=pool_detail,
             decision_close=decision_close,
         )
-        return [h for h in hits if h.pipeline_line_id == PIPELINE_LINE_ID]
+        return [h for h in hits if h.pipeline_line_id == self._pipeline_line_id]
 
 
 def _load_publication_line(
     reader: PublishedActiveReader,
     cfg_hash: str,
     decision_close: datetime,
+    *,
+    pipeline_line_id: str = PIPELINE_LINE_ID,
 ) -> dict[str, Any]:
-    return reader.load_published(PIPELINE_LINE_ID, decision_close, config_hash=cfg_hash)
+    return reader.load_published(
+        pipeline_line_id, decision_close, config_hash=cfg_hash
+    )
 
 
 def _load_catalog(client, database: str, snapshot_id: str, decision_close: datetime) -> list[dict]:
@@ -433,12 +445,17 @@ def _load_catalog(client, database: str, snapshot_id: str, decision_close: datet
     return out
 
 
-def _active_members_from_catalog(catalog: list[dict], snapshot_id: str) -> list[dict[str, Any]]:
+def _active_members_from_catalog(
+    catalog: list[dict],
+    snapshot_id: str,
+    *,
+    pipeline_line_id: str = PIPELINE_LINE_ID,
+) -> list[dict[str, Any]]:
     members = []
     for row in catalog:
         members.append(
             {
-                "pipeline_line_id": PIPELINE_LINE_ID,
+                "pipeline_line_id": pipeline_line_id,
                 "snapshot_id": snapshot_id,
                 "pool_id": row["pool_id"],
                 "side": row["side"],
@@ -470,16 +487,26 @@ def load_historical_pool_state_at_close(
     reader: PublishedActiveReader | None = None,
     cfg_hash: str | None = None,
 ) -> HistoricalPoolStateAtClose:
+    from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
+
     dc = _parse_close(decision_close)
     reader = reader or PublishedActiveReader()
-    cfg_hash = cfg_hash or config_hash(build_live_micro_lld_v2_config(pool_detail))
-    published = get_published_decision_closes(reader, cfg_hash)
+    hcfg = resolve_historical_pd_config(pool_detail)
+    cfg_hash = cfg_hash or hcfg.config_hash
+    line_id = hcfg.pipeline_line_id
+    published = get_published_decision_closes(
+        reader, cfg_hash, pipeline_line_id=line_id
+    )
     i = bisect.bisect_left(published, dc)
     if i >= len(published) or published[i] != dc:
         raise HistoricalPoolStateError("MISSING_PUBLICATION", "no published snapshot at decision_close")
     sym = symbol.upper()
-    if sym != PILOT_SYMBOL or timeframe != PILOT_TIMEFRAME or pool_detail != PILOT_POOL_DETAIL:
-        raise HistoricalPoolStateError("INVALID_SCOPE", "pilot supports DOGEUSDT 15m PD10 only")
+    if sym != hcfg.symbol or timeframe != hcfg.timeframe:
+        raise HistoricalPoolStateError(
+            "INVALID_SCOPE",
+            "historical scope supports DOGEUSDT 15m only",
+            {"symbol": sym, "timeframe": timeframe, "pool_detail": hcfg.pool_detail},
+        )
     own_client = client is None
     if client is None:
         ch_cfg = load_clickhouse_config()
@@ -488,12 +515,16 @@ def load_historical_pool_state_at_close(
         client = clickhouse_connect.get_client(**ch_cfg.connect_kwargs())
         database = ch_cfg.database
     try:
-        pub = _load_publication_line(reader, cfg_hash, dc)
+        pub = _load_publication_line(
+            reader, cfg_hash, dc, pipeline_line_id=line_id
+        )
         catalog = _load_catalog(client, database, pub["snapshot_id"], dc)
         member_ids = set(pub["pool_ids"])
         if member_ids != {r["pool_id"] for r in catalog}:
             raise HistoricalPoolStateError("MEMBER_CATALOG_MISMATCH", "active membership vs catalog")
-        source = LineFilteredPublicationSource(client, database)
+        source = LineFilteredPublicationSource(
+            client, database, pipeline_line_id=line_id
+        )
         try:
             rem = load_historical_remaining(
                 source,
@@ -511,14 +542,16 @@ def load_historical_pool_state_at_close(
         rem["decision_close"] = _iso_z(dc)
         segments = list(rem.get("remaining") or [])
         return HistoricalPoolStateAtClose(
-            pipeline_line_id=PIPELINE_LINE_ID,
+            pipeline_line_id=line_id,
             symbol=sym,
             timeframe=timeframe,
-            pool_detail=pool_detail,
+            pool_detail=hcfg.pool_detail,
             decision_close=_iso_z(dc),
             snapshot_id=pub["snapshot_id"],
             active_state_fingerprint=pub["active_state_fingerprint"],
-            active_members=_active_members_from_catalog(catalog, pub["snapshot_id"]),
+            active_members=_active_members_from_catalog(
+                catalog, pub["snapshot_id"], pipeline_line_id=line_id
+            ),
             remaining_projection=rem,
             remaining_segments=segments,
             remaining_fingerprint=remaining_fingerprint(rem),
@@ -535,6 +568,9 @@ def build_active_episode_records(
     client,
     database: str,
     closes: Sequence[datetime],
+    episode_batch: Any | None = None,
+    *,
+    pipeline_line_id: str = PIPELINE_LINE_ID,
 ) -> list[dict[str, Any]]:
     """Membership-bounded ACTIVE episodes across decision closes."""
     if not closes:
@@ -544,9 +580,16 @@ def build_active_episode_records(
     window_end_unix = int(closes[-1].timestamp())
 
     for i, dc in enumerate(closes):
-        pub = _load_publication_line(reader, cfg_hash, dc)
-        sid = pub["snapshot_id"]
-        catalog = _load_catalog(client, database, sid, dc)
+        if episode_batch is not None:
+            pub = episode_batch.publication(cfg_hash, dc)
+            sid = pub["snapshot_id"]
+            catalog = episode_batch.catalog(database, sid, dc)
+        else:
+            pub = _load_publication_line(
+                reader, cfg_hash, dc, pipeline_line_id=pipeline_line_id
+            )
+            sid = pub["snapshot_id"]
+            catalog = _load_catalog(client, database, sid, dc)
         for row in catalog:
             row["snapshot_id"] = sid
         by_id = {row["pool_id"]: row for row in catalog}

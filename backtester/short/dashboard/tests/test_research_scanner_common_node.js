@@ -963,6 +963,36 @@ function test_historical_lmv2_aug_sep_boundary_chunks() {
   assert.ok(cSep[cSep.length - 1].to_close_unix <= asOf);
 }
 
+function test_historical_lmv2_pd_cache_key_isolation() {
+  const isoFrom = "2026-09-01T00:00:00Z";
+  const isoTo = "2026-09-01T00:45:00Z";
+  const k1 = h.staticTimelineCacheKey("DOGEUSDT", "15m", isoFrom, isoTo, 1);
+  const k10 = h.staticTimelineCacheKey("DOGEUSDT", "15m", isoFrom, isoTo, 10);
+  assert.notStrictEqual(k1, k10);
+  const b1 = h.staticTimelinePreloadBundleKey("DOGEUSDT", "15m", 1_000, 2_000, 1);
+  const b5 = h.staticTimelinePreloadBundleKey("DOGEUSDT", "15m", 1_000, 2_000, 5);
+  assert.notStrictEqual(b1, b5);
+  const c1 = h.historicalLmv2ChunkCacheKey(
+    "DOGEUSDT",
+    "15m",
+    isoFrom,
+    isoTo,
+    "2026-09-01T12:00:00Z",
+    "A",
+    1
+  );
+  const c10 = h.historicalLmv2ChunkCacheKey(
+    "DOGEUSDT",
+    "15m",
+    isoFrom,
+    isoTo,
+    "2026-09-01T12:00:00Z",
+    "A",
+    10
+  );
+  assert.notStrictEqual(c1, c10);
+}
+
 function test_live_micro_lld_v2_chart_viewport_filter() {
   const many = [];
   for (let i = 0; i < 1200; i += 1) {
@@ -1039,6 +1069,7 @@ const tests = [
   test_static_timeline_preload_7day_three_windows,
   test_static_timeline_lazy_visible_not_full_selected,
   test_historical_lmv2_aug_sep_boundary_chunks,
+  test_historical_lmv2_pd_cache_key_isolation,
 ];
 
 let failed = 0;

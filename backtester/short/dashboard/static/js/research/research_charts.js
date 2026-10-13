@@ -90,6 +90,9 @@
     historicalLmv2StaticLoadSerial: 0,
     historicalLmv2StaticInflight: false,
     historicalLmv2SelectedRange: null,
+    historicalLmv2PdSwitchSerial: 0,
+    historicalLmv2LoadStatus: { phase: "IDLE" },
+    historicalLmv2ExplicitLoad: false,
     historicalLmv2Preload: {
       status: "idle",
       bundleKey: null,
@@ -1266,24 +1269,22 @@
   }
 
   function scheduleHistoricalLmv2ViewportLoad(pane) {
-    if (historicalLmv2PreloadedStaticEnabled()) {
-      if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
-      const pl = state.historicalLmv2Preload || {};
-      if (pl.status === "LOADING") return;
-      if (pl.status === "READY") {
-        if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
-        pane.historicalLmv2ViewportTimer = setTimeout(function () {
-          pane.historicalLmv2ViewportTimer = null;
-          renderHistoricalLmv2Preloaded(pane, { viewport: true }).catch(function (err) {
-            if (!(err && err.name === "AbortError")) {
-              try { console.warn("[research] historical-lmv2 preload viewport", err); } catch (e) { /* ignore */ }
-            }
-          });
-        }, VP_DEBOUNCE_MS);
-      }
+    if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
+    const pl = state.historicalLmv2Preload || {};
+    if (historicalLmv2PreloadedStaticEnabled() && pl.status === "LOADING") return;
+    if (historicalLmv2PreloadReady()) {
+      if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
+      pane.historicalLmv2ViewportTimer = setTimeout(function () {
+        pane.historicalLmv2ViewportTimer = null;
+        renderHistoricalLmv2Preloaded(pane, { viewport: true }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] historical-lmv2 preload viewport", err); } catch (e) { /* ignore */ }
+          }
+        });
+      }, VP_DEBOUNCE_MS);
       return;
     }
-    if (historicalLmv2StaticTimelineEnabled()) {
+    if (historicalLmv2UseStaticLazyPath()) {
       if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
       if (state.historicalLmv2StaticInflight) return;
       if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
@@ -1360,6 +1361,54 @@
     return !!(cb && cb.checked && historicalLmv2StaticTimelineEnabled());
   }
 
+  function historicalLmv2PreloadReady() {
+    const pl = state.historicalLmv2Preload || {};
+    const histPdNow = historicalLmv2HistoricalPoolDetail();
+    return !!(
+      historicalLmv2PreloadedStaticEnabled() &&
+      pl.status === "READY" &&
+      pl.mergedZones &&
+      pl.range &&
+      pl.poolDetail === histPdNow &&
+      (pl.pdSwitchSerial == null || pl.pdSwitchSerial === (state.historicalLmv2PdSwitchSerial || 0))
+    );
+  }
+
+  /** Static lazy (5O) when static timeline is on and preload (5P) is not READY. */
+  function historicalLmv2UseStaticLazyPath() {
+    if (!historicalLmv2StaticTimelineEnabled()) return false;
+    if (!historicalLmv2PreloadedStaticEnabled()) return true;
+    return !historicalLmv2PreloadReady();
+  }
+
+  function historicalLmv2HistoricalPoolDetail() {
+    const el = document.querySelector('input[name="researchHistoricalLmv2PoolDetail"]:checked');
+    const n = el ? parseInt(el.value, 10) : 10;
+    return n === 1 || n === 5 || n === 10 ? n : 10;
+  }
+
+  function historicalLmv2StaticResponseOk(body, expectedPd, pdSerialAtStart) {
+    if (pdSerialAtStart !== (state.historicalLmv2PdSwitchSerial || 0)) return false;
+    if (!body || body.success === false) return false;
+    const pdRaw =
+      body.pool_detail != null
+        ? body.pool_detail
+        : body.historical_pd_contract && body.historical_pd_contract.pool_detail;
+    const pd = parseInt(pdRaw, 10);
+    return pd === expectedPd;
+  }
+
+  function invalidateHistoricalLmv2CachesForPdSwitch() {
+    state.historicalLmv2RefreshToken = (state.historicalLmv2RefreshToken || 0) + 1;
+    state.historicalLmv2StaticLoadSerial = (state.historicalLmv2StaticLoadSerial || 0) + 1;
+    state.historicalLmv2PdSwitchSerial = (state.historicalLmv2PdSwitchSerial || 0) + 1;
+    state.historicalLmv2Cache = {};
+    state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
+    state.historicalLmv2StaticBody = null;
+    state.historicalLmv2StaticCache = { windows: {}, order: [] };
+    resetHistoricalLmv2Preload(true);
+  }
+
   function staticTimelineCacheEvictHook(dropKey) {
     const pl = state.historicalLmv2Preload;
     if (!pl || pl.status !== "READY" || !pl.pinKeys || !pl.pinKeys[dropKey]) return;
@@ -1415,8 +1464,11 @@
     const rangeTxt = rng
       ? unixToIsoZExact(rng.from_close_unix) + "…" + unixToIsoZExact(rng.to_close_unix)
       : "(no range)";
+    const preloadPhase = pl.status || "idle";
     el.textContent =
-      "Preload 5P · " + rangeTxt +
+      "Preload 5P · " + preloadPhase +
+      " · PD" + (pl.poolDetail != null ? pl.poolDetail : historicalLmv2HistoricalPoolDetail()) +
+      " · " + rangeTxt +
       " · WIN " + (pl.windowsLoaded != null ? pl.windowsLoaded : 0) + "/" + (pl.windowsTotal || "?") +
       " · " + pct + "%" +
       " · closes=" + (pl.verifiedCloseCount || 0) +
@@ -1454,7 +1506,14 @@
     updateHistoricalLmv2UiChrome();
     const pl = state.historicalLmv2Preload || {};
     if (!historicalLmv2PoolsEnabled() || !historicalLmv2PreloadedStaticEnabled()) return;
-    if (pl.status !== "READY" || !pl.mergedZones || !pl.range) {
+    const histPdNow = historicalLmv2HistoricalPoolDetail();
+    if (
+      pl.status !== "READY" ||
+      !pl.mergedZones ||
+      !pl.range ||
+      pl.poolDetail !== histPdNow ||
+      (pl.pdSwitchSerial != null && pl.pdSwitchSerial !== (state.historicalLmv2PdSwitchSerial || 0))
+    ) {
       updateHistoricalLmv2PreloadHint();
       return;
     }
@@ -1531,12 +1590,14 @@
       valid.from_close_unix,
       valid.to_close_unix
     );
-    const pinKeys = SC_HELPERS.staticTimelinePinKeysFromWindows(symAtStart, tf, windows);
+    const histPd = historicalLmv2HistoricalPoolDetail();
+    const pinKeys = SC_HELPERS.staticTimelinePinKeysFromWindows(symAtStart, tf, windows, histPd);
     const bundleKey = SC_HELPERS.staticTimelinePreloadBundleKey(
       symAtStart,
       tf,
       valid.from_close_unix,
-      valid.to_close_unix
+      valid.to_close_unix,
+      histPd
     );
     const loadSerial = (state.historicalLmv2Preload.loadSerial || 0) + 1;
     state.historicalLmv2Preload = {
@@ -1558,6 +1619,8 @@
       segmentCount: 0,
       poolCount: 0,
       invalidateReason: null,
+      poolDetail: histPd,
+      pdSwitchSerial: state.historicalLmv2PdSwitchSerial || 0,
     };
     updateHistoricalLmv2PreloadHint();
     const cache = state.historicalLmv2StaticCache || { windows: {}, order: [] };
@@ -1582,7 +1645,7 @@
       const w = windows[wi];
       const fromIso = unixToIsoZExact(w.from_close_unix);
       const toIso = unixToIsoZExact(w.to_close_unix);
-      const cacheKey = SC_HELPERS.staticTimelineCacheKey(symAtStart, tf, fromIso, toIso);
+      const cacheKey = SC_HELPERS.staticTimelineCacheKey(symAtStart, tf, fromIso, toIso, histPd);
       const existing = cache.windows[cacheKey];
       if (existing && existing.status === "ok" && existing.body) {
         windowsLoaded += 1;
@@ -1592,14 +1655,16 @@
       }
       let body = null;
       let attempt = 0;
+      const pdSerialAtStart = state.historicalLmv2PdSwitchSerial || 0;
       while (attempt < maxRetries) {
         if (pl.cancelRequested) break;
+        if (pdSerialAtStart !== (state.historicalLmv2PdSwitchSerial || 0)) break;
         const tApi = performance.now();
         try {
           body = await sendJson("/api/research/historical-lld-v2-static-timeline", "POST", {
             symbol: symAtStart,
             timeframe: "15m",
-            pool_detail: 10,
+            pool_detail: histPd,
             from_close: fromIso,
             to_close: toIso,
             include_active: true,
@@ -1620,12 +1685,18 @@
           await new Promise(function (r) { setTimeout(r, 400 * attempt); });
         }
       }
-      if (!body || body.success === false) {
+      if (!historicalLmv2StaticResponseOk(body, histPd, pdSerialAtStart)) {
+        if (pdSerialAtStart !== (state.historicalLmv2PdSwitchSerial || 0)) {
+          pl.status = "CANCELLED";
+          state.historicalLmv2StaticInflight = false;
+          updateHistoricalLmv2PreloadHint();
+          return;
+        }
         pl.status = "ERROR";
         touchStaticTimelineCacheEntry(cache, cacheKey, {
           status: "error",
           at: Date.now(),
-          message: (body && body.message) || "request failed",
+          message: (body && body.message) || "PD mismatch or request failed",
         }, pinKeys);
         state.historicalLmv2StaticInflight = false;
         updateHistoricalLmv2PreloadHint();
@@ -1644,7 +1715,8 @@
       tf,
       valid.from_close_unix,
       valid.to_close_unix,
-      windows
+      windows,
+      histPd
     );
     const plFinal = state.historicalLmv2Preload;
     if (plFinal.cancelRequested || plFinal.loadSerial !== loadSerial) {
@@ -1666,6 +1738,13 @@
     plFinal.status = "READY";
     plFinal.pinKeys = pinKeys;
     updateHistoricalLmv2PreloadHint();
+    const rng = plFinal.range || {};
+    updateHistoricalLmv2LoadStatus({
+      phase: "IDLE",
+      preload_ready_from: unixToIsoZExact(rng.from_close_unix),
+      preload_ready_to: unixToIsoZExact(rng.to_close_unix),
+      message: "Preload READY — pan/zoom uses bundle",
+    });
     await renderHistoricalLmv2Preloaded(null, { force: true });
     setStatus("Preload READY — " + plFinal.windowsTotal + " windows, " + plFinal.segmentCount + " segments", "ok");
   }
@@ -1693,11 +1772,15 @@
     const sw = $("researchHistoricalLmv2StaticWrap");
     const srw = $("researchHistoricalLmv2StaticRangeWrap");
     const prw = $("researchHistoricalLmv2PreloadWrap");
+    const pmw = $("researchHistoricalLmv2PreloadModeWrap");
+    const pdw = $("researchHistoricalLmv2PdWrap");
     const banner = $("researchHistoricalLmv2Banner");
     if (aw) aw.hidden = !on;
     if (rw) rw.hidden = !on;
     if (sw) sw.hidden = !on;
+    if (pdw) pdw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
     if (srw) srw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
+    if (pmw) pmw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
     if (prw) prw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
     if (banner) banner.hidden = !on;
     if (on && $("researchLiveMicroV2PoolDetail")) {
@@ -1762,6 +1845,71 @@
       localStorage.setItem("research.liveMicroLldV2", liveMicroLldV2Enabled() ? "1" : "0");
       localStorage.setItem("research.liveMicroLldV2Remaining", liveMicroLldV2RemainingEnabled() ? "1" : "0");
     } catch (e) { /* ignore */ }
+  }
+
+  /** Phase 5Z: legacy Live-Micro dock hidden — keep IDs, force overlays off. */
+  function applyResearchUiLegacyCleanup() {
+    const wrap = $("researchLegacyLiveMicroWrap");
+    if (!wrap) return;
+    const v2El = $("researchIndLiveMicroLldV2");
+    const remEl = $("researchIndLiveMicroLldV2Remaining");
+    if (v2El) v2El.checked = false;
+    if (remEl) remEl.checked = false;
+    try {
+      localStorage.setItem("research.liveMicroLldV2", "0");
+      localStorage.setItem("research.liveMicroLldV2Remaining", "0");
+    } catch (e) { /* ignore */ }
+    if (!SC_HELPERS) return;
+    visibleIds().forEach(function (pid) {
+      const p = state.panes[pid];
+      if (!p) return;
+      syncOverlays(
+        p,
+        SC_HELPERS.stripLiveMicroLldV2Overlays(p.pendingOverlays || [])
+      );
+    });
+  }
+
+  function updateHistoricalLmv2LoadStatus(patch) {
+    state.historicalLmv2LoadStatus = Object.assign(
+      {},
+      state.historicalLmv2LoadStatus || {},
+      patch || {}
+    );
+    const el = $("researchHistoricalLmv2LoadStatus");
+    if (!el) return;
+    const s = state.historicalLmv2LoadStatus;
+    const phase = s.phase || "IDLE";
+    if (phase === "IDLE") {
+      el.hidden = true;
+      el.textContent = "";
+      el.className = "research-historical-load-status";
+      return;
+    }
+    el.hidden = false;
+    let cls = "research-historical-load-status";
+    if (phase === "ERROR") cls += " is-error";
+    else if (phase === "NO_VISIBLE_ZONES") cls += " is-warn";
+    else if (phase === "DATA_COMPLETE") cls += " is-ok";
+    else if (phase === "STARTING" || phase === "LOADING") cls += " is-loading";
+    el.className = cls;
+    const parts = [
+      "Static · " + phase,
+      s.pd != null ? "PD" + s.pd : null,
+      s.selected_from && s.selected_to ? "SEL " + s.selected_from + "…" + s.selected_to : null,
+      s.visible_from && s.visible_to ? "VIS " + s.visible_from + "…" + s.visible_to : null,
+      s.loaded_from && s.loaded_to ? "LOAD " + s.loaded_from + "…" + s.loaded_to : null,
+      s.preload_ready_from && s.preload_ready_to
+        ? "PRELOAD " + s.preload_ready_from + "…" + s.preload_ready_to
+        : null,
+      s.windows_loaded != null && s.windows_total != null
+        ? "WIN " + s.windows_loaded + "/" + s.windows_total
+        : null,
+      s.segments_loaded != null ? "seg=" + s.segments_loaded : null,
+      s.zones_painted != null ? "painted=" + s.zones_painted : null,
+      s.message || null,
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
   }
 
   function interleaveRemainingZones(zones) {
@@ -2705,13 +2853,17 @@
           (payload.missing_close_count != null ? "/" + payload.required_close_count : "") +
           " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
           " · " + (payload.static_display_status || "?") + " · "
-        : "Historical LLD V2 · PD10 · ") +
+        : "Historical LLD V2 · PD" + (payload.pool_detail != null ? payload.pool_detail : historicalLmv2HistoricalPoolDetail()) + " · ") +
       "closes=" + (payload.pilot_close_count != null ? payload.pilot_close_count : "?") +
       (payload.historical_lmv2_chunks_planned != null
         ? " · chunks=" + payload.historical_lmv2_chunks_loaded + "/" + payload.historical_lmv2_chunks_planned
         : "") +
       " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
       " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+      (payload.zones_painted_count != null
+        ? " · painted=" + payload.zones_painted_count
+        : "") +
+      (payload.render_note ? " · " + payload.render_note : "") +
       (payload.remaining_segment_count_full != null
         ? " · rem_full=" + payload.remaining_segment_count_full
         : "") +
@@ -2721,7 +2873,7 @@
           ? payload.static_windows_missing
           : "?")
         : payload.historical_lmv2_coverage_complete === true
-          ? " · display=complete"
+          ? " · data_coverage=complete"
           : "");
     if (historicalLmv2DebugEnabled() && payload.historical_lmv2_debug) {
       const d = payload.historical_lmv2_debug;
@@ -2825,8 +2977,17 @@
       const ch = chunks[ci];
       const fromIso = unixToIsoZExact(ch.from_close_unix);
       const toIso = unixToIsoZExact(ch.to_close_unix);
+      const histPd = historicalLmv2HistoricalPoolDetail();
       const cacheKey = SC_HELPERS
-        ? SC_HELPERS.historicalLmv2ChunkCacheKey(symAtStart, target.tf, fromIso, toIso, asOfIso, layersKey)
+        ? SC_HELPERS.historicalLmv2ChunkCacheKey(
+          symAtStart,
+          target.tf,
+          fromIso,
+          toIso,
+          asOfIso,
+          layersKey,
+          histPd
+        )
         : null;
       let entry = cacheKey ? chunkStore.chunks[cacheKey] : null;
       if (entry && entry.status === "ok" && entry.body && !(opts && opts.force)) {
@@ -2847,7 +3008,7 @@
         body = await sendJson("/api/research/historical-lld-v2-pools", "POST", {
           symbol: symAtStart,
           timeframe: target.tf,
-          pool_detail: 10,
+          pool_detail: histPd,
           from_close: fromIso,
           to_close: toIso,
           as_of_close: asOfIso,
@@ -2872,11 +3033,12 @@
         failedChunks += 1;
         continue;
       }
-      if (!body || body.success === false) {
+      const pdSerialChunk = state.historicalLmv2PdSwitchSerial || 0;
+      if (!historicalLmv2StaticResponseOk(body, histPd, pdSerialChunk)) {
         if (SC_HELPERS && cacheKey) {
           SC_HELPERS.touchHistoricalLmv2ChunkCache(chunkStore, cacheKey, {
             status: "error",
-            error: (body && body.message) || "request failed",
+            error: (body && body.message) || "PD mismatch or request failed",
             at: Date.now(),
           });
         }
@@ -3008,7 +3170,14 @@
     if (!SC_HELPERS || !targets.length) return null;
     const tf = targets[0].tf;
     const windows = plan.windows || [];
-    const zoneParts = SC_HELPERS.gatherStaticTimelineZoneParts(cache, symAtStart, tf, windows);
+    const histPd = historicalLmv2HistoricalPoolDetail();
+    const zoneParts = SC_HELPERS.gatherStaticTimelineZoneParts(
+      cache,
+      symAtStart,
+      tf,
+      windows,
+      histPd
+    );
     const mergedZones = SC_HELPERS.mergeHistoricalLmv2Zones(zoneParts);
     const cov = SC_HELPERS.staticTimelineWindowCoverage(
       windows,
@@ -3016,7 +3185,8 @@
       symAtStart,
       tf,
       plan.visible_from_close_unix,
-      plan.visible_to_close_unix
+      plan.visible_to_close_unix,
+      histPd
     );
     const clipFrom = plan.visible_from_close_unix;
     const clipTo = plan.visible_to_close_unix;
@@ -3045,21 +3215,62 @@
       segment_count: (mergedZones || []).length,
       static_display_status: displayStatus,
       historical_lmv2_coverage_complete: cov.complete,
+      pool_detail: histPd,
     };
+    let paintedTotal = 0;
     state.historicalLmv2StaticBody = hintBody;
     targets.forEach(function (target) {
       if (!target) return;
-      syncOverlays(
-        target,
-        SC_HELPERS.applyHistoricalLmv2ToOverlays(
-          target.pendingOverlays || [],
-          mergedZones,
-          clipFrom,
-          clipTo
-        )
+      const nextOverlays = SC_HELPERS.applyHistoricalLmv2ToOverlays(
+        target.pendingOverlays || [],
+        mergedZones,
+        clipFrom,
+        clipTo
       );
+      if (SC_HELPERS && SC_HELPERS.countHistoricalLmv2Overlays) {
+        paintedTotal += SC_HELPERS.countHistoricalLmv2Overlays(nextOverlays);
+      }
+      syncOverlays(target, nextOverlays);
     });
+    hintBody.zones_painted_count = paintedTotal;
+    hintBody.historical_lmv2_overlay_source = historicalLmv2PreloadReady()
+      ? "preloaded_static"
+      : "static_timeline_lazy";
+    if (paintedTotal === 0 && mergedZones && mergedZones.length > 0) {
+      hintBody.render_note = "KEINE POOLZONEN IM SICHTBAREN BEREICH";
+    } else if (paintedTotal === 0 && displayStatus === "COMPLETE") {
+      hintBody.render_note = "KEINE POOLZONEN IM SICHTBAREN BEREICH";
+    } else {
+      hintBody.render_note = null;
+    }
+    state.historicalLmv2StaticBody = hintBody;
     updateHistoricalLmv2Hint(hintBody);
+    if (state.historicalLmv2ExplicitLoad || state.historicalLmv2LoadStatus.phase === "LOADING") {
+      const loadPhase =
+        displayStatus === "LOADING"
+          ? "LOADING"
+          : paintedTotal === 0 && (mergedZones || []).length > 0
+            ? "NO_VISIBLE_ZONES"
+            : cov.complete
+              ? "DATA_COMPLETE"
+              : "INCOMPLETE";
+      updateHistoricalLmv2LoadStatus({
+        phase: loadPhase,
+        pd: histPd,
+        selected_from: hintBody.selected_from_close,
+        selected_to: hintBody.selected_to_close,
+        visible_from: hintBody.visible_from_close,
+        visible_to: hintBody.visible_to_close,
+        windows_loaded: cov.windows.windows_loaded,
+        windows_total: cov.windows.windows_planned,
+        segments_loaded: hintBody.segment_count,
+        zones_painted: paintedTotal,
+        message: hintBody.render_note || null,
+      });
+      if (loadPhase === "DATA_COMPLETE" || loadPhase === "NO_VISIBLE_ZONES" || loadPhase === "INCOMPLETE") {
+        state.historicalLmv2ExplicitLoad = false;
+      }
+    }
     return hintBody;
   }
 
@@ -3117,6 +3328,20 @@
     const cache = state.historicalLmv2StaticCache || { windows: {}, order: [] };
     state.historicalLmv2StaticCache = cache;
     state.historicalLmv2StaticInflight = true;
+    if (state.historicalLmv2ExplicitLoad) {
+      updateHistoricalLmv2LoadStatus({
+        phase: "LOADING",
+        pd: historicalLmv2HistoricalPoolDetail(),
+        selected_from: selected ? unixToIsoZExact(selected.from_close_unix) : null,
+        selected_to: selected ? unixToIsoZExact(selected.to_close_unix) : null,
+        visible_from: unixToIsoZExact(plan.visible_from_close_unix),
+        visible_to: unixToIsoZExact(plan.visible_to_close_unix),
+        loaded_from: unixToIsoZExact(plan.load_from_close_unix),
+        loaded_to: unixToIsoZExact(plan.load_to_close_unix),
+        windows_loaded: 0,
+        windows_total: plan.windows.length,
+      });
+    }
     applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: true });
     let hadError = false;
     for (let wi = 0; wi < plan.windows.length; wi += 1) {
@@ -3131,7 +3356,14 @@
       const w = plan.windows[wi];
       const fromIso = unixToIsoZExact(w.from_close_unix);
       const toIso = unixToIsoZExact(w.to_close_unix);
-      const cacheKey = SC_HELPERS.staticTimelineCacheKey(symAtStart, targets[0].tf, fromIso, toIso);
+      const histPd = historicalLmv2HistoricalPoolDetail();
+      const cacheKey = SC_HELPERS.staticTimelineCacheKey(
+        symAtStart,
+        targets[0].tf,
+        fromIso,
+        toIso,
+        histPd
+      );
       const entry = cache.windows[cacheKey];
       if (entry && entry.status === "ok" && entry.body && !(opts && opts.force)) {
         applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, {
@@ -3140,11 +3372,12 @@
         continue;
       }
       let body = null;
+      const pdSerialAtStart = state.historicalLmv2PdSwitchSerial || 0;
       try {
         body = await sendJson("/api/research/historical-lld-v2-static-timeline", "POST", {
           symbol: symAtStart,
           timeframe: "15m",
-          pool_detail: 10,
+          pool_detail: histPd,
           from_close: fromIso,
           to_close: toIso,
           include_active: true,
@@ -3162,11 +3395,15 @@
         }
         throw err;
       }
-      if (!body || body.success === false) {
+      if (pdSerialAtStart !== (state.historicalLmv2PdSwitchSerial || 0)) {
+        state.historicalLmv2StaticInflight = false;
+        return;
+      }
+      if (!historicalLmv2StaticResponseOk(body, histPd, pdSerialAtStart)) {
         touchStaticTimelineCacheEntry(cache, cacheKey, {
           status: "error",
           at: Date.now(),
-          message: (body && body.message) || "request failed",
+          message: (body && body.message) || "PD mismatch or request failed",
         });
         hadError = true;
         applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: false });
@@ -3177,11 +3414,25 @@
         continue;
       }
       touchStaticTimelineCacheEntry(cache, cacheKey, { status: "ok", body: body, at: Date.now() });
+      if (state.historicalLmv2ExplicitLoad) {
+        updateHistoricalLmv2LoadStatus({
+          phase: "LOADING",
+          windows_loaded: wi + 1,
+          windows_total: plan.windows.length,
+        });
+      }
       applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, {
         loading: wi < plan.windows.length - 1 && !hadError,
       });
     }
     state.historicalLmv2StaticInflight = false;
+    if (state.historicalLmv2ExplicitLoad && hadError) {
+      updateHistoricalLmv2LoadStatus({
+        phase: "ERROR",
+        message: "Static window request failed — see hint",
+      });
+      state.historicalLmv2ExplicitLoad = false;
+    }
     if (state.symbol !== symAtStart) return;
     if (loadSerial !== state.historicalLmv2StaticLoadSerial) return;
     applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: false });
@@ -3193,15 +3444,20 @@
 
   async function refreshHistoricalLmv2(pane, opts) {
     updateHistoricalLmv2UiChrome();
-    if (historicalLmv2PreloadedStaticEnabled()) {
-      if (state.historicalLmv2Preload && state.historicalLmv2Preload.status === "READY") {
-        return renderHistoricalLmv2Preloaded(pane, opts);
-      }
-      updateHistoricalLmv2PreloadHint();
-      return;
+    if (historicalLmv2PreloadReady()) {
+      return renderHistoricalLmv2Preloaded(pane, opts);
     }
-    if (historicalLmv2StaticTimelineEnabled()) {
+    if (historicalLmv2UseStaticLazyPath()) {
       return refreshHistoricalLmv2StaticTimeline(pane, opts);
+    }
+    if (historicalLmv2PreloadedStaticEnabled()) {
+      updateHistoricalLmv2PreloadHint();
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message:
+          "Preload idle — run “Preload historical pools” or turn off Preloaded static for lazy static",
+      });
+      return;
     }
     return refreshHistoricalLmv2Core(pane, opts);
   }
@@ -6260,6 +6516,7 @@
 
   function bindUi() {
     restoreLiveMicroLldV2Toggles();
+    applyResearchUiLegacyCleanup();
     bindHistoryUi();
     restoreHistoryPrefs();
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
@@ -7674,11 +7931,38 @@
     }
     if ($("researchStaticTimelineLoad")) {
       $("researchStaticTimelineLoad").addEventListener("click", function () {
-        if (historicalLmv2PreloadedStaticEnabled()) {
-          setStatus("Preload mode: use “Preload historical pools” (lazy Load static disabled)", "info");
+        if (state.historicalLmv2StaticInflight) {
+          setStatus("Static load already running", "info");
+          return;
+        }
+        if (historicalLmv2PreloadedStaticEnabled() && historicalLmv2PreloadReady()) {
+          setStatus("Preload READY — use preloaded bundle or disable Preloaded static for lazy Load static", "info");
+          return;
+        }
+        const histPd = historicalLmv2HistoricalPoolDetail();
+        const parsed = SC_HELPERS
+          ? SC_HELPERS.parseStaticTimelineSelectedRangeFromInputs()
+          : null;
+        state.historicalLmv2ExplicitLoad = true;
+        updateHistoricalLmv2LoadStatus({
+          phase: "STARTING",
+          pd: histPd,
+          selected_from: parsed ? unixToIsoZExact(parsed.from_close_unix) : null,
+          selected_to: parsed ? unixToIsoZExact(parsed.to_close_unix) : null,
+          message: parsed ? null : "invalid From/To — fix UTC fields",
+        });
+        if (!parsed) {
+          state.historicalLmv2ExplicitLoad = false;
+          updateHistoricalLmv2LoadStatus({ phase: "ERROR" });
+          setStatus("Static: invalid From/To UTC", "error");
           return;
         }
         refreshHistoricalLmv2(null, { force: true, commitSelectedRange: true }).catch(function (err) {
+          state.historicalLmv2ExplicitLoad = false;
+          updateHistoricalLmv2LoadStatus({
+            phase: "ERROR",
+            message: err && err.message ? err.message : String(err),
+          });
           setStatus("Historical static timeline: " + (err && err.message ? err.message : err), "error");
         });
       });
@@ -7692,6 +7976,15 @@
         });
       });
     }
+    document.querySelectorAll('input[name="researchHistoricalLmv2PoolDetail"]').forEach(function (el) {
+      el.addEventListener("change", function () {
+        invalidateHistoricalLmv2CachesForPdSwitch();
+        updateHistoricalLmv2UiChrome();
+        refreshHistoricalLmv2(null, { force: true }).catch(function (err) {
+          setStatus("Historical PD switch: " + (err && err.message ? err.message : err), "error");
+        });
+      });
+    });
     if ($("researchStaticTimelinePreload")) {
       $("researchStaticTimelinePreload").addEventListener("click", function () {
         runHistoricalLmv2Preload().catch(function (err) {

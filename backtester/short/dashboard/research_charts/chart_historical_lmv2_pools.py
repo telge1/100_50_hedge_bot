@@ -20,6 +20,7 @@ from research_charts.live_micro_lld_v2_ch_test.phase11u_b.adapter import Adapter
 
 from .chart_live_micro_lld_v2 import _parse_close
 from .clickhouse_config import load_clickhouse_config
+from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
 from .historical_pool_state_v1 import (
     IMMUTABLE_PRICE_HASH,
     IMMUTABLE_REVISION_HASH,
@@ -100,19 +101,26 @@ def chart_historical_lmv2_pools(
 ) -> dict[str, Any]:
     sym = str(symbol or "").strip().upper()
     tf = str(timeframe or "").strip()
-    pd = int(pool_detail)
-    if sym != PILOT_SYMBOL or tf != PILOT_TIMEFRAME or pd != PILOT_POOL_DETAIL:
+    try:
+        hcfg = resolve_historical_pd_config(int(pool_detail))
+    except HistoricalPoolStateError as exc:
+        raise _state_err(exc) from exc
+    if sym != hcfg.symbol or tf != hcfg.timeframe:
         raise HistoricalLmv2PilotError(
             "INVALID_SCOPE",
-            "pilot supports DOGEUSDT 15m PD10 only",
+            "historical chart supports DOGEUSDT 15m only",
         )
     from_dt = _parse_close(from_close)
     to_dt = _parse_close(to_close)
     _assert_request_order(from_dt, to_dt)
 
-    cfg_hash = config_hash(build_live_micro_lld_v2_config(pd))
+    cfg_hash = hcfg.config_hash
+    line_id = hcfg.pipeline_line_id
+    pd = hcfg.pool_detail
     reader = PublishedActiveReader()
-    published = get_published_decision_closes(reader, cfg_hash)
+    published = get_published_decision_closes(
+        reader, cfg_hash, pipeline_line_id=line_id
+    )
     try:
         assert_research_chart_window(from_dt, to_dt, published)
     except HistoricalPoolStateError as exc:
@@ -123,7 +131,9 @@ def chart_historical_lmv2_pools(
             "INVALID_REQUEST",
             f"more than {PILOT_MAX_CLOSES} closes in range",
         )
-    data_bounds = research_chart_data_bounds(published)
+    data_bounds = research_chart_data_bounds(
+        published, pipeline_line_id=line_id
+    )
     ch_cfg = load_clickhouse_config()
     import clickhouse_connect
 
@@ -147,7 +157,12 @@ def chart_historical_lmv2_pools(
                     published, from_dt, as_of_dt
                 )
                 pools = build_active_episode_records(
-                    reader, cfg_hash, client, database, episode_closes
+                    reader,
+                    cfg_hash,
+                    client,
+                    database,
+                    episode_closes,
+                    pipeline_line_id=line_id,
                 )
             except HistoricalPoolStateError as exc:
                 raise _state_err(exc) from exc
@@ -200,7 +215,9 @@ def chart_historical_lmv2_pools(
         pub_rows = []
         for dc in closes:
             try:
-                pub = _load_publication_line(reader, cfg_hash, dc)
+                pub = _load_publication_line(
+                    reader, cfg_hash, dc, pipeline_line_id=line_id
+                )
             except UnpublishedSnapshotError as exc:
                 raise HistoricalLmv2PilotError("MISSING_PUBLICATION", str(exc)) from exc
             pub_rows.append(
@@ -216,11 +233,12 @@ def chart_historical_lmv2_pools(
             "namespace": HISTORICAL_LMV2_NAMESPACE,
             "visibility_mode": VISIBILITY_MODE,
             "live_availability_rule": LIVE_TREATS_BACKFILL_AS_SIGNAL,
-            "pipeline_line_id": PIPELINE_LINE_ID,
+            "pipeline_line_id": line_id,
             "symbol": sym,
             "timeframe": tf,
             "pool_detail": pd,
             "config_hash": cfg_hash,
+            "historical_pd_contract": hcfg.to_api_dict(),
             "from_close": _iso_z(from_dt),
             "to_close": _iso_z(to_dt),
             "as_of_close": _iso_z(as_of_dt),
@@ -258,12 +276,18 @@ def chart_historical_lmv2_static_timeline(
     """
     sym = str(symbol or "").strip().upper()
     tf = str(timeframe or "").strip()
-    pd = int(pool_detail)
-    if sym != PILOT_SYMBOL or tf != PILOT_TIMEFRAME or pd != PILOT_POOL_DETAIL:
+    try:
+        hcfg = resolve_historical_pd_config(int(pool_detail))
+    except HistoricalPoolStateError as exc:
+        raise _state_err(exc) from exc
+    if sym != hcfg.symbol or tf != hcfg.timeframe:
         raise HistoricalLmv2PilotError(
             "INVALID_SCOPE",
-            "static timeline supports DOGEUSDT 15m PD10 only",
+            "static timeline supports DOGEUSDT 15m only",
         )
+    cfg_hash = hcfg.config_hash
+    line_id = hcfg.pipeline_line_id
+    pd = hcfg.pool_detail
     if from_close is None or to_close is None:
         raise HistoricalLmv2PilotError(
             "INVALID_REQUEST",
@@ -273,9 +297,10 @@ def chart_historical_lmv2_static_timeline(
     to_dt = _parse_close(to_close)
     _assert_request_order(from_dt, to_dt)
 
-    cfg_hash = config_hash(build_live_micro_lld_v2_config(pd))
     reader = PublishedActiveReader()
-    published = get_published_decision_closes(reader, cfg_hash)
+    published = get_published_decision_closes(
+        reader, cfg_hash, pipeline_line_id=line_id
+    )
     try:
         assert_static_timeline_window(from_dt, to_dt, published)
         import_lo, import_hi = static_timeline_import_bounds(published)
@@ -285,7 +310,9 @@ def chart_historical_lmv2_static_timeline(
     display_closes = decision_closes_in_range(published, from_dt, to_dt)
 
     as_of_dt = resolve_as_of_close(published, to_dt)
-    data_bounds = research_chart_data_bounds(published)
+    data_bounds = research_chart_data_bounds(
+        published, pipeline_line_id=line_id
+    )
     ch_cfg = load_clickhouse_config()
     import clickhouse_connect
 
@@ -297,10 +324,33 @@ def chart_historical_lmv2_static_timeline(
         zones: list[dict[str, Any]] = []
         active_count = 0
         episode_closes: list[datetime] = []
+        episode_batch = None
         if include_active:
             episode_closes = episode_closes_for_chart_request(published, from_dt, as_of_dt)
+            try:
+                from .historical_pool_state_batch_reader_v1 import (
+                    build_episode_walk_batch_cache,
+                    historical_lmv2_batch_reader_enabled,
+                )
+
+                if historical_lmv2_batch_reader_enabled() and episode_closes:
+                    episode_batch = build_episode_walk_batch_cache(
+                        client,
+                        database,
+                        line_id,
+                        cfg_hash,
+                        episode_closes,
+                    )
+            except ImportError:
+                episode_batch = None
             pools = build_active_episode_records(
-                reader, cfg_hash, client, database, episode_closes
+                reader,
+                cfg_hash,
+                client,
+                database,
+                episode_closes,
+                episode_batch=episode_batch,
+                pipeline_line_id=line_id,
             )
             active_count = len({p["pool_id"] for p in pools})
             zones.extend(
@@ -318,11 +368,12 @@ def chart_historical_lmv2_static_timeline(
             "namespace": HISTORICAL_LMV2_NAMESPACE,
             "visibility_mode": VISIBILITY_MODE,
             "live_availability_rule": LIVE_TREATS_BACKFILL_AS_SIGNAL,
-            "pipeline_line_id": PIPELINE_LINE_ID,
+            "pipeline_line_id": line_id,
             "symbol": sym,
             "timeframe": tf,
             "pool_detail": pd,
             "config_hash": cfg_hash,
+            "historical_pd_contract": hcfg.to_api_dict(),
             "from_close": _iso_z(from_dt),
             "to_close": _iso_z(to_dt),
             "as_of_close": _iso_z(as_of_dt),
@@ -333,6 +384,7 @@ def chart_historical_lmv2_static_timeline(
             "historical_lmv2_coverage_complete": True,
             "pilot_close_count": len(display_closes),
             "episode_walk_close_count": len(episode_closes),
+            "historical_lmv2_batch_reader_active": episode_batch is not None,
             "pool_count": active_count,
             "segment_count": len(zones),
             "zones": zones,
