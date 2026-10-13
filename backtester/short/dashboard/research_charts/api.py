@@ -28,6 +28,7 @@ from .chart_live_micro_lld_v2_ch_test import chart_live_micro_lld_v2_ch_test
 from .chart_historical_lmv2_pools import (
     HistoricalLmv2PilotError,
     chart_historical_lmv2_pools,
+    chart_historical_lmv2_static_timeline,
 )
 from .live_micro_lld_v2_ch_test.compare_guard import evaluate_compare_guard
 from .live_micro_lld_v2_ch_test.errors import (
@@ -777,7 +778,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         user: dict = Depends(require_auth),
         body: dict[str, Any] = Body(default_factory=dict),
     ):
-        """Phase 5D pilot: read-only historical ACTIVE/Remaining from CH (20 closes max)."""
+        """Phase 5I day pilot: read-only historical ACTIVE/Remaining from CH (96 closes max)."""
         from_close = body.get("from_close")
         to_close = body.get("to_close")
         if not from_close or not to_close:
@@ -812,6 +813,38 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(400, str(exc), str(exc))
         except Exception as exc:
             return _error(500, "historical_lld_v2_pools_failed", str(exc))
+
+    @router.post("/api/research/historical-lld-v2-static-timeline")
+    async def api_research_historical_lmv2_static_timeline(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        """Phase 5M: full-window SSOT timeline (no per-chunk zone clip / viewport merge)."""
+        try:
+            payload = await asyncio.to_thread(
+                chart_historical_lmv2_static_timeline,
+                str(body.get("symbol") or "DOGEUSDT"),
+                body.get("from_close"),
+                body.get("to_close"),
+                timeframe=str(body.get("timeframe") or "15m"),
+                pool_detail=int(body.get("pool_detail") or 10),
+                include_active=bool(body.get("include_active", True)),
+            )
+        except HistoricalLmv2PilotError as exc:
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": exc.code,
+                    "message": exc.message,
+                    "details": exc.details,
+                    "feed_ready": True,
+                },
+                status_code=422,
+            )
+        except ValueError as exc:
+            return _error(400, str(exc), str(exc))
+        except Exception as exc:
+            return _error(500, "historical_lmv2_static_timeline_failed", str(exc))
         return {"success": True, "message": FEED_MESSAGE, **payload}
 
     @router.get("/api/research/live-micro-lld-v2-preset-matrix")

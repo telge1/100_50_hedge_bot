@@ -779,6 +779,190 @@ function test_live_micro_lld_v2_ch_test_comparison_window_uses_fixed_from() {
   assert.ok(win.to_close_unix <= h.LIVE_MICRO_LLD_V2_CH_TEST_COV_TO_UNIX);
 }
 
+function test_historical_lmv2_viewport_uses_timescale_before_first_candle() {
+  const sec = TF_SEC_15;
+  const scaleFrom = Math.floor(Date.parse("2026-09-26T00:00:00Z") / 1000);
+  const scaleTo = Math.floor(Date.parse("2026-09-30T23:59:00Z") / 1000);
+  const firstCandle = Math.floor(Date.parse("2026-09-28T00:00:00Z") / 1000);
+  const lastCandle = Math.floor(Date.parse("2026-09-30T22:45:00Z") / 1000);
+  const asOf = Math.floor(Date.parse("2026-09-30T23:45:00Z") / 1000);
+  const ctx = {
+    isHistoricalReplay: true,
+    replayTargetTs: asOf,
+    tfSec: sec,
+    historyBlocksLive: true,
+  };
+  const chartApi = {
+    getVisibleTimeRange: function () {
+      return { from: scaleFrom, to: scaleTo, firstCandle: firstCandle, lastCandle: lastCandle };
+    },
+  };
+  const vp = h.resolveHistoricalLmv2ViewportCloseWindow({}, sec, ctx, chartApi);
+  assert.ok(vp);
+  assert.strictEqual(vp.viewport_after_replay_cutoff, false);
+  const sep26Close = Math.floor(Date.parse("2026-09-26T00:15:00Z") / 1000);
+  assert.ok(vp.view_from_close_unix <= sep26Close);
+  const chunks = h.planHistoricalLmv2Chunks(vp.view_from_close_unix, vp.view_to_close_unix, asOf, sec, 1);
+  const cov = h.historicalLmv2CloseCoverage(
+    chunks,
+    vp.display_from_close_unix,
+    Math.min(vp.display_to_close_unix, asOf),
+    sec
+  );
+  assert.strictEqual(cov.complete, true);
+  assert.strictEqual(vp.display_from_close_unix, vp.view_from_close_unix);
+}
+
+function test_historical_lmv2_viewport_replay_cutoff() {
+  const sec = TF_SEC_15;
+  const sepOpen = Math.floor(Date.parse("2026-09-29T00:00:00Z") / 1000);
+  const augReplay = Math.floor(Date.parse("2026-08-26T12:00:00Z") / 1000);
+  const ctx = {
+    isHistoricalReplay: true,
+    replayTargetTs: augReplay,
+    tfSec: sec,
+  };
+  const chartApi = {
+    getVisibleTimeRange: function () {
+      return { firstCandle: sepOpen, lastCandle: sepOpen + 2 * sec };
+    },
+  };
+  const vp = h.resolveHistoricalLmv2ViewportCloseWindow({}, sec, ctx, chartApi);
+  assert.ok(vp);
+  assert.strictEqual(vp.viewport_after_replay_cutoff, true);
+  assert.ok(vp.as_of_close_unix < vp.view_from_close_unix);
+}
+
+function test_historical_lmv2_plan_chunks_sep_pan_sequence() {
+  const sec = TF_SEC_15;
+  const asOf = h.HISTORICAL_LMV2_PILOT_TO_UNIX;
+  const sep20 = Math.floor(Date.parse("2026-09-20T00:00:00Z") / 1000);
+  const sep19 = sep20 - 86400;
+  const sep18 = sep19 - 86400;
+  const c20 = h.planHistoricalLmv2Chunks(sep20, sep20 + 86400, asOf, sec, 1);
+  const c19 = h.planHistoricalLmv2Chunks(sep19, sep19 + 86400, asOf, sec, 1);
+  const c18 = h.planHistoricalLmv2Chunks(sep18, sep18 + 86400, asOf, sec, 1);
+  assert.ok(c20.length >= 1);
+  assert.ok(c19.length >= 1);
+  assert.ok(c18.length >= 1);
+  const mergedLists = [];
+  [c20, c19, c18].forEach(function (chunks) {
+    chunks.forEach(function (ch) {
+      mergedLists.push([
+        {
+          namespace: h.HISTORICAL_LMV2_NS,
+          id: "pool-" + ch.from_close_unix,
+          pool_id: "pool-" + ch.from_close_unix,
+          start_timestamp: ch.from_close_unix,
+          end_timestamp: ch.to_close_unix,
+        },
+      ]);
+    });
+  });
+  const merged = h.mergeHistoricalLmv2Zones(mergedLists);
+  assert.ok(merged.length >= 3);
+  const ids = {};
+  merged.forEach(function (z) {
+    ids[z.pool_id] = (ids[z.pool_id] || 0) + 1;
+  });
+  assert.ok(Object.keys(ids).length >= 3);
+}
+
+function test_historical_lmv2_merge_preserves_identity_across_chunks() {
+  const sec = TF_SEC_15;
+  const z1 = {
+    namespace: h.HISTORICAL_LMV2_NS,
+    id: "p1",
+    pool_id: "p1",
+    start_timestamp: 1_000_000,
+    end_timestamp: 1_000_000 + sec * 10,
+  };
+  const z2 = {
+    namespace: h.HISTORICAL_LMV2_NS,
+    id: "p1",
+    pool_id: "p1",
+    start_timestamp: z1.end_timestamp,
+    end_timestamp: 1_000_000 + sec * 20,
+  };
+  const merged = h.mergeHistoricalLmv2Zones([[z1], [z2]]);
+  assert.strictEqual(merged.length, 1);
+  assert.strictEqual(merged[0].pool_id, "p1");
+  assert.strictEqual(merged[0].end_timestamp, z2.end_timestamp);
+}
+
+function test_historical_lmv2_chunk_cache_gather_and_lru() {
+  const store = { chunks: {}, order: [] };
+  const asOfIso = "2026-09-30T23:45:00Z";
+  const layersKey = "A";
+  const span = (h.HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST - 1) * h.HISTORICAL_LMV2_TF_SEC;
+  let start = h.HISTORICAL_LMV2_PILOT_FROM_UNIX;
+  const planned = [];
+  for (let i = 0; i < h.HISTORICAL_LMV2_CHUNK_CACHE_MAX + 2; i += 1) {
+    const ch = { from_close_unix: start, to_close_unix: start + span };
+    planned.push(ch);
+    const fromIso = h.historicalCloseUnixToIsoZ(ch.from_close_unix);
+    const toIso = h.historicalCloseUnixToIsoZ(ch.to_close_unix);
+    const key = h.historicalLmv2ChunkCacheKey("DOGEUSDT", "15m", fromIso, toIso, asOfIso, layersKey);
+    h.touchHistoricalLmv2ChunkCache(store, key, {
+      status: "ok",
+      body: { zones: [{ namespace: h.HISTORICAL_LMV2_NS, id: "z" + i, start_timestamp: start, end_timestamp: start + span }] },
+    });
+    start += span + h.HISTORICAL_LMV2_TF_SEC;
+  }
+  assert.ok(Object.keys(store.chunks).length <= h.HISTORICAL_LMV2_CHUNK_CACHE_MAX);
+  assert.ok(store.order.length <= h.HISTORICAL_LMV2_CHUNK_CACHE_MAX);
+  const tail = planned[planned.length - 1];
+  const g = h.gatherHistoricalLmv2ZonePartsFromPlannedChunks(
+    store,
+    "DOGEUSDT",
+    "15m",
+    asOfIso,
+    layersKey,
+    [tail]
+  );
+  assert.strictEqual(g.stats.cache_hits, 1);
+  assert.strictEqual(g.zone_parts[0].length, 1);
+}
+
+function test_static_timeline_preload_7day_three_windows() {
+  const from = Math.floor(Date.parse(h.PHASE5P_PILOT_FROM_ISO) / 1000);
+  const to = Math.floor(Date.parse(h.PHASE5P_PILOT_TO_ISO) / 1000);
+  const v = h.validateStaticTimelinePreloadRange(from, to);
+  assert.strictEqual(v.ok, true);
+  assert.strictEqual(v.close_count, h.PHASE5P_PILOT_MAX_CLOSES);
+  const wins = h.planStaticTimelinePreloadWindows(from, to);
+  assert.strictEqual(wins.length, 3);
+  const cov = h.historicalLmv2CloseCoverage(wins, from, to, h.HISTORICAL_LMV2_TF_SEC);
+  assert.strictEqual(cov.complete, true);
+  assert.strictEqual(cov.required_count, 672);
+}
+
+function test_static_timeline_lazy_visible_not_full_selected() {
+  const selFrom = Math.floor(Date.parse("2026-08-15T00:00:00Z") / 1000);
+  const selTo = Math.floor(Date.parse("2026-09-17T23:45:00Z") / 1000);
+  const visFrom = Math.floor(Date.parse("2026-08-15T00:00:00Z") / 1000);
+  const visTo = Math.floor(Date.parse("2026-08-17T23:45:00Z") / 1000);
+  const selected = { from_close_unix: selFrom, to_close_unix: selTo };
+  const full = h.planStaticTimelineWindows(selFrom, selTo);
+  const lazy = h.planStaticTimelineLoadForVisible(visFrom, visTo, selected, 1);
+  assert.ok(full.length > lazy.windows.length);
+  assert.ok(lazy.windows.length >= 1);
+  assert.ok(lazy.windows.length <= 3);
+}
+
+function test_historical_lmv2_aug_sep_boundary_chunks() {
+  const sec = TF_SEC_15;
+  const asOf = h.HISTORICAL_LMV2_PILOT_TO_UNIX;
+  const aug31 = Math.floor(Date.parse("2026-08-31T12:00:00Z") / 1000);
+  const sep01 = Math.floor(Date.parse("2026-09-01T12:00:00Z") / 1000);
+  const cAug = h.planHistoricalLmv2Chunks(aug31, aug31 + 86400, asOf, sec, 1);
+  const cSep = h.planHistoricalLmv2Chunks(sep01, sep01 + 86400, asOf, sec, 1);
+  assert.ok(cAug.length >= 1);
+  assert.ok(cSep.length >= 1);
+  assert.ok(cAug[0].from_close_unix >= h.HISTORICAL_LMV2_PILOT_FROM_UNIX);
+  assert.ok(cSep[cSep.length - 1].to_close_unix <= asOf);
+}
+
 function test_live_micro_lld_v2_chart_viewport_filter() {
   const many = [];
   for (let i = 0; i < 1200; i += 1) {
@@ -847,6 +1031,14 @@ const tests = [
   test_live_micro_lld_v2_ch_test_overlay_namespace_and_dashed,
   test_live_micro_lld_v2_ch_test_coverage_clip,
   test_live_micro_lld_v2_ch_test_comparison_window_uses_fixed_from,
+  test_historical_lmv2_viewport_uses_timescale_before_first_candle,
+  test_historical_lmv2_viewport_replay_cutoff,
+  test_historical_lmv2_plan_chunks_sep_pan_sequence,
+  test_historical_lmv2_merge_preserves_identity_across_chunks,
+  test_historical_lmv2_chunk_cache_gather_and_lru,
+  test_static_timeline_preload_7day_three_windows,
+  test_static_timeline_lazy_visible_not_full_selected,
+  test_historical_lmv2_aug_sep_boundary_chunks,
 ];
 
 let failed = 0;

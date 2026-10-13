@@ -82,7 +82,31 @@
     liveMicroLldV2ChTestRefreshToken: 0,
     liveMicroLldV2ChCompareStatus: null,
     historicalLmv2Cache: {},
+    historicalLmv2ChunkStore: { chunks: {}, order: [] },
     historicalLmv2RefreshToken: 0,
+    historicalLmv2LoadSerial: 0,
+    historicalLmv2StaticBody: null,
+    historicalLmv2StaticCache: { windows: {}, order: [] },
+    historicalLmv2StaticLoadSerial: 0,
+    historicalLmv2StaticInflight: false,
+    historicalLmv2SelectedRange: null,
+    historicalLmv2Preload: {
+      status: "idle",
+      bundleKey: null,
+      range: null,
+      windows: [],
+      pinKeys: {},
+      mergedZones: null,
+      loadSerial: 0,
+      cancelRequested: false,
+      windowsLoaded: 0,
+      windowsTotal: 0,
+      apiMsTotal: 0,
+      verifiedCloseCount: 0,
+      segmentCount: 0,
+      poolCount: 0,
+      invalidateReason: null,
+    },
     scannerCommonReplayRefreshTimer: null,
     formingTimer: null,
     obpRefreshTimer: null,
@@ -421,6 +445,7 @@
     state.liveMicroLldV2Cache = {};
     state.liveMicroLldV2ChTestCache = {};
     state.historicalLmv2Cache = {};
+    state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
     abortInflightPaneLoads();
     stopPoll();
     lockReplayViewOnAllPanes(state.replayWindow);
@@ -435,6 +460,7 @@
     state.liveMicroLldV2Cache = {};
     state.liveMicroLldV2ChTestCache = {};
     state.historicalLmv2Cache = {};
+    state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
     state.liquidityLocationAsOf = null;
     unlockReplayViewOnAllPanes();
     abortInflightPaneLoads();
@@ -1229,12 +1255,59 @@
     const chOn = liveMicroLldV2ChTestEnabled() && paneSupportsLiveMicroLldV2ChTest(pane);
     const histOn = historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane);
     if (!v2On && !chOn && !histOn) return;
+    if (histOn) scheduleHistoricalLmv2ViewportLoad(pane);
+    if (!v2On && !chOn) return;
     if (!SC_HELPERS.liveMicroLldV2NeedsViewportChartSync(pane.pendingOverlays || [])) return;
     if (pane.liveMicroLldV2ViewportTimer) clearTimeout(pane.liveMicroLldV2ViewportTimer);
     pane.liveMicroLldV2ViewportTimer = setTimeout(function () {
       pane.liveMicroLldV2ViewportTimer = null;
       syncOverlays(pane, pane.pendingOverlays || []);
     }, 200);
+  }
+
+  function scheduleHistoricalLmv2ViewportLoad(pane) {
+    if (historicalLmv2PreloadedStaticEnabled()) {
+      if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
+      const pl = state.historicalLmv2Preload || {};
+      if (pl.status === "LOADING") return;
+      if (pl.status === "READY") {
+        if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
+        pane.historicalLmv2ViewportTimer = setTimeout(function () {
+          pane.historicalLmv2ViewportTimer = null;
+          renderHistoricalLmv2Preloaded(pane, { viewport: true }).catch(function (err) {
+            if (!(err && err.name === "AbortError")) {
+              try { console.warn("[research] historical-lmv2 preload viewport", err); } catch (e) { /* ignore */ }
+            }
+          });
+        }, VP_DEBOUNCE_MS);
+      }
+      return;
+    }
+    if (historicalLmv2StaticTimelineEnabled()) {
+      if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
+      if (state.historicalLmv2StaticInflight) return;
+      if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
+      pane.historicalLmv2ViewportTimer = setTimeout(function () {
+        pane.historicalLmv2ViewportTimer = null;
+        if (state.historicalLmv2StaticInflight) return;
+        refreshHistoricalLmv2StaticTimeline(pane, { viewport: true, gen: state.loadGen }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] historical-lmv2 static viewport", err); } catch (e) { /* ignore */ }
+          }
+        });
+      }, VP_DEBOUNCE_MS);
+      return;
+    }
+    if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
+    if (pane.historicalLmv2ViewportTimer) clearTimeout(pane.historicalLmv2ViewportTimer);
+    pane.historicalLmv2ViewportTimer = setTimeout(function () {
+      pane.historicalLmv2ViewportTimer = null;
+      refreshHistoricalLmv2(pane, { viewport: true, gen: state.loadGen }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] historical-lmv2 viewport", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, VP_DEBOUNCE_MS);
   }
 
   function scannerPoolsCommonEnabled() {
@@ -1277,6 +1350,334 @@
     return !!(cb && cb.checked);
   }
 
+  function historicalLmv2StaticTimelineEnabled() {
+    const cb = $("researchIndHistoricalLmv2StaticTimeline");
+    return !!(cb && cb.checked && historicalLmv2PoolsEnabled());
+  }
+
+  function historicalLmv2PreloadedStaticEnabled() {
+    const cb = $("researchIndHistoricalLmv2PreloadedStatic");
+    return !!(cb && cb.checked && historicalLmv2StaticTimelineEnabled());
+  }
+
+  function staticTimelineCacheEvictHook(dropKey) {
+    const pl = state.historicalLmv2Preload;
+    if (!pl || pl.status !== "READY" || !pl.pinKeys || !pl.pinKeys[dropKey]) return;
+    pl.status = "INCOMPLETE";
+    pl.mergedZones = null;
+    pl.invalidateReason = "cache_evict";
+    updateHistoricalLmv2PreloadHint();
+  }
+
+  function touchStaticTimelineCacheEntry(cache, cacheKey, entry, pinKeys) {
+    const opts = { onEvict: staticTimelineCacheEvictHook };
+    if (pinKeys) opts.pinKeys = pinKeys;
+    SC_HELPERS.touchStaticTimelineCache(cache, cacheKey, entry, opts);
+  }
+
+  function resetHistoricalLmv2Preload(hard) {
+    const prev = state.historicalLmv2Preload || {};
+    state.historicalLmv2Preload = {
+      status: hard ? "idle" : prev.status === "LOADING" ? "CANCELLED" : "idle",
+      bundleKey: null,
+      range: null,
+      windows: [],
+      pinKeys: {},
+      mergedZones: null,
+      loadSerial: (prev.loadSerial || 0) + 1,
+      cancelRequested: false,
+      windowsLoaded: 0,
+      windowsTotal: 0,
+      apiMsTotal: 0,
+      verifiedCloseCount: 0,
+      segmentCount: 0,
+      poolCount: 0,
+      invalidateReason: null,
+    };
+    if (hard) state.historicalLmv2Preload.status = "idle";
+    updateHistoricalLmv2PreloadHint();
+  }
+
+  function updateHistoricalLmv2PreloadHint() {
+    const el = $("researchHistoricalLmv2PreloadHint");
+    if (!el) return;
+    const pl = state.historicalLmv2Preload || {};
+    if (!historicalLmv2PreloadedStaticEnabled()) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    const rng = pl.range;
+    const pct = pl.windowsTotal > 0
+      ? Math.round((100 * (pl.windowsLoaded || 0)) / pl.windowsTotal)
+      : 0;
+    const rangeTxt = rng
+      ? unixToIsoZExact(rng.from_close_unix) + "…" + unixToIsoZExact(rng.to_close_unix)
+      : "(no range)";
+    el.textContent =
+      "Preload 5P · " + rangeTxt +
+      " · WIN " + (pl.windowsLoaded != null ? pl.windowsLoaded : 0) + "/" + (pl.windowsTotal || "?") +
+      " · " + pct + "%" +
+      " · closes=" + (pl.verifiedCloseCount || 0) +
+      " · seg=" + (pl.segmentCount || 0) +
+      " · api_ms=" + Math.round(pl.apiMsTotal || 0) +
+      " · " + (pl.status || "idle") +
+      (pl.invalidateReason ? " · " + pl.invalidateReason : "");
+  }
+
+  function buildHistoricalLmv2PreloadHintBody(pl, visibleFrom, visibleTo) {
+    const rng = pl.range || {};
+    return {
+      historical_lmv2_mode: "preloaded_static",
+      selected_from_close: unixToIsoZExact(rng.from_close_unix),
+      selected_to_close: unixToIsoZExact(rng.to_close_unix),
+      visible_from_close: unixToIsoZExact(visibleFrom),
+      visible_to_close: unixToIsoZExact(visibleTo),
+      static_windows_planned: pl.windowsTotal,
+      static_windows_loaded: pl.windowsLoaded,
+      static_windows_missing: Math.max(0, (pl.windowsTotal || 0) - (pl.windowsLoaded || 0)),
+      loaded_close_count: pl.verifiedCloseCount,
+      required_close_count: pl.range
+        ? SC_HELPERS.staticTimelineCloseCount(rng.from_close_unix, rng.to_close_unix)
+        : 0,
+      missing_close_count: pl.status === "READY" ? 0 : null,
+      pool_count: pl.poolCount,
+      segment_count: pl.segmentCount,
+      static_display_status: pl.status,
+      historical_lmv2_coverage_complete: pl.status === "READY",
+      preload_api_ms_total: pl.apiMsTotal,
+    };
+  }
+
+  async function renderHistoricalLmv2Preloaded(pane, opts) {
+    updateHistoricalLmv2UiChrome();
+    const pl = state.historicalLmv2Preload || {};
+    if (!historicalLmv2PoolsEnabled() || !historicalLmv2PreloadedStaticEnabled()) return;
+    if (pl.status !== "READY" || !pl.mergedZones || !pl.range) {
+      updateHistoricalLmv2PreloadHint();
+      return;
+    }
+    const targets = [];
+    if (pane && paneSupportsHistoricalLmv2(pane)) targets.push(pane);
+    else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsHistoricalLmv2(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !SC_HELPERS) return;
+    const chart = api(targets[0]);
+    const tfSec = TF_SEC[targets[0].tf] || 900;
+    const desired = SC_HELPERS.resolveStaticTimelineDesiredWindow(
+      targets[0],
+      tfSec,
+      chart,
+      { selected_range: pl.range }
+    );
+    const visFrom = desired.visible_from_close_unix;
+    const visTo = desired.visible_to_close_unix;
+    const clipFrom = Math.max(visFrom, pl.range.from_close_unix);
+    const clipTo = Math.min(visTo, pl.range.to_close_unix);
+    const hintBody = buildHistoricalLmv2PreloadHintBody(pl, clipFrom, clipTo);
+    state.historicalLmv2StaticBody = hintBody;
+    targets.forEach(function (target) {
+      syncOverlays(
+        target,
+        SC_HELPERS.applyHistoricalLmv2ToOverlays(
+          target.pendingOverlays || [],
+          pl.mergedZones,
+          clipFrom,
+          clipTo
+        )
+      );
+    });
+    updateHistoricalLmv2Hint(hintBody);
+    updateHistoricalLmv2PreloadHint();
+    return hintBody;
+  }
+
+  async function runHistoricalLmv2Preload() {
+    if (!historicalLmv2PoolsEnabled() || !historicalLmv2PreloadedStaticEnabled()) return;
+    const parsed = SC_HELPERS.parseStaticTimelineSelectedRangeFromInputs();
+    if (!parsed) {
+      setStatus("Preload: invalid From/To UTC", "error");
+      return;
+    }
+    const valid = SC_HELPERS.validateStaticTimelinePreloadRange(
+      parsed.from_close_unix,
+      parsed.to_close_unix
+    );
+    if (!valid.ok) {
+      setStatus("Preload: " + (valid.reason || "invalid range"), "error");
+      return;
+    }
+    state.historicalLmv2SelectedRange = {
+      from_close_unix: valid.from_close_unix,
+      to_close_unix: valid.to_close_unix,
+    };
+    const symAtStart = state.symbol;
+    const targets = [];
+    visibleIds().forEach(function (pid) {
+      const p = state.panes[pid];
+      if (p && paneSupportsHistoricalLmv2(p)) targets.push(p);
+    });
+    if (!targets.length) {
+      setStatus("Preload: DOGEUSDT 15m PD10 pane required", "error");
+      return;
+    }
+    const tf = targets[0].tf;
+    const windows = SC_HELPERS.planStaticTimelinePreloadWindows(
+      valid.from_close_unix,
+      valid.to_close_unix
+    );
+    const pinKeys = SC_HELPERS.staticTimelinePinKeysFromWindows(symAtStart, tf, windows);
+    const bundleKey = SC_HELPERS.staticTimelinePreloadBundleKey(
+      symAtStart,
+      tf,
+      valid.from_close_unix,
+      valid.to_close_unix
+    );
+    const loadSerial = (state.historicalLmv2Preload.loadSerial || 0) + 1;
+    state.historicalLmv2Preload = {
+      status: "LOADING",
+      bundleKey: bundleKey,
+      range: {
+        from_close_unix: valid.from_close_unix,
+        to_close_unix: valid.to_close_unix,
+      },
+      windows: windows,
+      pinKeys: pinKeys,
+      mergedZones: null,
+      loadSerial: loadSerial,
+      cancelRequested: false,
+      windowsLoaded: 0,
+      windowsTotal: windows.length,
+      apiMsTotal: 0,
+      verifiedCloseCount: 0,
+      segmentCount: 0,
+      poolCount: 0,
+      invalidateReason: null,
+    };
+    updateHistoricalLmv2PreloadHint();
+    const cache = state.historicalLmv2StaticCache || { windows: {}, order: [] };
+    state.historicalLmv2StaticCache = cache;
+    state.historicalLmv2StaticInflight = true;
+    let windowsLoaded = 0;
+    const maxRetries = 3;
+    for (let wi = 0; wi < windows.length; wi += 1) {
+      const pl = state.historicalLmv2Preload;
+      if (pl.cancelRequested || pl.loadSerial !== loadSerial) {
+        pl.status = "CANCELLED";
+        state.historicalLmv2StaticInflight = false;
+        updateHistoricalLmv2PreloadHint();
+        return;
+      }
+      if (state.symbol !== symAtStart) {
+        pl.status = "CANCELLED";
+        state.historicalLmv2StaticInflight = false;
+        updateHistoricalLmv2PreloadHint();
+        return;
+      }
+      const w = windows[wi];
+      const fromIso = unixToIsoZExact(w.from_close_unix);
+      const toIso = unixToIsoZExact(w.to_close_unix);
+      const cacheKey = SC_HELPERS.staticTimelineCacheKey(symAtStart, tf, fromIso, toIso);
+      const existing = cache.windows[cacheKey];
+      if (existing && existing.status === "ok" && existing.body) {
+        windowsLoaded += 1;
+        pl.windowsLoaded = windowsLoaded;
+        updateHistoricalLmv2PreloadHint();
+        continue;
+      }
+      let body = null;
+      let attempt = 0;
+      while (attempt < maxRetries) {
+        if (pl.cancelRequested) break;
+        const tApi = performance.now();
+        try {
+          body = await sendJson("/api/research/historical-lld-v2-static-timeline", "POST", {
+            symbol: symAtStart,
+            timeframe: "15m",
+            pool_detail: 10,
+            from_close: fromIso,
+            to_close: toIso,
+            include_active: true,
+          }, { sourceAction: "historical-lmv2-static-preload" });
+          pl.apiMsTotal += performance.now() - tApi;
+          if (body && body.success !== false) break;
+        } catch (err) {
+          pl.apiMsTotal += performance.now() - tApi;
+          if (err && err.name === "AbortError") {
+            pl.status = "CANCELLED";
+            state.historicalLmv2StaticInflight = false;
+            updateHistoricalLmv2PreloadHint();
+            return;
+          }
+        }
+        attempt += 1;
+        if (attempt < maxRetries) {
+          await new Promise(function (r) { setTimeout(r, 400 * attempt); });
+        }
+      }
+      if (!body || body.success === false) {
+        pl.status = "ERROR";
+        touchStaticTimelineCacheEntry(cache, cacheKey, {
+          status: "error",
+          at: Date.now(),
+          message: (body && body.message) || "request failed",
+        }, pinKeys);
+        state.historicalLmv2StaticInflight = false;
+        updateHistoricalLmv2PreloadHint();
+        setStatus("Preload failed window " + (wi + 1) + "/" + windows.length, "error");
+        return;
+      }
+      touchStaticTimelineCacheEntry(cache, cacheKey, { status: "ok", body: body, at: Date.now() }, pinKeys);
+      windowsLoaded += 1;
+      pl.windowsLoaded = windowsLoaded;
+      updateHistoricalLmv2PreloadHint();
+    }
+    state.historicalLmv2StaticInflight = false;
+    const assess = SC_HELPERS.assessStaticTimelinePreloadBundle(
+      cache,
+      symAtStart,
+      tf,
+      valid.from_close_unix,
+      valid.to_close_unix,
+      windows
+    );
+    const plFinal = state.historicalLmv2Preload;
+    if (plFinal.cancelRequested || plFinal.loadSerial !== loadSerial) {
+      plFinal.status = "CANCELLED";
+      updateHistoricalLmv2PreloadHint();
+      return;
+    }
+    plFinal.verifiedCloseCount = assess.coverage.closes.covered_count;
+    plFinal.segmentCount = assess.segment_count;
+    plFinal.poolCount = Object.keys(assess.pool_count || {}).length;
+    if (!assess.ready) {
+      plFinal.status = "INCOMPLETE";
+      plFinal.mergedZones = null;
+      updateHistoricalLmv2PreloadHint();
+      setStatus("Preload incomplete — missing windows or closes", "error");
+      return;
+    }
+    plFinal.mergedZones = assess.merged_zones;
+    plFinal.status = "READY";
+    plFinal.pinKeys = pinKeys;
+    updateHistoricalLmv2PreloadHint();
+    await renderHistoricalLmv2Preloaded(null, { force: true });
+    setStatus("Preload READY — " + plFinal.windowsTotal + " windows, " + plFinal.segmentCount + " segments", "ok");
+  }
+
+  function cancelHistoricalLmv2Preload() {
+    const pl = state.historicalLmv2Preload;
+    if (!pl || pl.status !== "LOADING") return;
+    pl.cancelRequested = true;
+    state.historicalLmv2StaticLoadSerial = (state.historicalLmv2StaticLoadSerial || 0) + 1;
+    updateHistoricalLmv2PreloadHint();
+  }
+
   function paneSupportsHistoricalLmv2(pane) {
     if (!pane || !state.symbol) return false;
     if (String(state.symbol).toUpperCase() !== "DOGEUSDT") return false;
@@ -1289,9 +1690,15 @@
     const on = historicalLmv2PoolsEnabled();
     const aw = $("researchHistoricalLmv2ActiveWrap");
     const rw = $("researchHistoricalLmv2RemainingWrap");
+    const sw = $("researchHistoricalLmv2StaticWrap");
+    const srw = $("researchHistoricalLmv2StaticRangeWrap");
+    const prw = $("researchHistoricalLmv2PreloadWrap");
     const banner = $("researchHistoricalLmv2Banner");
     if (aw) aw.hidden = !on;
     if (rw) rw.hidden = !on;
+    if (sw) sw.hidden = !on;
+    if (srw) srw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
+    if (prw) prw.hidden = !on || !historicalLmv2StaticTimelineEnabled();
     if (banner) banner.hidden = !on;
     if (on && $("researchLiveMicroV2PoolDetail")) {
       $("researchLiveMicroV2PoolDetail").value = "10";
@@ -2241,6 +2648,24 @@
     return false;
   }
 
+  function historicalLmv2DebugEnabled() {
+    try {
+      if (typeof window !== "undefined") {
+        if (window.__RESEARCH_HISTORICAL_LMV2_DEBUG__) return true;
+        const q = window.location && window.location.search ? window.location.search : "";
+        if (/[?&]historical_lmv2_debug=1(?:&|$)/.test(q)) return true;
+      }
+    } catch (e) { /* ignore */ }
+    return false;
+  }
+
+  function recordHistoricalLmv2DebugSnapshot(target, snap) {
+    if (!historicalLmv2DebugEnabled()) return;
+    const payload = snap || {};
+    if (target) target.historicalLmv2Debug = payload;
+    state.historicalLmv2Debug = payload;
+  }
+
   function updateHistoricalLmv2Hint(payload, extra) {
     const el = $("researchHistoricalLmv2Hint");
     if (!el) return;
@@ -2255,26 +2680,99 @@
       return;
     }
     el.hidden = false;
-    el.textContent =
-      "Historical LLD V2 · PD10 · closes=" + (payload.pilot_close_count != null ? payload.pilot_close_count : "?") +
+    let line =
+      (payload.historical_lmv2_mode === "preloaded_static"
+        ? "Historical LLD V2 · PRELOADED · SEL " +
+          (payload.selected_from_close || "?") + "…" + (payload.selected_to_close || "?") +
+          " · VIS " + (payload.visible_from_close || "?") + "…" + (payload.visible_to_close || "?") +
+          " · WIN " + (payload.static_windows_loaded != null ? payload.static_windows_loaded : "?") +
+          "/" + (payload.static_windows_planned != null ? payload.static_windows_planned : "?") +
+          " · closes " + (payload.loaded_close_count != null ? payload.loaded_close_count : "?") +
+          "/" + (payload.required_close_count != null ? payload.required_close_count : "?") +
+          " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+          " · " + (payload.static_display_status || "?") +
+          (payload.preload_api_ms_total != null
+            ? " · api_ms=" + Math.round(payload.preload_api_ms_total)
+            : "") +
+          " · "
+        : payload.historical_lmv2_mode === "static_timeline"
+        ? "Historical LLD V2 · STATIC · SEL " +
+          (payload.selected_from_close || "?") + "…" + (payload.selected_to_close || "?") +
+          " · VIS " + (payload.visible_from_close || "?") + "…" + (payload.visible_to_close || "?") +
+          " · WIN " + (payload.static_windows_loaded != null ? payload.static_windows_loaded : "?") +
+          "/" + (payload.static_windows_planned != null ? payload.static_windows_planned : "?") +
+          " · closes " + (payload.loaded_close_count != null ? payload.loaded_close_count : "?") +
+          (payload.missing_close_count != null ? "/" + payload.required_close_count : "") +
+          " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
+          " · " + (payload.static_display_status || "?") + " · "
+        : "Historical LLD V2 · PD10 · ") +
+      "closes=" + (payload.pilot_close_count != null ? payload.pilot_close_count : "?") +
+      (payload.historical_lmv2_chunks_planned != null
+        ? " · chunks=" + payload.historical_lmv2_chunks_loaded + "/" + payload.historical_lmv2_chunks_planned
+        : "") +
       " · pools=" + (payload.pool_count != null ? payload.pool_count : "?") +
       " · seg=" + (payload.segment_count != null ? payload.segment_count : "?") +
       (payload.remaining_segment_count_full != null
         ? " · rem_full=" + payload.remaining_segment_count_full
         : "") +
-      (payload.remaining_truncated ? " · DISPLAY remaining capped" : "");
+      (payload.remaining_truncated ? " · DISPLAY remaining capped" : "") +
+      (payload.historical_lmv2_coverage_complete === false
+        ? " · display=INCOMPLETE missing_win=" + (payload.static_windows_missing != null
+          ? payload.static_windows_missing
+          : "?")
+        : payload.historical_lmv2_coverage_complete === true
+          ? " · display=complete"
+          : "");
+    if (historicalLmv2DebugEnabled() && payload.historical_lmv2_debug) {
+      const d = payload.historical_lmv2_debug;
+      line +=
+        " · dbg replay=" + (d.replay_as_of_iso || "?") +
+        " · vp=" + (d.viewport_from_iso || "?") + "…" + (d.viewport_to_iso || "?") +
+        " · raw=" + (d.raw_zone_count != null ? d.raw_zone_count : "?") +
+        " · merged=" + (d.merged_zone_count != null ? d.merged_zone_count : "?") +
+        " · drawn=" + (d.drawn_zone_count != null ? d.drawn_zone_count : "?") +
+        (d.overlay_clear_reason ? " · clear=" + d.overlay_clear_reason : "");
+    }
+    el.textContent = line;
   }
 
   async function refreshHistoricalLmv2OnePane(target, opts, ctx) {
     const symAtStart = ctx.symAtStart;
     const refreshToken = ctx.refreshToken;
+    const loadSerial = (target.historicalLmv2LoadSerial || 0) + 1;
+    target.historicalLmv2LoadSerial = loadSerial;
     const tfSec = TF_SEC[target.tf] || 900;
     const microCtx = liveMicroLldV2DecisionContext(target);
-    const win = SC_HELPERS
-      ? SC_HELPERS.resolveHistoricalLmv2RequestWindow(target, tfSec, microCtx)
+    const chart = api(target);
+    const viewport = SC_HELPERS
+      ? SC_HELPERS.resolveHistoricalLmv2ViewportCloseWindow(target, tfSec, microCtx, chart)
       : null;
-    if (!win) {
-      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "outside pilot window or no closed bar" });
+    const debugSnap = {
+      load_serial: loadSerial,
+      refresh_token: refreshToken,
+      viewport: viewport,
+      overlay_clear_reason: null,
+    };
+    if (!viewport) {
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message: "viewport not ready (overlays retained)",
+      });
+      debugSnap.overlay_clear_reason = "none_viewport_null";
+      recordHistoricalLmv2DebugSnapshot(target, debugSnap);
+      return null;
+    }
+    if (viewport.viewport_after_replay_cutoff) {
+      const asOfIsoHint = unixToIsoZExact(viewport.as_of_close_unix);
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message:
+          "Replay as-of " + asOfIsoHint +
+          " — sichtbarer Bereich liegt danach (keine Zukunfts-Pools; GO TO anpassen oder Zurück zu Live)",
+      });
+      debugSnap.replay_as_of_iso = asOfIsoHint;
+      debugSnap.overlay_clear_reason = "replay_cutoff";
+      recordHistoricalLmv2DebugSnapshot(target, debugSnap);
       syncOverlays(
         target,
         SC_HELPERS
@@ -2283,73 +2781,432 @@
       );
       return null;
     }
-    const fromIso = unixToIsoZExact(win.from_close_unix);
-    const toIso = unixToIsoZExact(win.to_close_unix);
-    const asOfUnix = SC_HELPERS
-      ? SC_HELPERS.resolveHistoricalLmv2AsOfCloseUnix(microCtx)
-      : win.to_close_unix;
+    const asOfUnix = viewport.as_of_close_unix;
     const asOfIso = unixToIsoZExact(asOfUnix);
-    const layersKey = (historicalLmv2ActiveEnabled() ? "A" : "") + (historicalLmv2RemainingEnabled() ? "R" : "");
-    let body = null;
-    let cacheKey = null;
-    if (SC_HELPERS && !(opts && opts.force)) {
-      cacheKey = SC_HELPERS.historicalLmv2CacheKey(symAtStart, target.tf, fromIso, toIso, asOfIso, layersKey);
-      if (state.historicalLmv2Cache && state.historicalLmv2Cache[cacheKey]) {
-        body = state.historicalLmv2Cache[cacheKey];
-      }
+    const chunks = SC_HELPERS
+      ? SC_HELPERS.planHistoricalLmv2Chunks(
+        viewport.view_from_close_unix,
+        viewport.view_to_close_unix,
+        asOfUnix,
+        tfSec,
+        SC_HELPERS.HISTORICAL_LMV2_CHUNK_PREFETCH
+      )
+      : [];
+    if (!chunks.length) {
+      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "no historical chunks in view" });
+      return null;
     }
-    if (!body) {
-      body = await sendJson("/api/research/historical-lld-v2-pools", "POST", {
-        symbol: symAtStart,
-        timeframe: target.tf,
-        pool_detail: 10,
-        from_close: fromIso,
-        to_close: toIso,
-        as_of_close: asOfIso,
-        include_active: historicalLmv2ActiveEnabled(),
-        include_remaining: historicalLmv2RemainingEnabled(),
-        remaining_limit: 6500,
-      }, {
-        sourceAction: "historical-lld-v2-pools",
-        pane: target.paneId || target.id,
-        timeframe: target.tf,
-        signal: (opts && opts.signal) || undefined,
-      });
-      if (!body || body.success === false) {
-        updateHistoricalLmv2Hint(null, {
-          _outOfCoverage: true,
-          message: (body && body.message) || "request failed",
+    const displayFromForCov = viewport.display_from_close_unix != null
+      ? viewport.display_from_close_unix
+      : viewport.view_from_close_unix;
+    const displayToForCov = Math.min(
+      viewport.display_to_close_unix != null ? viewport.display_to_close_unix : viewport.view_to_close_unix,
+      asOfUnix
+    );
+    const closeCoverage = SC_HELPERS && SC_HELPERS.historicalLmv2CloseCoverage
+      ? SC_HELPERS.historicalLmv2CloseCoverage(chunks, displayFromForCov, displayToForCov, tfSec)
+      : null;
+    debugSnap.coverage = closeCoverage;
+    const layersKey = (historicalLmv2ActiveEnabled() ? "A" : "") + (historicalLmv2RemainingEnabled() ? "R" : "");
+    const allowRemaining = historicalLmv2RemainingEnabled() && chunks.length === 1;
+    const chunkStore = state.historicalLmv2ChunkStore || { chunks: {}, order: [] };
+    state.historicalLmv2ChunkStore = chunkStore;
+    const retryErrorChunks = !!(opts && (opts.viewport || opts.force));
+    const zoneParts = [];
+    let lastBody = null;
+    let loadedChunks = 0;
+    let failedChunks = 0;
+    let totalCloseCount = 0;
+    let cacheHits = 0;
+    let cacheMisses = 0;
+    for (let ci = 0; ci < chunks.length; ci += 1) {
+      if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return null;
+      if (loadSerial !== target.historicalLmv2LoadSerial) return null;
+      const ch = chunks[ci];
+      const fromIso = unixToIsoZExact(ch.from_close_unix);
+      const toIso = unixToIsoZExact(ch.to_close_unix);
+      const cacheKey = SC_HELPERS
+        ? SC_HELPERS.historicalLmv2ChunkCacheKey(symAtStart, target.tf, fromIso, toIso, asOfIso, layersKey)
+        : null;
+      let entry = cacheKey ? chunkStore.chunks[cacheKey] : null;
+      if (entry && entry.status === "ok" && entry.body && !(opts && opts.force)) {
+        zoneParts.push(entry.body.zones || []);
+        lastBody = entry.body;
+        loadedChunks += 1;
+        cacheHits += 1;
+        totalCloseCount += Number(entry.body.pilot_close_count) || 0;
+        continue;
+      }
+      if (entry && entry.status === "error" && !retryErrorChunks) {
+        failedChunks += 1;
+        continue;
+      }
+      cacheMisses += 1;
+      let body = null;
+      try {
+        body = await sendJson("/api/research/historical-lld-v2-pools", "POST", {
+          symbol: symAtStart,
+          timeframe: target.tf,
+          pool_detail: 10,
+          from_close: fromIso,
+          to_close: toIso,
+          as_of_close: asOfIso,
+          include_active: historicalLmv2ActiveEnabled(),
+          include_remaining: allowRemaining,
+          remaining_limit: 6500,
+        }, {
+          sourceAction: "historical-lld-v2-pools",
+          pane: target.paneId || target.id,
+          timeframe: target.tf,
+          signal: (opts && opts.signal) || undefined,
         });
-        syncOverlays(
-          target,
-          SC_HELPERS
-            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
-            : (target.pendingOverlays || [])
-        );
-        return null;
+      } catch (err) {
+        if (err && err.name === "AbortError") throw err;
+        if (SC_HELPERS && cacheKey) {
+          SC_HELPERS.touchHistoricalLmv2ChunkCache(chunkStore, cacheKey, {
+            status: "error",
+            error: String(err && err.message ? err.message : err),
+            at: Date.now(),
+          });
+        }
+        failedChunks += 1;
+        continue;
       }
-      if (SC_HELPERS && cacheKey && body) {
-        state.historicalLmv2Cache[cacheKey] = body;
+      if (!body || body.success === false) {
+        if (SC_HELPERS && cacheKey) {
+          SC_HELPERS.touchHistoricalLmv2ChunkCache(chunkStore, cacheKey, {
+            status: "error",
+            error: (body && body.message) || "request failed",
+            at: Date.now(),
+          });
+        }
+        failedChunks += 1;
+        continue;
       }
+      if (SC_HELPERS && cacheKey) {
+        SC_HELPERS.touchHistoricalLmv2ChunkCache(chunkStore, cacheKey, {
+          status: "ok",
+          body: body,
+          at: Date.now(),
+        });
+      }
+      zoneParts.push(body.zones || []);
+      lastBody = body;
+      loadedChunks += 1;
+      totalCloseCount += Number(body.pilot_close_count) || 0;
     }
     if (historicalLmv2ShouldAbort(opts, symAtStart, refreshToken)) return null;
+    if (loadSerial !== target.historicalLmv2LoadSerial) return null;
     if (!historicalLmv2PoolsEnabled()) return null;
+    const rawZoneCount = zoneParts.reduce(function (acc, part) {
+      return acc + ((part && part.length) || 0);
+    }, 0);
+    if (!zoneParts.length) {
+      const hasPrior =
+        SC_HELPERS && SC_HELPERS.countHistoricalLmv2Overlays
+          ? SC_HELPERS.countHistoricalLmv2Overlays(target.pendingOverlays || []) > 0
+          : false;
+      const retain = failedChunks > 0 && hasPrior;
+      updateHistoricalLmv2Hint(null, {
+        _outOfCoverage: true,
+        message: retain
+          ? "chunk load failed (keeping prior overlay)"
+          : failedChunks
+            ? "chunk load failed"
+            : "no zones loaded",
+      });
+      debugSnap.overlay_clear_reason = retain ? "none_all_chunks_failed" : "none_empty_zone_parts";
+      debugSnap.chunks_planned = chunks.length;
+      debugSnap.chunks_loaded = loadedChunks;
+      debugSnap.chunks_failed = failedChunks;
+      debugSnap.raw_zone_count = rawZoneCount;
+      recordHistoricalLmv2DebugSnapshot(target, debugSnap);
+      return null;
+    }
+    const mergedZones = SC_HELPERS ? SC_HELPERS.mergeHistoricalLmv2Zones(zoneParts) : zoneParts[0];
+    const clipFrom = Math.min(
+      viewport.view_from_close_unix,
+      viewport.display_from_close_unix != null
+        ? viewport.display_from_close_unix
+        : viewport.view_from_close_unix
+    );
+    const clipTo = Math.max(
+      viewport.view_to_close_unix,
+      viewport.display_to_close_unix != null
+        ? Math.min(viewport.display_to_close_unix, asOfUnix)
+        : viewport.view_to_close_unix
+    );
+    const clipToBounded = Math.min(clipTo, asOfUnix);
+    let drawnCount = 0;
     if (SC_HELPERS) {
+      const clipped = SC_HELPERS.clipZonesForWindow(mergedZones, clipFrom, clipToBounded);
+      drawnCount = (clipped || []).length;
+      if (mergedZones.length === 0) {
+        debugSnap.overlay_clear_reason = "empty_membership";
+        syncOverlays(
+          target,
+          SC_HELPERS.applyHistoricalLmv2ToOverlays(
+            target.pendingOverlays || [],
+            mergedZones,
+            clipFrom,
+            clipToBounded
+          )
+        );
+      } else {
+        debugSnap.overlay_clear_reason = "replace_success";
+        syncOverlays(
+          target,
+          SC_HELPERS.applyHistoricalLmv2ToOverlays(
+            target.pendingOverlays || [],
+            mergedZones,
+            clipFrom,
+            clipToBounded
+          )
+        );
+        target.historicalLmv2LastGood = {
+          mergedZones: mergedZones,
+          clipFrom: clipFrom,
+          clipTo: clipToBounded,
+          asOfUnix: asOfUnix,
+          at: Date.now(),
+        };
+      }
+    }
+    debugSnap.replay_as_of_iso = asOfIso;
+    debugSnap.viewport_from_iso = unixToIsoZExact(clipFrom);
+    debugSnap.viewport_to_iso = unixToIsoZExact(clipToBounded);
+    debugSnap.chunks_planned = chunks.length;
+    debugSnap.chunks_loaded = loadedChunks;
+    debugSnap.chunks_failed = failedChunks;
+    debugSnap.cache_hits = cacheHits;
+    debugSnap.cache_misses = cacheMisses;
+    debugSnap.raw_zone_count = rawZoneCount;
+    debugSnap.merged_zone_count = (mergedZones || []).length;
+    debugSnap.drawn_zone_count = drawnCount;
+    recordHistoricalLmv2DebugSnapshot(target, debugSnap);
+    if (lastBody) {
+      const activeIds = {};
+      (mergedZones || []).forEach(function (z) {
+        if (z && z.pool_id) activeIds[z.pool_id] = true;
+      });
+      lastBody = Object.assign({}, lastBody, {
+        pilot_close_count: totalCloseCount,
+        pool_count: Object.keys(activeIds).length,
+        segment_count: (mergedZones || []).length,
+        historical_lmv2_chunks_loaded: loadedChunks,
+        historical_lmv2_chunks_planned: chunks.length,
+        historical_lmv2_chunks_failed: failedChunks,
+        historical_lmv2_coverage_complete: closeCoverage ? closeCoverage.complete : undefined,
+        historical_lmv2_coverage_missing: closeCoverage ? closeCoverage.missing_count : undefined,
+        historical_lmv2_debug: historicalLmv2DebugEnabled() ? debugSnap : undefined,
+      });
+    }
+    return lastBody;
+  }
+
+  function applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, opts) {
+    if (!SC_HELPERS || !targets.length) return null;
+    const tf = targets[0].tf;
+    const windows = plan.windows || [];
+    const zoneParts = SC_HELPERS.gatherStaticTimelineZoneParts(cache, symAtStart, tf, windows);
+    const mergedZones = SC_HELPERS.mergeHistoricalLmv2Zones(zoneParts);
+    const cov = SC_HELPERS.staticTimelineWindowCoverage(
+      windows,
+      cache,
+      symAtStart,
+      tf,
+      plan.visible_from_close_unix,
+      plan.visible_to_close_unix
+    );
+    const clipFrom = plan.visible_from_close_unix;
+    const clipTo = plan.visible_to_close_unix;
+    const activeIds = {};
+    (mergedZones || []).forEach(function (z) {
+      if (z && z.pool_id) activeIds[z.pool_id] = true;
+    });
+    const selected = state.historicalLmv2SelectedRange;
+    let displayStatus = "LOADING";
+    if (cov.complete) displayStatus = "COMPLETE";
+    else if (cov.windows.windows_missing > 0 && cov.windows.windows_loaded > 0) displayStatus = "INCOMPLETE";
+    else if (cov.windows.windows_loaded === 0) displayStatus = opts && opts.loading ? "LOADING" : "INCOMPLETE";
+    const hintBody = {
+      historical_lmv2_mode: "static_timeline",
+      selected_from_close: selected ? unixToIsoZExact(selected.from_close_unix) : null,
+      selected_to_close: selected ? unixToIsoZExact(selected.to_close_unix) : null,
+      visible_from_close: unixToIsoZExact(clipFrom),
+      visible_to_close: unixToIsoZExact(clipTo),
+      static_windows_planned: cov.windows.windows_planned,
+      static_windows_loaded: cov.windows.windows_loaded,
+      static_windows_missing: cov.windows.windows_missing,
+      loaded_close_count: cov.closes.covered_count,
+      required_close_count: cov.closes.required_count,
+      missing_close_count: cov.closes.missing_count,
+      pool_count: Object.keys(activeIds).length,
+      segment_count: (mergedZones || []).length,
+      static_display_status: displayStatus,
+      historical_lmv2_coverage_complete: cov.complete,
+    };
+    state.historicalLmv2StaticBody = hintBody;
+    targets.forEach(function (target) {
+      if (!target) return;
       syncOverlays(
         target,
         SC_HELPERS.applyHistoricalLmv2ToOverlays(
           target.pendingOverlays || [],
-          body.zones || [],
-          win.from_close_unix,
-          win.to_close_unix
+          mergedZones,
+          clipFrom,
+          clipTo
         )
       );
+    });
+    updateHistoricalLmv2Hint(hintBody);
+    return hintBody;
+  }
+
+  async function refreshHistoricalLmv2StaticTimeline(pane, opts) {
+    updateHistoricalLmv2UiChrome();
+    if (!historicalLmv2PoolsEnabled() || !historicalLmv2StaticTimelineEnabled()) {
+      return refreshHistoricalLmv2Core(pane, opts);
     }
-    return body;
+    if (!historicalLmv2ActiveEnabled()) {
+      return refreshHistoricalLmv2Core(pane, opts);
+    }
+    const targets = [];
+    if (pane && paneSupportsHistoricalLmv2(pane)) {
+      targets.push(pane);
+    } else if (!pane) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p && paneSupportsHistoricalLmv2(p)) targets.push(p);
+      });
+    }
+    if (!targets.length || !state.symbol || !SC_HELPERS) {
+      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "static timeline requires DOGEUSDT 15m PD10" });
+      return;
+    }
+    if (opts && opts.commitSelectedRange) {
+      const parsed = SC_HELPERS.parseStaticTimelineSelectedRangeFromInputs();
+      if (!parsed) {
+        updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "invalid From/To UTC for selected range" });
+        return;
+      }
+      state.historicalLmv2SelectedRange = parsed;
+    }
+    const symAtStart = state.symbol;
+    const tfSec = TF_SEC[targets[0].tf] || 900;
+    const loadSerial = (state.historicalLmv2StaticLoadSerial || 0) + 1;
+    state.historicalLmv2StaticLoadSerial = loadSerial;
+    const chart = api(targets[0]);
+    const selected = state.historicalLmv2SelectedRange;
+    const desired = SC_HELPERS.resolveStaticTimelineDesiredWindow(
+      targets[0],
+      tfSec,
+      chart,
+      { selected_range: selected }
+    );
+    const plan = SC_HELPERS.planStaticTimelineLoadForVisible(
+      desired.visible_from_close_unix,
+      desired.visible_to_close_unix,
+      selected,
+      SC_HELPERS.STATIC_TIMELINE_PREFETCH_WINDOWS
+    );
+    if (!plan.windows.length) {
+      updateHistoricalLmv2Hint(null, { _outOfCoverage: true, message: "no static windows for visible range" });
+      return;
+    }
+    const cache = state.historicalLmv2StaticCache || { windows: {}, order: [] };
+    state.historicalLmv2StaticCache = cache;
+    state.historicalLmv2StaticInflight = true;
+    applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: true });
+    let hadError = false;
+    for (let wi = 0; wi < plan.windows.length; wi += 1) {
+      if (state.symbol !== symAtStart) {
+        state.historicalLmv2StaticInflight = false;
+        return;
+      }
+      if (loadSerial !== state.historicalLmv2StaticLoadSerial) {
+        state.historicalLmv2StaticInflight = false;
+        return;
+      }
+      const w = plan.windows[wi];
+      const fromIso = unixToIsoZExact(w.from_close_unix);
+      const toIso = unixToIsoZExact(w.to_close_unix);
+      const cacheKey = SC_HELPERS.staticTimelineCacheKey(symAtStart, targets[0].tf, fromIso, toIso);
+      const entry = cache.windows[cacheKey];
+      if (entry && entry.status === "ok" && entry.body && !(opts && opts.force)) {
+        applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, {
+          loading: wi < plan.windows.length - 1,
+        });
+        continue;
+      }
+      let body = null;
+      try {
+        body = await sendJson("/api/research/historical-lld-v2-static-timeline", "POST", {
+          symbol: symAtStart,
+          timeframe: "15m",
+          pool_detail: 10,
+          from_close: fromIso,
+          to_close: toIso,
+          include_active: true,
+        }, {
+          sourceAction: "historical-lmv2-static-timeline",
+          signal: (opts && opts.signal) || undefined,
+        });
+      } catch (err) {
+        state.historicalLmv2StaticInflight = false;
+        if (err && err.name === "AbortError") return;
+        hadError = true;
+        if (state.historicalLmv2StaticBody) {
+          state.historicalLmv2StaticBody.static_display_status = "ERROR";
+          updateHistoricalLmv2Hint(state.historicalLmv2StaticBody);
+        }
+        throw err;
+      }
+      if (!body || body.success === false) {
+        touchStaticTimelineCacheEntry(cache, cacheKey, {
+          status: "error",
+          at: Date.now(),
+          message: (body && body.message) || "request failed",
+        });
+        hadError = true;
+        applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: false });
+        if (state.historicalLmv2StaticBody) {
+          state.historicalLmv2StaticBody.static_display_status = "ERROR";
+          updateHistoricalLmv2Hint(state.historicalLmv2StaticBody);
+        }
+        continue;
+      }
+      touchStaticTimelineCacheEntry(cache, cacheKey, { status: "ok", body: body, at: Date.now() });
+      applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, {
+        loading: wi < plan.windows.length - 1 && !hadError,
+      });
+    }
+    state.historicalLmv2StaticInflight = false;
+    if (state.symbol !== symAtStart) return;
+    if (loadSerial !== state.historicalLmv2StaticLoadSerial) return;
+    applyHistoricalLmv2StaticTimelineRender(targets, plan, cache, symAtStart, { loading: false });
+  }
+
+  async function refreshHistoricalLmv2Viewport(pane, opts) {
+    return refreshHistoricalLmv2Core(pane, opts);
   }
 
   async function refreshHistoricalLmv2(pane, opts) {
     updateHistoricalLmv2UiChrome();
+    if (historicalLmv2PreloadedStaticEnabled()) {
+      if (state.historicalLmv2Preload && state.historicalLmv2Preload.status === "READY") {
+        return renderHistoricalLmv2Preloaded(pane, opts);
+      }
+      updateHistoricalLmv2PreloadHint();
+      return;
+    }
+    if (historicalLmv2StaticTimelineEnabled()) {
+      return refreshHistoricalLmv2StaticTimeline(pane, opts);
+    }
+    return refreshHistoricalLmv2Core(pane, opts);
+  }
+
+  async function refreshHistoricalLmv2Core(pane, opts) {
     if (!historicalLmv2PoolsEnabled()) {
       const stripTargets = pane
         ? [pane]
@@ -2394,19 +3251,11 @@
       }
     } catch (err) {
       if (err && err.name === "AbortError") return;
-      targets.forEach(function (target) {
-        if (!target) return;
-        syncOverlays(
-          target,
-          SC_HELPERS
-            ? SC_HELPERS.stripHistoricalLmv2Overlays(target.pendingOverlays || [])
-            : (target.pendingOverlays || [])
-        );
-      });
       const el = $("researchHistoricalLmv2Hint");
       if (el && historicalLmv2PoolsEnabled()) {
         el.hidden = false;
-        el.textContent = "Historical LLD V2 · Fehler: " + (err.message || err);
+        el.textContent =
+          "Historical LLD V2 · Fehler: " + (err.message || err) + " (overlays retained)";
       }
       throw err;
     }
@@ -6784,6 +7633,7 @@
     if ($("researchIndHistoricalLmv2Pools")) {
       $("researchIndHistoricalLmv2Pools").addEventListener("change", async function () {
         state.historicalLmv2Cache = {};
+        state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
         updateHistoricalLmv2UiChrome();
         try {
           await refreshHistoricalLmv2(null, { force: true });
@@ -6794,6 +7644,7 @@
     }
     function onHistoricalLmv2LayerChange() {
       state.historicalLmv2Cache = {};
+      state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
       if (historicalLmv2PoolsEnabled()) {
         refreshHistoricalLmv2(null, { force: true }).catch(function (err) {
           setStatus("Historical LLD V2 Pools: " + (err && err.message ? err.message : err), "error");
@@ -6806,11 +7657,59 @@
     if ($("researchIndHistoricalLmv2Remaining")) {
       $("researchIndHistoricalLmv2Remaining").addEventListener("change", onHistoricalLmv2LayerChange);
     }
+    if ($("researchIndHistoricalLmv2StaticTimeline")) {
+      $("researchIndHistoricalLmv2StaticTimeline").addEventListener("change", async function () {
+        state.historicalLmv2Cache = {};
+        state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
+        state.historicalLmv2StaticBody = null;
+        state.historicalLmv2StaticCache = { windows: {}, order: [] };
+        resetHistoricalLmv2Preload(true);
+        updateHistoricalLmv2UiChrome();
+        try {
+          await refreshHistoricalLmv2(null, { force: true });
+        } catch (err) {
+          setStatus("Historical static timeline: " + (err && err.message ? err.message : err), "error");
+        }
+      });
+    }
+    if ($("researchStaticTimelineLoad")) {
+      $("researchStaticTimelineLoad").addEventListener("click", function () {
+        if (historicalLmv2PreloadedStaticEnabled()) {
+          setStatus("Preload mode: use “Preload historical pools” (lazy Load static disabled)", "info");
+          return;
+        }
+        refreshHistoricalLmv2(null, { force: true, commitSelectedRange: true }).catch(function (err) {
+          setStatus("Historical static timeline: " + (err && err.message ? err.message : err), "error");
+        });
+      });
+    }
+    if ($("researchIndHistoricalLmv2PreloadedStatic")) {
+      $("researchIndHistoricalLmv2PreloadedStatic").addEventListener("change", function () {
+        resetHistoricalLmv2Preload(true);
+        updateHistoricalLmv2UiChrome();
+        refreshHistoricalLmv2(null, { force: true }).catch(function (err) {
+          setStatus("Historical preload: " + (err && err.message ? err.message : err), "error");
+        });
+      });
+    }
+    if ($("researchStaticTimelinePreload")) {
+      $("researchStaticTimelinePreload").addEventListener("click", function () {
+        runHistoricalLmv2Preload().catch(function (err) {
+          setStatus("Historical preload: " + (err && err.message ? err.message : err), "error");
+        });
+      });
+    }
+    if ($("researchStaticTimelinePreloadCancel")) {
+      $("researchStaticTimelinePreloadCancel").addEventListener("click", function () {
+        cancelHistoricalLmv2Preload();
+      });
+    }
     function onLiveMicroV2FilterChange() {
       rememberLiveMicroLldV2Toggles();
       state.liveMicroLldV2Cache = {};
       state.liveMicroLldV2ChTestCache = {};
     state.historicalLmv2Cache = {};
+      state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
       if (liveMicroLldV2Enabled()) {
         refreshLiveMicroLldV2(null, { force: true }).catch(function (err) {
           setStatus("Live Micro LLD V2: " + (err && err.message ? err.message : err), "error");

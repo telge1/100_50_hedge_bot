@@ -6,6 +6,7 @@ must consume this module rather than reimplementing membership or RemainingPoolP
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import re
@@ -44,9 +45,22 @@ PILOT_SYMBOL = "DOGEUSDT"
 PILOT_TIMEFRAME = "15m"
 PILOT_POOL_DETAIL = 10
 PILOT_FROM = datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc)
-PILOT_TO = datetime(2026, 8, 1, 4, 45, tzinfo=timezone.utc)
+PILOT_TO = datetime(2026, 8, 1, 23, 45, tzinfo=timezone.utc)
 PILOT_STEP = timedelta(minutes=15)
-PILOT_MAX_REMAINING_SEGMENTS = 6500  # pilot ceiling (> 6423 @ 04:45)
+PILOT_MAX_CLOSES = 96  # one UTC day @ 15m
+# Research chart GO TO / lazy window (Aug–Sep 2026 production line; Oct fail-closed until verified).
+RESEARCH_CHART_RELEASED_FROM = datetime(2026, 8, 1, 0, 0, tzinfo=timezone.utc)
+RESEARCH_CHART_RELEASED_TO_NOMINAL = datetime(2026, 9, 30, 23, 45, tzinfo=timezone.utc)
+RESEARCH_CHART_OCTOBER_FROM = datetime(2026, 10, 1, 0, 0, tzinfo=timezone.utc)
+RESEARCH_CHART_OCTOBER_TO_NOMINAL = datetime(2026, 10, 31, 23, 45, tzinfo=timezone.utc)
+# Phase 5N — Apr–Sep imported catalog (static timeline loads; no October reconstruction).
+STATIC_TIMELINE_IMPORT_FROM = datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc)
+STATIC_TIMELINE_IMPORT_TO_NOMINAL = datetime(2026, 9, 30, 23, 45, tzinfo=timezone.utc)
+STATIC_TIMELINE_MAX_DISPLAY_CLOSES = PILOT_MAX_CLOSES * 3  # 3 UTC days @ 15m
+EPISODE_MEMBERSHIP_WARMUP_CLOSES = PILOT_MAX_CLOSES - 1
+
+_PUBLISHED_CLOSES_CACHE: dict[tuple[str, str], list[datetime]] = {}
+PILOT_MAX_REMAINING_SEGMENTS = 6500  # display ceiling; full projection unchanged
 
 IMMUTABLE_SNAPSHOT_ID = "84c22453fc6e2b5cc2791ab2301bdc600a9804632088a8e144b5007941e52c93"
 IMMUTABLE_PRICE_HASH = "d489aa686f6f648850f248d4809338abbee0d7ab6f0bda3ec5ffe3e698757f48"
@@ -104,12 +118,223 @@ class HistoricalPoolStateAtClose:
 
 
 def pilot_decision_closes() -> list[datetime]:
+    """Phase 5C/5I single UTC day (Aug 1) — audit scripts only; chart uses published closes."""
     out: list[datetime] = []
     cur = PILOT_FROM
     while cur <= PILOT_TO:
         out.append(cur)
         cur += PILOT_STEP
     return out
+
+
+def clear_published_closes_cache() -> None:
+    _PUBLISHED_CLOSES_CACHE.clear()
+
+
+def get_published_decision_closes(
+    reader: PublishedActiveReader,
+    cfg_hash: str,
+    *,
+    pipeline_line_id: str = PIPELINE_LINE_ID,
+) -> list[datetime]:
+    key = (pipeline_line_id, cfg_hash)
+    if key not in _PUBLISHED_CLOSES_CACHE:
+        _PUBLISHED_CLOSES_CACHE[key] = reader.list_published_closes(
+            pipeline_line_id, config_hash=cfg_hash
+        )
+    return _PUBLISHED_CLOSES_CACHE[key]
+
+
+def _closes_in_nominal_research_window(published: Sequence[datetime]) -> list[datetime]:
+    return [c for c in published if RESEARCH_CHART_RELEASED_FROM <= c <= RESEARCH_CHART_RELEASED_TO_NOMINAL]
+
+
+def _closes_in_october_nominal(published: Sequence[datetime]) -> list[datetime]:
+    return [
+        c
+        for c in published
+        if RESEARCH_CHART_OCTOBER_FROM <= c <= RESEARCH_CHART_OCTOBER_TO_NOMINAL
+    ]
+
+
+def _expected_15m_closes_in_range(from_dt: datetime, to_dt: datetime) -> int:
+    if from_dt > to_dt:
+        return 0
+    step_sec = int(PILOT_STEP.total_seconds())
+    return int((to_dt - from_dt).total_seconds() // step_sec) + 1
+
+
+def research_chart_data_bounds(published: Sequence[datetime]) -> dict[str, Any]:
+    """Released chart window derived from CH publications (fail-closed on gaps in Aug–Sep)."""
+    aug_sep = _closes_in_nominal_research_window(published)
+    october = _closes_in_october_nominal(published)
+    expected_aug_sep = _expected_15m_closes_in_range(
+        RESEARCH_CHART_RELEASED_FROM, RESEARCH_CHART_RELEASED_TO_NOMINAL
+    )
+    aug_sep_gapless = len(aug_sep) == expected_aug_sep and (
+        not aug_sep or aug_sep[0] == RESEARCH_CHART_RELEASED_FROM and aug_sep[-1] == RESEARCH_CHART_RELEASED_TO_NOMINAL
+    )
+    released_to = aug_sep[-1] if aug_sep_gapless else (
+        aug_sep[-1] if aug_sep else RESEARCH_CHART_RELEASED_FROM - PILOT_STEP
+    )
+    oct_expected = _expected_15m_closes_in_range(
+        RESEARCH_CHART_OCTOBER_FROM, RESEARCH_CHART_OCTOBER_TO_NOMINAL
+    )
+    oct_gapless = len(october) == oct_expected and (
+        not october
+        or october[0] == RESEARCH_CHART_OCTOBER_FROM and october[-1] == RESEARCH_CHART_OCTOBER_TO_NOMINAL
+    )
+    if not aug_sep:
+        aug_sep_status = "NOT_IMPORTED"
+    elif aug_sep_gapless:
+        aug_sep_status = "VERIFIED_AVAILABLE"
+    elif len(aug_sep) > 0:
+        aug_sep_status = "PARTIALLY_AVAILABLE"
+    else:
+        aug_sep_status = "NOT_VERIFIED"
+    if not october:
+        oct_status = "NOT_IMPORTED"
+    elif oct_gapless:
+        oct_status = "VERIFIED_AVAILABLE"
+    elif len(october) > 0:
+        oct_status = "PARTIALLY_AVAILABLE"
+    else:
+        oct_status = "NOT_VERIFIED"
+    return {
+        "pipeline_line_id": PIPELINE_LINE_ID,
+        "released_from": _iso_z(RESEARCH_CHART_RELEASED_FROM),
+        "released_to_nominal": _iso_z(RESEARCH_CHART_RELEASED_TO_NOMINAL),
+        "released_to": _iso_z(released_to) if aug_sep_gapless else _iso_z(released_to),
+        "released_to_effective": _iso_z(released_to),
+        "chart_released_gapless": aug_sep_gapless,
+        "max_closes_per_request": PILOT_MAX_CLOSES,
+        "august_september": {
+            "status": aug_sep_status,
+            "published_close_count": len(aug_sep),
+            "expected_close_count": expected_aug_sep,
+            "first_published": _iso_z(aug_sep[0]) if aug_sep else None,
+            "last_published": _iso_z(aug_sep[-1]) if aug_sep else None,
+        },
+        "october": {
+            "status": oct_status,
+            "chart_released": False,
+            "published_close_count": len(october),
+            "expected_close_count_full_month": oct_expected,
+            "first_published": _iso_z(october[0]) if october else None,
+            "last_published": _iso_z(october[-1]) if october else None,
+        },
+    }
+
+
+def effective_research_chart_released_to(published: Sequence[datetime]) -> datetime:
+    bounds = research_chart_data_bounds(published)
+    if not bounds["chart_released_gapless"]:
+        raise HistoricalPoolStateError(
+            "OUT_OF_PILOT_SCOPE",
+            "research chart Aug–Sep publications not gapless; fail-closed",
+            bounds,
+        )
+    return _parse_close(bounds["released_to_effective"])
+
+
+def published_closes_apr_sep_import(published: Sequence[datetime]) -> list[datetime]:
+    return [
+        c
+        for c in published
+        if STATIC_TIMELINE_IMPORT_FROM <= c <= STATIC_TIMELINE_IMPORT_TO_NOMINAL
+    ]
+
+
+def static_timeline_import_bounds(published: Sequence[datetime]) -> tuple[datetime, datetime]:
+    closes = published_closes_apr_sep_import(published)
+    if not closes:
+        raise HistoricalPoolStateError(
+            "OUT_OF_PILOT_SCOPE",
+            "no published closes in Apr–Sep static timeline import range",
+            {
+                "import_from": _iso_z(STATIC_TIMELINE_IMPORT_FROM),
+                "import_to_nominal": _iso_z(STATIC_TIMELINE_IMPORT_TO_NOMINAL),
+            },
+        )
+    return closes[0], closes[-1]
+
+
+def assert_static_timeline_window(
+    from_dt: datetime,
+    to_dt: datetime,
+    published: Sequence[datetime],
+) -> None:
+    lo, hi = static_timeline_import_bounds(published)
+    if from_dt < lo or to_dt > hi or from_dt > to_dt:
+        raise HistoricalPoolStateError(
+            "OUT_OF_PILOT_SCOPE",
+            "static timeline request outside Apr–Sep imported publications",
+            {
+                "import_from": _iso_z(lo),
+                "import_to_effective": _iso_z(hi),
+                "requested_from": _iso_z(from_dt),
+                "requested_to": _iso_z(to_dt),
+            },
+        )
+    close_count = len(decision_closes_in_range(published, from_dt, to_dt))
+    if close_count > STATIC_TIMELINE_MAX_DISPLAY_CLOSES:
+        raise HistoricalPoolStateError(
+            "INVALID_REQUEST",
+            f"static timeline window exceeds {STATIC_TIMELINE_MAX_DISPLAY_CLOSES} display closes",
+            {
+                "requested_close_count": close_count,
+                "max_display_closes": STATIC_TIMELINE_MAX_DISPLAY_CLOSES,
+            },
+        )
+
+
+def assert_research_chart_window(
+    from_dt: datetime,
+    to_dt: datetime,
+    published: Sequence[datetime],
+) -> None:
+    released_to = effective_research_chart_released_to(published)
+    if from_dt < RESEARCH_CHART_RELEASED_FROM or to_dt > released_to or from_dt > to_dt:
+        raise HistoricalPoolStateError(
+            "OUT_OF_PILOT_SCOPE",
+            "request outside released research chart window",
+            {
+                "released_from": _iso_z(RESEARCH_CHART_RELEASED_FROM),
+                "released_to": _iso_z(released_to),
+                "requested_from": _iso_z(from_dt),
+                "requested_to": _iso_z(to_dt),
+            },
+        )
+
+
+def decision_closes_in_range(
+    published: Sequence[datetime],
+    from_dt: datetime,
+    to_dt: datetime,
+) -> list[datetime]:
+    i0 = bisect.bisect_left(published, from_dt)
+    i1 = bisect.bisect_right(published, to_dt)
+    return list(published[i0:i1])
+
+
+def resolve_as_of_close(published: Sequence[datetime], as_of_dt: datetime) -> datetime:
+    i = bisect.bisect_right(published, as_of_dt) - 1
+    if i < 0:
+        raise HistoricalPoolStateError("OUT_OF_PILOT_SCOPE", "as_of_close before first publication")
+    return published[i]
+
+
+def episode_closes_for_chart_request(
+    published: Sequence[datetime],
+    from_dt: datetime,
+    as_of_dt: datetime,
+) -> list[datetime]:
+    """Membership walk: up to 96 closes before window start, through as_of (causal)."""
+    as_of_dt = resolve_as_of_close(published, as_of_dt)
+    i_as_of = bisect.bisect_right(published, as_of_dt) - 1
+    i_from = bisect.bisect_left(published, from_dt)
+    i_start = max(0, min(i_from, i_as_of) - EPISODE_MEMBERSHIP_WARMUP_CLOSES)
+    return list(published[i_start : i_as_of + 1])
 
 
 def _utc(dt: datetime) -> datetime:
@@ -246,13 +471,15 @@ def load_historical_pool_state_at_close(
     cfg_hash: str | None = None,
 ) -> HistoricalPoolStateAtClose:
     dc = _parse_close(decision_close)
-    if dc < PILOT_FROM or dc > PILOT_TO:
-        raise HistoricalPoolStateError("OUT_OF_PILOT_SCOPE", "decision_close outside pilot window")
+    reader = reader or PublishedActiveReader()
+    cfg_hash = cfg_hash or config_hash(build_live_micro_lld_v2_config(pool_detail))
+    published = get_published_decision_closes(reader, cfg_hash)
+    i = bisect.bisect_left(published, dc)
+    if i >= len(published) or published[i] != dc:
+        raise HistoricalPoolStateError("MISSING_PUBLICATION", "no published snapshot at decision_close")
     sym = symbol.upper()
     if sym != PILOT_SYMBOL or timeframe != PILOT_TIMEFRAME or pool_detail != PILOT_POOL_DETAIL:
         raise HistoricalPoolStateError("INVALID_SCOPE", "pilot supports DOGEUSDT 15m PD10 only")
-    cfg_hash = cfg_hash or config_hash(build_live_micro_lld_v2_config(pool_detail))
-    reader = reader or PublishedActiveReader()
     own_client = client is None
     if client is None:
         ch_cfg = load_clickhouse_config()
@@ -546,19 +773,18 @@ def load_window_pool_state(
     """Aggregate state for chart window: per-close publications + domain remaining at as_of."""
     from_dt = _parse_close(from_close)
     to_dt = _parse_close(to_close)
-    if from_dt < PILOT_FROM or to_dt > PILOT_TO or from_dt > to_dt:
-        raise HistoricalPoolStateError("OUT_OF_PILOT_SCOPE", "invalid pilot window")
-    closes = [dc for dc in pilot_decision_closes() if from_dt <= dc <= to_dt]
-    if len(closes) > 20:
-        raise HistoricalPoolStateError("INVALID_REQUEST", "more than 20 closes")
-    as_of_dt = _parse_close(as_of_close) if as_of_close else to_dt
-    candidates = [dc for dc in pilot_decision_closes() if dc <= as_of_dt]
-    if not candidates:
-        raise HistoricalPoolStateError("OUT_OF_PILOT_SCOPE", "as_of before pilot")
-    as_of_dt = candidates[-1]
-
     cfg_hash = config_hash(build_live_micro_lld_v2_config(pool_detail))
     reader = PublishedActiveReader()
+    published = get_published_decision_closes(reader, cfg_hash)
+    assert_research_chart_window(from_dt, to_dt, published)
+    closes = decision_closes_in_range(published, from_dt, to_dt)
+    if len(closes) > PILOT_MAX_CLOSES:
+        raise HistoricalPoolStateError(
+            "INVALID_REQUEST",
+            f"more than {PILOT_MAX_CLOSES} closes",
+        )
+    as_of_dt = _parse_close(as_of_close) if as_of_close else to_dt
+    as_of_dt = resolve_as_of_close(published, as_of_dt)
     ch_cfg = load_clickhouse_config()
     import clickhouse_connect
 
@@ -588,7 +814,8 @@ def load_window_pool_state(
             reader=reader,
             cfg_hash=cfg_hash,
         )
-        episodes = build_active_episode_records(reader, cfg_hash, client, database, closes)
+        ep_closes = episode_closes_for_chart_request(published, from_dt, as_of_dt)
+        episodes = build_active_episode_records(reader, cfg_hash, client, database, ep_closes)
         return {
             "from_close": _iso_z(from_dt),
             "to_close": _iso_z(to_dt),
