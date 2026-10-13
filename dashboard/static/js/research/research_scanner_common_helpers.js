@@ -29,7 +29,42 @@
   var HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST = 96;
   var HISTORICAL_LMV2_CHUNK_PREFETCH = 1;
   var HISTORICAL_LMV2_CHUNK_CACHE_MAX = 32;
-  var HISTORICAL_LMV2_PIPELINE_LINE = "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd10_v1";
+  var HISTORICAL_LMV2_SUPPORTED_PD = [1, 5, 10];
+  var HISTORICAL_LMV2_PD_REGISTRY = {
+    1: {
+      pipeline_line_id: "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd1_v1",
+      config_hash: "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9",
+    },
+    5: {
+      pipeline_line_id: "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd5_v1",
+      config_hash: "533e04c7cd0e1c93540ed9466a2a5a2eb626f82b828b9a45d1da234703ebd03c",
+    },
+    10: {
+      pipeline_line_id: "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd10_v1",
+      config_hash: "bd9ac4f30e177321b688f5adb0fe2681ebb4966d51701e3b323498bfcd0d06c2",
+    },
+  };
+  var HISTORICAL_LMV2_PIPELINE_LINE = HISTORICAL_LMV2_PD_REGISTRY[10].pipeline_line_id;
+
+  function historicalLmv2PdRegistryEntry(poolDetail) {
+    var pd = Number(poolDetail);
+    return HISTORICAL_LMV2_PD_REGISTRY[pd] || null;
+  }
+
+  function historicalLmv2CacheScopeKey(poolDetail) {
+    var ent = historicalLmv2PdRegistryEntry(poolDetail == null ? 10 : poolDetail);
+    if (!ent) {
+      return "pd_invalid";
+    }
+    return (
+      "pd" +
+      String(poolDetail == null ? 10 : poolDetail) +
+      "\x1f" +
+      ent.pipeline_line_id +
+      "\x1f" +
+      ent.config_hash
+    );
+  }
   var RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO = "2026-04-01T00:00:00Z";
   var RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO = "2026-09-30T23:45:00Z";
   var RESEARCH_STATIC_TIMELINE_FROM_UNIX = Math.floor(
@@ -636,12 +671,12 @@
     };
   }
 
-  function gatherStaticTimelineZoneParts(cacheState, symbol, timeframe, windows) {
+  function gatherStaticTimelineZoneParts(cacheState, symbol, timeframe, windows, poolDetail) {
     var parts = [];
     (windows || []).forEach(function (w) {
       var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
       var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
-      var key = staticTimelineCacheKey(symbol, timeframe, fromIso, toIso);
+      var key = staticTimelineCacheKey(symbol, timeframe, fromIso, toIso, poolDetail);
       var ent = cacheState && cacheState.windows ? cacheState.windows[key] : null;
       if (ent && ent.status === "ok" && ent.body && ent.body.zones) {
         parts.push(ent.body.zones);
@@ -650,14 +685,22 @@
     return parts;
   }
 
-  function staticTimelineWindowCoverage(windows, cacheState, symbol, timeframe, fromCloseUnix, toCloseUnix) {
+  function staticTimelineWindowCoverage(
+    windows,
+    cacheState,
+    symbol,
+    timeframe,
+    fromCloseUnix,
+    toCloseUnix,
+    poolDetail
+  ) {
     var closeCov = historicalLmv2CloseCoverage(
       windows,
       fromCloseUnix,
       toCloseUnix,
       HISTORICAL_LMV2_TF_SEC
     );
-    var winCov = staticTimelineLoadCoverage(windows, cacheState, symbol, timeframe);
+    var winCov = staticTimelineLoadCoverage(windows, cacheState, symbol, timeframe, poolDetail);
     return {
       closes: closeCov,
       windows: winCov,
@@ -676,13 +719,13 @@
     };
   }
 
-  function staticTimelineCacheKey(symbol, timeframe, fromIso, toIso) {
+  function staticTimelineCacheKey(symbol, timeframe, fromIso, toIso, poolDetail) {
     return (
       String(symbol || "") +
       "\x1f" +
       String(timeframe || "") +
       "\x1f" +
-      HISTORICAL_LMV2_PIPELINE_LINE +
+      historicalLmv2CacheScopeKey(poolDetail == null ? 10 : poolDetail) +
       "\x1fstatic\x1f" +
       String(fromIso || "") +
       "\x1f" +
@@ -690,13 +733,13 @@
     );
   }
 
-  function staticTimelinePreloadBundleKey(symbol, timeframe, fromUnix, toUnix) {
+  function staticTimelinePreloadBundleKey(symbol, timeframe, fromUnix, toUnix, poolDetail) {
     return (
       String(symbol || "") +
       "\x1f" +
       String(timeframe || "") +
       "\x1f" +
-      HISTORICAL_LMV2_PIPELINE_LINE +
+      historicalLmv2CacheScopeKey(poolDetail == null ? 10 : poolDetail) +
       "\x1fpreload\x1f" +
       STATIC_TIMELINE_PRELOAD_READER_VERSION +
       "\x1f" +
@@ -761,26 +804,34 @@
     cacheState.order = order;
   }
 
-  function staticTimelinePinKeysFromWindows(symbol, timeframe, windows) {
+  function staticTimelinePinKeysFromWindows(symbol, timeframe, windows, poolDetail) {
     var sym = symbol || "DOGEUSDT";
     var tf = timeframe || "15m";
     var pin = {};
     (windows || []).forEach(function (w) {
       var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
       var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
-      pin[staticTimelineCacheKey(sym, tf, fromIso, toIso)] = true;
+      pin[staticTimelineCacheKey(sym, tf, fromIso, toIso, poolDetail)] = true;
     });
     return pin;
   }
 
-  function assessStaticTimelinePreloadBundle(cacheState, symbol, timeframe, fromUnix, toUnix, windows) {
+  function assessStaticTimelinePreloadBundle(
+    cacheState,
+    symbol,
+    timeframe,
+    fromUnix,
+    toUnix,
+    windows,
+    poolDetail
+  ) {
     var sym = symbol || "DOGEUSDT";
     var tf = timeframe || "15m";
     var from = Math.floor(Number(fromUnix));
     var to = Math.floor(Number(toUnix));
     var plan = windows || planStaticTimelinePreloadWindows(from, to);
-    var cov = staticTimelineWindowCoverage(plan, cacheState, sym, tf, from, to);
-    var parts = gatherStaticTimelineZoneParts(cacheState, sym, tf, plan);
+    var cov = staticTimelineWindowCoverage(plan, cacheState, sym, tf, from, to, poolDetail);
+    var parts = gatherStaticTimelineZoneParts(cacheState, sym, tf, plan, poolDetail);
     var merged = mergeHistoricalLmv2Zones(parts);
     return {
       windows: plan,
@@ -795,7 +846,7 @@
     };
   }
 
-  function staticTimelineLoadCoverage(plannedWindows, cacheState, symbol, timeframe) {
+  function staticTimelineLoadCoverage(plannedWindows, cacheState, symbol, timeframe, poolDetail) {
     var sym = symbol || "DOGEUSDT";
     var tf = timeframe || "15m";
     var loaded = 0;
@@ -803,7 +854,7 @@
     (plannedWindows || []).forEach(function (w) {
       var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
       var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
-      var key = staticTimelineCacheKey(sym, tf, fromIso, toIso);
+      var key = staticTimelineCacheKey(sym, tf, fromIso, toIso, poolDetail);
       var ent = cacheState && cacheState.windows ? cacheState.windows[key] : null;
       if (ent && ent.status === "ok" && ent.body) loaded += 1;
       else missing += 1;
@@ -873,13 +924,21 @@
     };
   }
 
-  function historicalLmv2ChunkCacheKey(symbol, timeframe, fromIso, toIso, asOfIso, layersKey) {
+  function historicalLmv2ChunkCacheKey(
+    symbol,
+    timeframe,
+    fromIso,
+    toIso,
+    asOfIso,
+    layersKey,
+    poolDetail
+  ) {
     return (
       String(symbol || "") +
       "\x1f" +
       String(timeframe || "") +
       "\x1f" +
-      HISTORICAL_LMV2_PIPELINE_LINE +
+      historicalLmv2CacheScopeKey(poolDetail == null ? 10 : poolDetail) +
       "\x1fchunk\x1f" +
       String(fromIso || "") +
       "\x1f" +
@@ -1683,6 +1742,10 @@
     HISTORICAL_LMV2_CHUNK_PREFETCH: HISTORICAL_LMV2_CHUNK_PREFETCH,
     HISTORICAL_LMV2_CHUNK_CACHE_MAX: HISTORICAL_LMV2_CHUNK_CACHE_MAX,
     HISTORICAL_LMV2_PIPELINE_LINE: HISTORICAL_LMV2_PIPELINE_LINE,
+    HISTORICAL_LMV2_PD_REGISTRY: HISTORICAL_LMV2_PD_REGISTRY,
+    HISTORICAL_LMV2_SUPPORTED_PD: HISTORICAL_LMV2_SUPPORTED_PD,
+    historicalLmv2PdRegistryEntry: historicalLmv2PdRegistryEntry,
+    historicalLmv2CacheScopeKey: historicalLmv2CacheScopeKey,
     RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO: RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO,
     RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO: RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO,
     RESEARCH_STATIC_TIMELINE_FROM_UNIX: RESEARCH_STATIC_TIMELINE_FROM_UNIX,
