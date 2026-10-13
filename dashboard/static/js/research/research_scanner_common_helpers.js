@@ -23,9 +23,37 @@
     Date.parse("2026-08-01T00:00:00.000Z") / 1000
   );
   var HISTORICAL_LMV2_PILOT_TO_UNIX = Math.floor(
-    Date.parse("2026-08-01T04:45:00.000Z") / 1000
+    Date.parse("2026-09-30T23:45:00.000Z") / 1000
   );
   var HISTORICAL_LMV2_TF_SEC = 900;
+  var HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST = 96;
+  var HISTORICAL_LMV2_CHUNK_PREFETCH = 1;
+  var HISTORICAL_LMV2_CHUNK_CACHE_MAX = 32;
+  var HISTORICAL_LMV2_PIPELINE_LINE = "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd10_v1";
+  var RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO = "2026-04-01T00:00:00Z";
+  var RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO = "2026-09-30T23:45:00Z";
+  var RESEARCH_STATIC_TIMELINE_FROM_UNIX = Math.floor(
+    Date.parse(RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO) / 1000
+  );
+  var RESEARCH_STATIC_TIMELINE_TO_UNIX = Math.floor(
+    Date.parse(RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO) / 1000
+  );
+  var STATIC_TIMELINE_MAX_CLOSES = HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST * 3;
+  var STATIC_TIMELINE_MAX_SPAN_UNIX = (STATIC_TIMELINE_MAX_CLOSES - 1) * HISTORICAL_LMV2_TF_SEC;
+  var STATIC_TIMELINE_CACHE_MAX = 16;
+  var STATIC_TIMELINE_PREFETCH_WINDOWS = 1;
+  var STATIC_TIMELINE_PRELOAD_READER_VERSION = "historical_pool_state_v1";
+  var PHASE5P_PILOT_MAX_CLOSES = 672;
+  var PHASE5P_PILOT_FROM_ISO = "2026-09-01T00:00:00Z";
+  var PHASE5P_PILOT_TO_ISO = "2026-09-07T23:45:00Z";
+  var PHASE5M_STATIC_TIMELINE_FROM_ISO = "2026-09-27T00:00:00Z";
+  var PHASE5M_STATIC_TIMELINE_TO_ISO = "2026-09-29T23:45:00Z";
+  var PHASE5M_STATIC_TIMELINE_FROM_UNIX = Math.floor(
+    Date.parse(PHASE5M_STATIC_TIMELINE_FROM_ISO) / 1000
+  );
+  var PHASE5M_STATIC_TIMELINE_TO_UNIX = Math.floor(
+    Date.parse(PHASE5M_STATIC_TIMELINE_TO_ISO) / 1000
+  );
   var LIVE_MICRO_LLD_V2_TFS = { "1m": true, "5m": true, "15m": true, "30m": true, "1h": true, "4h": true };
   var LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID = "de5f74f6-236f-4dc1-81df-94e15dec1b83";
   var LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX = Math.floor(
@@ -293,6 +321,14 @@
     });
   }
 
+  function countHistoricalLmv2Overlays(list) {
+    var n = 0;
+    (list || []).forEach(function (p) {
+      if (isHistoricalLmv2Overlay(p)) n += 1;
+    });
+    return n;
+  }
+
   function mergePaneOverlaysPreservingScannerCommon(
     newPaneOverlays,
     previousPendingOverlays,
@@ -384,22 +420,574 @@
     return { from_close_unix: from, to_close_unix: to };
   }
 
+  function historicalDecisionCloseAtOrBefore(asOfUnix, tfSec) {
+    var step = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var u = Math.floor(Number(asOfUnix));
+    if (!Number.isFinite(u)) return null;
+    var mod = ((u % step) + step) % step;
+    var close = u - mod;
+    return close;
+  }
+
   function resolveHistoricalLmv2AsOfCloseUnix(ctx) {
-    return resolveLiveMicroLldV2DecisionCloseUnix(ctx || {});
+    ctx = ctx || {};
+    var sec = ctx.tfSec || HISTORICAL_LMV2_TF_SEC;
+    if (ctx.isHistoricalReplay && ctx.replayTargetTs != null) {
+      return historicalDecisionCloseAtOrBefore(ctx.replayTargetTs, sec);
+    }
+    var dc = resolveLiveMicroLldV2DecisionCloseUnix(ctx);
+    if (dc != null) return dc;
+    return null;
   }
 
   function resolveHistoricalLmv2RequestWindow(pane, tfSec, ctx) {
     ctx = ctx || {};
     var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var maxCloses = HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST;
     var decisionClose = resolveHistoricalLmv2AsOfCloseUnix(ctx);
     if (decisionClose == null) return null;
     var toClose = Math.min(Math.floor(Number(decisionClose)), HISTORICAL_LMV2_PILOT_TO_UNIX);
-    var paneBase = resolvePaneCloseWindow(pane, sec);
-    var fromClose = paneBase && Number.isFinite(paneBase.from_close_unix)
-      ? Number(paneBase.from_close_unix)
-      : toClose - sec * 4;
+    toClose = Math.max(toClose, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    var spanSec = (maxCloses - 1) * sec;
+    var fromClose = toClose - spanSec;
     fromClose = Math.max(fromClose, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    var paneBase = resolvePaneCloseWindow(pane, sec);
+    if (paneBase && Number.isFinite(paneBase.from_close_unix) && Number.isFinite(paneBase.to_close_unix)) {
+      var paneFrom = Math.max(Math.floor(paneBase.from_close_unix), HISTORICAL_LMV2_PILOT_FROM_UNIX);
+      var paneTo = Math.min(Math.floor(paneBase.to_close_unix), toClose);
+      if (paneTo >= paneFrom && paneFrom >= fromClose && paneTo <= toClose) {
+        var closeCount = Math.floor((paneTo - paneFrom) / sec) + 1;
+        if (closeCount >= 1 && closeCount <= maxCloses) {
+          fromClose = paneFrom;
+          toClose = paneTo;
+        }
+      }
+    }
     return clipUnixToHistoricalPilot(fromClose, toClose);
+  }
+
+  function resolveHistoricalLmv2ViewportCloseWindow(pane, tfSec, ctx, chartApi) {
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var asOf = resolveHistoricalLmv2AsOfCloseUnix(ctx || {});
+    if (asOf == null) return null;
+    asOf = Math.min(Math.floor(Number(asOf)), HISTORICAL_LMV2_PILOT_TO_UNIX);
+    asOf = Math.max(asOf, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    var viewFrom = null;
+    var viewTo = null;
+    if (chartApi && chartApi.getVisibleTimeRange) {
+      var tr = chartApi.getVisibleTimeRange();
+      if (tr && tr.from != null && tr.to != null) {
+        var scaleFrom = Math.floor(Number(tr.from));
+        var scaleTo = Math.floor(Number(tr.to));
+        var scaleFromClose = scaleFrom + sec;
+        var scaleToClose = historicalDecisionCloseAtOrBefore(scaleTo, sec);
+        var firstCandle = tr.firstCandle != null ? Math.floor(Number(tr.firstCandle)) : null;
+        var lastCandle = tr.lastCandle != null ? Math.floor(Number(tr.lastCandle)) : null;
+        var candleFromClose = firstCandle != null ? firstCandle + sec : scaleFromClose;
+        var candleToClose = lastCandle != null ? lastCandle + sec : scaleToClose;
+        viewFrom = Math.min(candleFromClose, scaleFromClose);
+        viewTo = Math.max(candleToClose, scaleToClose);
+      } else if (tr && tr.firstCandle != null && tr.lastCandle != null) {
+        viewFrom = Math.floor(Number(tr.firstCandle)) + sec;
+        viewTo = Math.floor(Number(tr.lastCandle)) + sec;
+      }
+    }
+    if (viewFrom == null || viewTo == null) {
+      var fallback = resolveHistoricalLmv2RequestWindow(pane, sec, ctx);
+      if (!fallback) return null;
+      return {
+        view_from_close_unix: fallback.from_close_unix,
+        view_to_close_unix: fallback.to_close_unix,
+        as_of_close_unix: asOf,
+      };
+    }
+    var visibleFrom = viewFrom;
+    var visibleTo = viewTo;
+    viewTo = Math.min(viewTo, asOf);
+    viewFrom = Math.max(viewFrom, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    if (visibleFrom > asOf || viewTo < viewFrom) {
+      return {
+        view_from_close_unix: visibleFrom,
+        view_to_close_unix: visibleTo,
+        as_of_close_unix: asOf,
+        viewport_after_replay_cutoff: true,
+      };
+    }
+    return {
+      view_from_close_unix: viewFrom,
+      view_to_close_unix: viewTo,
+      display_from_close_unix: viewFrom,
+      display_to_close_unix: Math.min(visibleTo, asOf),
+      as_of_close_unix: asOf,
+      viewport_after_replay_cutoff: false,
+    };
+  }
+
+  function clampCloseUnixToStaticImport(unix) {
+    var u = Math.floor(Number(unix));
+    if (!Number.isFinite(u)) return RESEARCH_STATIC_TIMELINE_FROM_UNIX;
+    return Math.min(
+      Math.max(u, RESEARCH_STATIC_TIMELINE_FROM_UNIX),
+      RESEARCH_STATIC_TIMELINE_TO_UNIX
+    );
+  }
+
+  function planStaticTimelineWindows(fromCloseUnix, toCloseUnix) {
+    var sec = HISTORICAL_LMV2_TF_SEC;
+    var span = STATIC_TIMELINE_MAX_SPAN_UNIX;
+    var from = clampCloseUnixToStaticImport(fromCloseUnix);
+    var to = clampCloseUnixToStaticImport(toCloseUnix);
+    if (to < from) return [];
+    var out = [];
+    var start = from;
+    while (start <= to) {
+      var end = Math.min(start + span, to);
+      out.push({ from_close_unix: start, to_close_unix: end });
+      if (end >= to) break;
+      start = end + sec;
+    }
+    return out;
+  }
+
+  function parseStaticTimelineUtcInput(text) {
+    var raw = String(text || "").trim();
+    if (!raw) return null;
+    var iso = raw.indexOf("T") >= 0 ? raw : raw.replace(" ", "T");
+    if (!/Z$/i.test(iso)) iso = iso.replace(/\s*UTC\s*$/i, "") + "Z";
+    var ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return null;
+    return Math.floor(ms / 1000);
+  }
+
+  function parseStaticTimelineSelectedRangeFromInputs() {
+    if (typeof document === "undefined") return null;
+    var fromEl = document.getElementById("researchStaticTimelineFrom");
+    var toEl = document.getElementById("researchStaticTimelineTo");
+    if (!fromEl || !toEl) return null;
+    var manualFrom = parseStaticTimelineUtcInput(fromEl.value);
+    var manualTo = parseStaticTimelineUtcInput(toEl.value);
+    if (manualFrom == null || manualTo == null || manualTo < manualFrom) return null;
+    return {
+      from_close_unix: clampCloseUnixToStaticImport(manualFrom),
+      to_close_unix: clampCloseUnixToStaticImport(manualTo),
+    };
+  }
+
+  function intersectCloseRanges(aFrom, aTo, bFrom, bTo) {
+    var from = Math.max(Math.floor(Number(aFrom)), Math.floor(Number(bFrom)));
+    var to = Math.min(Math.floor(Number(aTo)), Math.floor(Number(bTo)));
+    if (to < from) return null;
+    return { from_close_unix: from, to_close_unix: to };
+  }
+
+  function resolveStaticTimelineVisibleCloseRange(chartApi, tfSec, selectedRange) {
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var selFrom = selectedRange
+      ? selectedRange.from_close_unix
+      : RESEARCH_STATIC_TIMELINE_FROM_UNIX;
+    var selTo = selectedRange
+      ? selectedRange.to_close_unix
+      : RESEARCH_STATIC_TIMELINE_TO_UNIX;
+    var viewFrom = null;
+    var viewTo = null;
+    if (chartApi && chartApi.getVisibleTimeRange) {
+      var tr = chartApi.getVisibleTimeRange();
+      if (tr && tr.from != null && tr.to != null) {
+        viewFrom = Math.floor(Number(tr.from)) + sec;
+        viewTo = historicalDecisionCloseAtOrBefore(Math.floor(Number(tr.to)), sec);
+      }
+    }
+    if (viewFrom == null || viewTo == null) {
+      viewFrom = selFrom;
+      viewTo = Math.min(selFrom + STATIC_TIMELINE_MAX_SPAN_UNIX, selTo);
+    }
+    var vis = intersectCloseRanges(viewFrom, viewTo, selFrom, selTo);
+    if (!vis) {
+      vis = { from_close_unix: selFrom, to_close_unix: Math.min(selFrom + STATIC_TIMELINE_MAX_SPAN_UNIX, selTo) };
+    }
+    return vis;
+  }
+
+  function expandStaticTimelineLoadRange(visibleFrom, visibleTo, selectedRange, prefetchWindows) {
+    var span = STATIC_TIMELINE_MAX_SPAN_UNIX;
+    var sec = HISTORICAL_LMV2_TF_SEC;
+    var pf = prefetchWindows == null ? STATIC_TIMELINE_PREFETCH_WINDOWS : prefetchWindows;
+    var selFrom = selectedRange
+      ? selectedRange.from_close_unix
+      : RESEARCH_STATIC_TIMELINE_FROM_UNIX;
+    var selTo = selectedRange
+      ? selectedRange.to_close_unix
+      : RESEARCH_STATIC_TIMELINE_TO_UNIX;
+    var from = Math.max(selFrom, Math.floor(Number(visibleFrom)) - pf * span);
+    var to = Math.min(selTo, Math.floor(Number(visibleTo)) + pf * span);
+    if (to < from) to = from;
+    return { from_close_unix: from, to_close_unix: to };
+  }
+
+  function planStaticTimelineLoadForVisible(visibleFrom, visibleTo, selectedRange, prefetchWindows) {
+    var expanded = expandStaticTimelineLoadRange(visibleFrom, visibleTo, selectedRange, prefetchWindows);
+    var windows = planStaticTimelineWindows(expanded.from_close_unix, expanded.to_close_unix);
+    return {
+      load_from_close_unix: expanded.from_close_unix,
+      load_to_close_unix: expanded.to_close_unix,
+      windows: windows,
+      visible_from_close_unix: Math.floor(Number(visibleFrom)),
+      visible_to_close_unix: Math.floor(Number(visibleTo)),
+    };
+  }
+
+  function gatherStaticTimelineZoneParts(cacheState, symbol, timeframe, windows) {
+    var parts = [];
+    (windows || []).forEach(function (w) {
+      var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
+      var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
+      var key = staticTimelineCacheKey(symbol, timeframe, fromIso, toIso);
+      var ent = cacheState && cacheState.windows ? cacheState.windows[key] : null;
+      if (ent && ent.status === "ok" && ent.body && ent.body.zones) {
+        parts.push(ent.body.zones);
+      }
+    });
+    return parts;
+  }
+
+  function staticTimelineWindowCoverage(windows, cacheState, symbol, timeframe, fromCloseUnix, toCloseUnix) {
+    var closeCov = historicalLmv2CloseCoverage(
+      windows,
+      fromCloseUnix,
+      toCloseUnix,
+      HISTORICAL_LMV2_TF_SEC
+    );
+    var winCov = staticTimelineLoadCoverage(windows, cacheState, symbol, timeframe);
+    return {
+      closes: closeCov,
+      windows: winCov,
+      complete: closeCov.complete && winCov.complete,
+    };
+  }
+
+  function resolveStaticTimelineDesiredWindow(pane, tfSec, chartApi, ctx) {
+    var selected = (ctx && ctx.selected_range) || null;
+    var visible = resolveStaticTimelineVisibleCloseRange(chartApi, tfSec, selected);
+    return {
+      selected_range: selected,
+      visible_from_close_unix: visible.from_close_unix,
+      visible_to_close_unix: visible.to_close_unix,
+      source: selected ? "selected_plus_visible" : "visible_only",
+    };
+  }
+
+  function staticTimelineCacheKey(symbol, timeframe, fromIso, toIso) {
+    return (
+      String(symbol || "") +
+      "\x1f" +
+      String(timeframe || "") +
+      "\x1f" +
+      HISTORICAL_LMV2_PIPELINE_LINE +
+      "\x1fstatic\x1f" +
+      String(fromIso || "") +
+      "\x1f" +
+      String(toIso || "")
+    );
+  }
+
+  function staticTimelinePreloadBundleKey(symbol, timeframe, fromUnix, toUnix) {
+    return (
+      String(symbol || "") +
+      "\x1f" +
+      String(timeframe || "") +
+      "\x1f" +
+      HISTORICAL_LMV2_PIPELINE_LINE +
+      "\x1fpreload\x1f" +
+      STATIC_TIMELINE_PRELOAD_READER_VERSION +
+      "\x1f" +
+      String(fromUnix) +
+      "\x1f" +
+      String(toUnix)
+    );
+  }
+
+  function staticTimelineCloseCount(fromUnix, toUnix) {
+    var sec = HISTORICAL_LMV2_TF_SEC;
+    var from = Math.floor(Number(fromUnix));
+    var to = Math.floor(Number(toUnix));
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return 0;
+    return Math.floor((to - from) / sec) + 1;
+  }
+
+  function validateStaticTimelinePreloadRange(fromUnix, toUnix) {
+    var from = clampCloseUnixToStaticImport(fromUnix);
+    var to = clampCloseUnixToStaticImport(toUnix);
+    if (to < from) return { ok: false, reason: "to before from" };
+    var closes = staticTimelineCloseCount(from, to);
+    if (closes > PHASE5P_PILOT_MAX_CLOSES) {
+      return {
+        ok: false,
+        reason: "pilot max " + PHASE5P_PILOT_MAX_CLOSES + " closes (7 days @ 15m)",
+        close_count: closes,
+      };
+    }
+    return { ok: true, from_close_unix: from, to_close_unix: to, close_count: closes };
+  }
+
+  function planStaticTimelinePreloadWindows(fromUnix, toUnix) {
+    return planStaticTimelineWindows(fromUnix, toUnix);
+  }
+
+  function touchStaticTimelineCache(cacheState, key, entry, opts) {
+    if (!cacheState || !key) return;
+    if (!cacheState.windows) cacheState.windows = {};
+    if (!cacheState.order) cacheState.order = [];
+    var pin = (opts && opts.pinKeys) || null;
+    cacheState.windows[key] = entry;
+    var order = cacheState.order.filter(function (k) { return k !== key; });
+    order.push(key);
+    var max = (opts && opts.maxEntries) || STATIC_TIMELINE_CACHE_MAX;
+    while (order.length > max) {
+      var dropIdx = -1;
+      for (var di = 0; di < order.length; di += 1) {
+        var cand = order[di];
+        if (!cand || cand === key) continue;
+        if (pin && pin[cand]) continue;
+        dropIdx = di;
+        break;
+      }
+      if (dropIdx < 0) break;
+      var drop = order.splice(dropIdx, 1)[0];
+      if (drop && cacheState.windows[drop]) {
+        if (opts && opts.onEvict) opts.onEvict(drop);
+        delete cacheState.windows[drop];
+      }
+    }
+    cacheState.order = order;
+  }
+
+  function staticTimelinePinKeysFromWindows(symbol, timeframe, windows) {
+    var sym = symbol || "DOGEUSDT";
+    var tf = timeframe || "15m";
+    var pin = {};
+    (windows || []).forEach(function (w) {
+      var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
+      var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
+      pin[staticTimelineCacheKey(sym, tf, fromIso, toIso)] = true;
+    });
+    return pin;
+  }
+
+  function assessStaticTimelinePreloadBundle(cacheState, symbol, timeframe, fromUnix, toUnix, windows) {
+    var sym = symbol || "DOGEUSDT";
+    var tf = timeframe || "15m";
+    var from = Math.floor(Number(fromUnix));
+    var to = Math.floor(Number(toUnix));
+    var plan = windows || planStaticTimelinePreloadWindows(from, to);
+    var cov = staticTimelineWindowCoverage(plan, cacheState, sym, tf, from, to);
+    var parts = gatherStaticTimelineZoneParts(cacheState, sym, tf, plan);
+    var merged = mergeHistoricalLmv2Zones(parts);
+    return {
+      windows: plan,
+      coverage: cov,
+      merged_zones: merged,
+      segment_count: merged.length,
+      pool_count: merged.reduce(function (acc, z) {
+        if (z && z.pool_id) acc[z.pool_id] = true;
+        return acc;
+      }, {}),
+      ready: cov.complete,
+    };
+  }
+
+  function staticTimelineLoadCoverage(plannedWindows, cacheState, symbol, timeframe) {
+    var sym = symbol || "DOGEUSDT";
+    var tf = timeframe || "15m";
+    var loaded = 0;
+    var missing = 0;
+    (plannedWindows || []).forEach(function (w) {
+      var fromIso = historicalCloseUnixToIsoZ(w.from_close_unix);
+      var toIso = historicalCloseUnixToIsoZ(w.to_close_unix);
+      var key = staticTimelineCacheKey(sym, tf, fromIso, toIso);
+      var ent = cacheState && cacheState.windows ? cacheState.windows[key] : null;
+      if (ent && ent.status === "ok" && ent.body) loaded += 1;
+      else missing += 1;
+    });
+    return {
+      windows_planned: (plannedWindows || []).length,
+      windows_loaded: loaded,
+      windows_missing: missing,
+      complete: missing === 0 && (plannedWindows || []).length > 0,
+    };
+  }
+
+  function planHistoricalLmv2Chunks(viewFromClose, viewToClose, asOfClose, tfSec, prefetchChunks) {
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var maxCloses = HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST;
+    var span = (maxCloses - 1) * sec;
+    var prefetch = prefetchChunks == null ? HISTORICAL_LMV2_CHUNK_PREFETCH : prefetchChunks;
+    var asOf = Math.min(Math.floor(Number(asOfClose)), HISTORICAL_LMV2_PILOT_TO_UNIX);
+    var viewTo = Math.min(Math.floor(Number(viewToClose)), asOf);
+    var viewFrom = Math.max(Math.floor(Number(viewFromClose)), HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    if (viewTo < viewFrom) return [];
+    var loadFrom = viewFrom;
+    var loadTo = viewTo;
+    if (prefetch > 0) {
+      loadFrom = Math.max(HISTORICAL_LMV2_PILOT_FROM_UNIX, viewFrom - prefetch * span);
+      loadTo = Math.min(viewTo + prefetch * span, asOf, HISTORICAL_LMV2_PILOT_TO_UNIX);
+    }
+    var chunks = [];
+    var start = loadFrom;
+    while (start <= loadTo) {
+      var end = Math.min(start + span, loadTo);
+      chunks.push({ from_close_unix: start, to_close_unix: end });
+      if (end >= loadTo) break;
+      start = end + sec;
+    }
+    return chunks;
+  }
+
+  function historicalLmv2CloseCoverage(chunks, fromCloseUnix, toCloseUnix, tfSec) {
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    var from = Math.floor(Number(fromCloseUnix));
+    var to = Math.floor(Number(toCloseUnix));
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) {
+      return { complete: false, missing_count: 0, covered_count: 0, required_count: 0 };
+    }
+    var covered = {};
+    (chunks || []).forEach(function (ch) {
+      if (!ch) return;
+      var t = Math.floor(Number(ch.from_close_unix));
+      var end = Math.floor(Number(ch.to_close_unix));
+      while (t <= end) {
+        covered[t] = true;
+        t += sec;
+      }
+    });
+    var missing = 0;
+    var required = 0;
+    for (var c = from; c <= to; c += sec) {
+      required += 1;
+      if (!covered[c]) missing += 1;
+    }
+    return {
+      complete: missing === 0,
+      missing_count: missing,
+      covered_count: required - missing,
+      required_count: required,
+    };
+  }
+
+  function historicalLmv2ChunkCacheKey(symbol, timeframe, fromIso, toIso, asOfIso, layersKey) {
+    return (
+      String(symbol || "") +
+      "\x1f" +
+      String(timeframe || "") +
+      "\x1f" +
+      HISTORICAL_LMV2_PIPELINE_LINE +
+      "\x1fchunk\x1f" +
+      String(fromIso || "") +
+      "\x1f" +
+      String(toIso || "") +
+      "\x1f" +
+      String(asOfIso || "") +
+      "\x1f" +
+      String(layersKey || "-")
+    );
+  }
+
+  function mergeHistoricalLmv2Zones(zoneLists) {
+    var byKey = {};
+    (zoneLists || []).forEach(function (zones) {
+      (zones || []).forEach(function (z) {
+        if (!z || z.namespace !== HISTORICAL_LMV2_NS) return;
+        var baseId = String(z.id || z.pool_id || "");
+        if (!baseId) return;
+        var prev = byKey[baseId];
+        if (!prev) {
+          byKey[baseId] = z;
+          return;
+        }
+        var gap = Number(z.start_timestamp) - Number(prev.end_timestamp);
+        if (Number.isFinite(gap) && gap <= (HISTORICAL_LMV2_TF_SEC + 1)) {
+          prev.end_timestamp = Math.max(Number(prev.end_timestamp), Number(z.end_timestamp));
+          prev.start_timestamp = Math.min(Number(prev.start_timestamp), Number(z.start_timestamp));
+          if (z.metadata && !z.metadata.right_censored) {
+            if (!prev.metadata) prev.metadata = {};
+            prev.metadata.right_censored = false;
+          }
+        } else {
+          var altKey = baseId + "@" + String(z.start_timestamp);
+          byKey[altKey] = z;
+        }
+      });
+    });
+    return Object.keys(byKey).map(function (k) { return byKey[k]; });
+  }
+
+  function touchHistoricalLmv2ChunkCache(cacheState, key, entry) {
+    if (!cacheState || !key) return;
+    if (!cacheState.chunks) cacheState.chunks = {};
+    if (!cacheState.order) cacheState.order = [];
+    cacheState.chunks[key] = entry;
+    var order = cacheState.order.filter(function (k) { return k !== key; });
+    order.push(key);
+    while (order.length > HISTORICAL_LMV2_CHUNK_CACHE_MAX) {
+      var drop = order.shift();
+      if (drop && cacheState.chunks[drop]) delete cacheState.chunks[drop];
+    }
+    cacheState.order = order;
+  }
+
+  function historicalCloseUnixToIsoZ(unix) {
+    var u = Math.floor(Number(unix));
+    if (!Number.isFinite(u)) return "";
+    return new Date(u * 1000).toISOString().replace(".000Z", "Z");
+  }
+
+  function lookupHistoricalLmv2ChunkCacheEntry(
+    chunkStore,
+    symbol,
+    timeframe,
+    fromCloseUnix,
+    toCloseUnix,
+    asOfIso,
+    layersKey
+  ) {
+    var fromIso = historicalCloseUnixToIsoZ(fromCloseUnix);
+    var toIso = historicalCloseUnixToIsoZ(toCloseUnix);
+    var key = historicalLmv2ChunkCacheKey(symbol, timeframe, fromIso, toIso, asOfIso, layersKey);
+    var entry = chunkStore && chunkStore.chunks ? chunkStore.chunks[key] : null;
+    return { cache_key: key, entry: entry };
+  }
+
+  function gatherHistoricalLmv2ZonePartsFromPlannedChunks(
+    chunkStore,
+    symbol,
+    timeframe,
+    asOfIso,
+    layersKey,
+    chunks
+  ) {
+    var parts = [];
+    var stats = { cache_hits: 0, cache_misses: 0, cache_errors: 0 };
+    (chunks || []).forEach(function (ch) {
+      if (!ch) return;
+      var lu = lookupHistoricalLmv2ChunkCacheEntry(
+        chunkStore,
+        symbol,
+        timeframe,
+        ch.from_close_unix,
+        ch.to_close_unix,
+        asOfIso,
+        layersKey
+      );
+      var entry = lu.entry;
+      if (entry && entry.status === "ok" && entry.body) {
+        parts.push(entry.body.zones || []);
+        stats.cache_hits += 1;
+      } else if (entry && entry.status === "error") {
+        stats.cache_errors += 1;
+      } else {
+        stats.cache_misses += 1;
+      }
+    });
+    return { zone_parts: parts, stats: stats };
   }
 
   function normalizeHistoricalLmv2ZoneForRender(zone) {
@@ -1091,6 +1679,43 @@
     HISTORICAL_LMV2_NS: HISTORICAL_LMV2_NS,
     HISTORICAL_LMV2_PILOT_FROM_UNIX: HISTORICAL_LMV2_PILOT_FROM_UNIX,
     HISTORICAL_LMV2_PILOT_TO_UNIX: HISTORICAL_LMV2_PILOT_TO_UNIX,
+    HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST: HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST,
+    HISTORICAL_LMV2_CHUNK_PREFETCH: HISTORICAL_LMV2_CHUNK_PREFETCH,
+    HISTORICAL_LMV2_CHUNK_CACHE_MAX: HISTORICAL_LMV2_CHUNK_CACHE_MAX,
+    HISTORICAL_LMV2_PIPELINE_LINE: HISTORICAL_LMV2_PIPELINE_LINE,
+    RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO: RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO,
+    RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO: RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO,
+    RESEARCH_STATIC_TIMELINE_FROM_UNIX: RESEARCH_STATIC_TIMELINE_FROM_UNIX,
+    RESEARCH_STATIC_TIMELINE_TO_UNIX: RESEARCH_STATIC_TIMELINE_TO_UNIX,
+    STATIC_TIMELINE_MAX_CLOSES: STATIC_TIMELINE_MAX_CLOSES,
+    STATIC_TIMELINE_MAX_SPAN_UNIX: STATIC_TIMELINE_MAX_SPAN_UNIX,
+    planStaticTimelineWindows: planStaticTimelineWindows,
+    planStaticTimelineLoadForVisible: planStaticTimelineLoadForVisible,
+    resolveStaticTimelineDesiredWindow: resolveStaticTimelineDesiredWindow,
+    resolveStaticTimelineVisibleCloseRange: resolveStaticTimelineVisibleCloseRange,
+    parseStaticTimelineSelectedRangeFromInputs: parseStaticTimelineSelectedRangeFromInputs,
+    gatherStaticTimelineZoneParts: gatherStaticTimelineZoneParts,
+    staticTimelineWindowCoverage: staticTimelineWindowCoverage,
+    staticTimelineCacheKey: staticTimelineCacheKey,
+    touchStaticTimelineCache: touchStaticTimelineCache,
+    staticTimelineLoadCoverage: staticTimelineLoadCoverage,
+    parseStaticTimelineUtcInput: parseStaticTimelineUtcInput,
+    clampCloseUnixToStaticImport: clampCloseUnixToStaticImport,
+    STATIC_TIMELINE_PREFETCH_WINDOWS: STATIC_TIMELINE_PREFETCH_WINDOWS,
+    staticTimelinePreloadBundleKey: staticTimelinePreloadBundleKey,
+    staticTimelineCloseCount: staticTimelineCloseCount,
+    validateStaticTimelinePreloadRange: validateStaticTimelinePreloadRange,
+    planStaticTimelinePreloadWindows: planStaticTimelinePreloadWindows,
+    staticTimelinePinKeysFromWindows: staticTimelinePinKeysFromWindows,
+    assessStaticTimelinePreloadBundle: assessStaticTimelinePreloadBundle,
+    STATIC_TIMELINE_PRELOAD_READER_VERSION: STATIC_TIMELINE_PRELOAD_READER_VERSION,
+    PHASE5P_PILOT_MAX_CLOSES: PHASE5P_PILOT_MAX_CLOSES,
+    PHASE5P_PILOT_FROM_ISO: PHASE5P_PILOT_FROM_ISO,
+    PHASE5P_PILOT_TO_ISO: PHASE5P_PILOT_TO_ISO,
+    PHASE5M_STATIC_TIMELINE_FROM_ISO: PHASE5M_STATIC_TIMELINE_FROM_ISO,
+    PHASE5M_STATIC_TIMELINE_TO_ISO: PHASE5M_STATIC_TIMELINE_TO_ISO,
+    PHASE5M_STATIC_TIMELINE_FROM_UNIX: PHASE5M_STATIC_TIMELINE_FROM_UNIX,
+    PHASE5M_STATIC_TIMELINE_TO_UNIX: PHASE5M_STATIC_TIMELINE_TO_UNIX,
     LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID: LIVE_MICRO_LLD_V2_CH_TEST_RUN_ID,
     LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX: LIVE_MICRO_LLD_V2_CH_TEST_COV_FROM_UNIX,
     LIVE_MICRO_LLD_V2_CH_TEST_COV_TO_UNIX: LIVE_MICRO_LLD_V2_CH_TEST_COV_TO_UNIX,
@@ -1108,6 +1733,7 @@
     stripLiveMicroLldV2Overlays: stripLiveMicroLldV2Overlays,
     stripLiveMicroLldV2ChTestOverlays: stripLiveMicroLldV2ChTestOverlays,
     stripHistoricalLmv2Overlays: stripHistoricalLmv2Overlays,
+    countHistoricalLmv2Overlays: countHistoricalLmv2Overlays,
     normalizeScannerCommonZone: normalizeScannerCommonZone,
     selectPaneForScannerCommon: selectPaneForScannerCommon,
     scannerCommonOverlayToZone: scannerCommonOverlayToZone,
@@ -1139,8 +1765,18 @@
     applyHistoricalLmv2ToOverlays: applyHistoricalLmv2ToOverlays,
     clipUnixToHistoricalPilot: clipUnixToHistoricalPilot,
     resolveHistoricalLmv2RequestWindow: resolveHistoricalLmv2RequestWindow,
+    resolveHistoricalLmv2ViewportCloseWindow: resolveHistoricalLmv2ViewportCloseWindow,
+    planHistoricalLmv2Chunks: planHistoricalLmv2Chunks,
+    historicalLmv2CloseCoverage: historicalLmv2CloseCoverage,
     resolveHistoricalLmv2AsOfCloseUnix: resolveHistoricalLmv2AsOfCloseUnix,
+    historicalDecisionCloseAtOrBefore: historicalDecisionCloseAtOrBefore,
     historicalLmv2CacheKey: historicalLmv2CacheKey,
+    historicalLmv2ChunkCacheKey: historicalLmv2ChunkCacheKey,
+    mergeHistoricalLmv2Zones: mergeHistoricalLmv2Zones,
+    historicalCloseUnixToIsoZ: historicalCloseUnixToIsoZ,
+    lookupHistoricalLmv2ChunkCacheEntry: lookupHistoricalLmv2ChunkCacheEntry,
+    gatherHistoricalLmv2ZonePartsFromPlannedChunks: gatherHistoricalLmv2ZonePartsFromPlannedChunks,
+    touchHistoricalLmv2ChunkCache: touchHistoricalLmv2ChunkCache,
     normalizeHistoricalLmv2ZoneForRender: normalizeHistoricalLmv2ZoneForRender,
     filterOverlaysForChartRender: filterOverlaysForChartRender,
     countLiveMicroLldV2Overlays: countLiveMicroLldV2Overlays,

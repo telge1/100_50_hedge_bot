@@ -185,9 +185,21 @@
                     <label class="trp-check trp-dock-ind" title="Stärke Very Strong"><input type="checkbox" class="research-lmv2-strength" value="Very Strong" checked> VS</label>
                     <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
                     <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
-                    <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Phase 5D pilot, Aug 2026)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
+                    <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Phase 5I, DOGE 15m PD10, 2026-08-01 UTC)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Remaining</label>
+                    <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
+                    <span id="researchHistoricalLmv2StaticRangeWrap" class="trp-dock-ind" hidden>
+                        <input type="text" id="researchStaticTimelineFrom" class="trp-input trp-width" placeholder="From UTC e.g. 2026-04-01 00:00 UTC" aria-label="Static timeline from" autocomplete="off">
+                        <input type="text" id="researchStaticTimelineTo" class="trp-input trp-width" placeholder="To UTC e.g. 2026-04-03 23:45 UTC" aria-label="Static timeline to" autocomplete="off">
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelineLoad" title="Explicit 3-day (max) static window">Load static</button>
+                    </span>
+                    <span id="researchHistoricalLmv2PreloadWrap" class="trp-dock-ind" hidden>
+                        <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreload" title="Serial static windows for selected From/To (pilot max 7 days)">Preload historical pools</button>
+                        <button type="button" class="trp-text-btn" id="researchStaticTimelinePreloadCancel" title="Cancel running preload">Cancel preload</button>
+                        <span id="researchHistoricalLmv2PreloadHint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    </span>
                     <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
                     <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
@@ -512,8 +524,8 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5f-1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase5f-1"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5p-1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase5p-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
