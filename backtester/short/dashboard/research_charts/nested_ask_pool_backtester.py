@@ -109,6 +109,52 @@ def run_nested_ask_pool_backtest(
     )
 
 
+def run_historical_lmv2_input_dry_run(
+    *,
+    decision_close: str | datetime,
+    pool_detail: int,
+    symbol: str = "DOGEUSDT",
+    timeframe: str = "15m",
+    client=None,
+    database: str | None = None,
+) -> dict[str, Any]:
+    """Real nested-ask backtester entry: LMV2 input-only (Phase 6D), no trades."""
+    ensure_oa_on_path()
+    from orderbook_analyse.a_plus_nested_ask_pool_edge_short_v1.historical_lmv2_input_dry_run import (
+        run_historical_lmv2_input_dry_run as oa_run_historical_lmv2_input_dry_run,
+    )
+
+    from .historical_lmv2_backtester_input_bridge_v1 import (
+        load_historical_lmv2_backtester_input_at_close,
+    )
+    from .live_micro_lld_v2_ch_test.active_snapshot.published_reader import (
+        PublishedActiveReader,
+    )
+
+    reader = PublishedActiveReader()
+
+    def _bridge_loader(dc, *, pool_detail: int, symbol: str, timeframe: str, **_: Any):
+        state = load_historical_lmv2_backtester_input_at_close(
+            dc,
+            pool_detail=pool_detail,
+            symbol=symbol,
+            timeframe=timeframe,
+            client=client,
+            database=database,
+            reader=reader,
+        )
+        return state.to_dict()
+
+    return oa_run_historical_lmv2_input_dry_run(
+        decision_close=decision_close,
+        pool_detail=int(pool_detail),
+        symbol=symbol,
+        timeframe=timeframe,
+        loader=_bridge_loader,
+        loader_kwargs={"_loader_module": "research_charts.historical_lmv2_backtester_input_bridge_v1"},
+    )
+
+
 def load_run_payload(run_dir: Path | str) -> dict[str, Any]:
     p = Path(run_dir)
     overlay: dict[str, Any] = {}
