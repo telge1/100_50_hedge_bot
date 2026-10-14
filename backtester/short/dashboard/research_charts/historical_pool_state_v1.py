@@ -486,6 +486,7 @@ def load_historical_pool_state_at_close(
     database: str | None = None,
     reader: PublishedActiveReader | None = None,
     cfg_hash: str | None = None,
+    include_remaining: bool = True,
 ) -> HistoricalPoolStateAtClose:
     from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
 
@@ -522,25 +523,38 @@ def load_historical_pool_state_at_close(
         member_ids = set(pub["pool_ids"])
         if member_ids != {r["pool_id"] for r in catalog}:
             raise HistoricalPoolStateError("MEMBER_CATALOG_MISMATCH", "active membership vs catalog")
-        source = LineFilteredPublicationSource(
-            client, database, pipeline_line_id=line_id
+        active_members = _active_members_from_catalog(
+            catalog, pub["snapshot_id"], pipeline_line_id=line_id
         )
-        try:
-            rem = load_historical_remaining(
-                source,
-                symbol=sym,
-                timeframe=timeframe,
-                pool_detail=pool_detail,
-                decision_close=dc,
-                immutable_candle_snapshot_id=IMMUTABLE_SNAPSHOT_ID,
-                price_content_hash=IMMUTABLE_PRICE_HASH,
-                revision_metadata_hash=IMMUTABLE_REVISION_HASH,
-                snapshot_root=SNAPSHOT_ROOT,
+        if include_remaining:
+            source = LineFilteredPublicationSource(
+                client, database, pipeline_line_id=line_id
             )
-        except AdapterStop as exc:
-            raise HistoricalPoolStateError(exc.status, str(exc)) from exc
-        rem["decision_close"] = _iso_z(dc)
-        segments = list(rem.get("remaining") or [])
+            try:
+                rem = load_historical_remaining(
+                    source,
+                    symbol=sym,
+                    timeframe=timeframe,
+                    pool_detail=pool_detail,
+                    decision_close=dc,
+                    immutable_candle_snapshot_id=IMMUTABLE_SNAPSHOT_ID,
+                    price_content_hash=IMMUTABLE_PRICE_HASH,
+                    revision_metadata_hash=IMMUTABLE_REVISION_HASH,
+                    snapshot_root=SNAPSHOT_ROOT,
+                )
+            except AdapterStop as exc:
+                raise HistoricalPoolStateError(exc.status, str(exc)) from exc
+            rem["decision_close"] = _iso_z(dc)
+            segments = list(rem.get("remaining") or [])
+        else:
+            rem = {
+                "decision_close": _iso_z(dc),
+                "remaining": [],
+                "active": [],
+                "published_snapshot_id": pub["snapshot_id"],
+                "active_only_load": True,
+            }
+            segments = []
         return HistoricalPoolStateAtClose(
             pipeline_line_id=line_id,
             symbol=sym,
@@ -549,9 +563,7 @@ def load_historical_pool_state_at_close(
             decision_close=_iso_z(dc),
             snapshot_id=pub["snapshot_id"],
             active_state_fingerprint=pub["active_state_fingerprint"],
-            active_members=_active_members_from_catalog(
-                catalog, pub["snapshot_id"], pipeline_line_id=line_id
-            ),
+            active_members=active_members,
             remaining_projection=rem,
             remaining_segments=segments,
             remaining_fingerprint=remaining_fingerprint(rem),
