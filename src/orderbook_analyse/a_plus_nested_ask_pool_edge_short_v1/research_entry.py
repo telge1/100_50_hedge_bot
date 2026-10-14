@@ -552,3 +552,25 @@ def run_single_symbol_research_backtest(
         "strategy_id": STRATEGY_ID,
         "symbol": sym,
     }
+
+
+def run_historical_lmv2_input_dry_run(
+    *,
+    decision_close: str | datetime,
+    pool_detail: int,
+    symbol: str = "DOGEUSDT",
+    timeframe: str = "15m",
+    loader,
+    loader_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Programmatic LMV2 input-only entry (does not call ``run_backtest``)."""
+    from .historical_lmv2_input_dry_run import run_historical_lmv2_input_dry_run as _run
+
+    return _run(
+        decision_close=decision_close,
+        pool_detail=int(pool_detail),
+        symbol=symbol,
+        timeframe=timeframe,
+        loader=loader,
+        loader_kwargs=loader_kwargs,
+    )
