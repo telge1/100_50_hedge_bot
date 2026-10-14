@@ -155,6 +155,70 @@ def run_historical_lmv2_input_dry_run(
     )
 
 
+def run_historical_lmv2_sequential_candle_input_dry_run(
+    *,
+    first_decision_close: str | datetime,
+    last_decision_close: str | datetime,
+    pool_detail: int,
+    symbol: str = "DOGEUSDT",
+    timeframe: str = "15m",
+    client=None,
+    database: str | None = None,
+    ch_client=None,
+) -> dict[str, Any]:
+    """Phase 6E: sequential 15m candle walk → LMV2 input (no trades)."""
+    ensure_oa_on_path()
+    from orderbook_analyse.a_plus_nested_ask_pool_edge_short_v1.historical_lmv2_sequential_candle_input import (
+        run_sequential_lmv2_candle_input_dry_run,
+    )
+
+    from .historical_lmv2_backtester_input_bridge_v1 import (
+        load_historical_lmv2_backtester_input_at_close,
+    )
+    from .live_micro_lld_v2_ch_test.active_snapshot.published_reader import (
+        PublishedActiveReader,
+    )
+
+    reader = PublishedActiveReader()
+    ch = ch_client if ch_client is not None else client
+
+    def _bridge_loader(dc, *, pool_detail: int, symbol: str, timeframe: str, **_: Any):
+        state = load_historical_lmv2_backtester_input_at_close(
+            dc,
+            pool_detail=pool_detail,
+            symbol=symbol,
+            timeframe=timeframe,
+            client=client,
+            database=database,
+            reader=reader,
+        )
+        return state.to_dict()
+
+    def _bridge_parity(dc_iso: str, pd: int) -> dict[str, Any]:
+        st = load_historical_lmv2_backtester_input_at_close(
+            dc_iso,
+            pool_detail=pd,
+            symbol=symbol,
+            timeframe=timeframe,
+            client=client,
+            database=database,
+            reader=reader,
+        )
+        return st.to_dict()
+
+    return run_sequential_lmv2_candle_input_dry_run(
+        first_decision_close=first_decision_close,
+        last_decision_close=last_decision_close,
+        pool_detail=int(pool_detail),
+        symbol=symbol,
+        timeframe=timeframe,
+        loader=_bridge_loader,
+        loader_kwargs={"_loader_module": "research_charts.historical_lmv2_backtester_input_bridge_v1"},
+        client=ch,
+        bridge_parity_fn=_bridge_parity,
+    )
+
+
 def load_run_payload(run_dir: Path | str) -> dict[str, Any]:
     p = Path(run_dir)
     overlay: dict[str, Any] = {}
