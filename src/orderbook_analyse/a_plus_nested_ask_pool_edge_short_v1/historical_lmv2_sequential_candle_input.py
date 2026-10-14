@@ -195,6 +195,7 @@ def run_sequential_lmv2_candle_input_dry_run(
     loader_kwargs: dict[str, Any] | None = None,
     client=None,
     bridge_parity_fn: Callable[[str, int], dict[str, Any]] | None = None,
+    strategy_input_consumer: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Walk 15m closes in order; load LMV2 state at each via Phase 6D entry."""
     if timeframe != DEFAULT_TIMEFRAME:
@@ -210,6 +211,7 @@ def run_sequential_lmv2_candle_input_dry_run(
 
     per_close: list[dict[str, Any]] = []
     transitions: list[dict[str, Any]] = []
+    consumer_receipts: list[dict[str, Any]] = []
     prev_state: dict[str, Any] | None = None
 
     for candle in candle_rows:
@@ -252,12 +254,32 @@ def run_sequential_lmv2_candle_input_dry_run(
                 row["verdict"] = "PASS"
         else:
             row["verdict"] = "PASS"
+        if strategy_input_consumer is not None:
+            st_before = copy.deepcopy(st)
+            consumed = strategy_input_consumer(
+                candle=candle,
+                lmv2_state=st,
+                pool_detail=int(pool_detail),
+            )
+            if st_before != st:
+                row["verdict"] = "FAIL"
+                row["consumer_error"] = "STATE_MUTATION_AFTER_CONSUMER"
+            receipt = (consumed or {}).get("receipt")
+            if not receipt:
+                row["verdict"] = "FAIL"
+                row["consumer_error"] = "MISSING_RECEIPT"
+            else:
+                row["strategy_consumer"] = consumed
+                consumer_receipts.append(receipt)
+                if receipt.get("members_hash") != st.get("members_hash"):
+                    row["verdict"] = "FAIL"
+                    row["consumer_error"] = "RECEIPT_HASH_MISMATCH"
         per_close.append(row)
         transitions.append(membership_transition(prev_state, st))
         prev_state = st
 
     all_pass = all(r.get("verdict") == "PASS" for r in per_close)
-    return {
+    out: dict[str, Any] = {
         "consumer_entrypoint": CONSUMER_ENTRYPOINT,
         "candle_time_contract": {
             "label": CANDLE_LABEL_CONVENTION,
@@ -273,6 +295,14 @@ def run_sequential_lmv2_candle_input_dry_run(
         "membership_transitions": transitions,
         "verdict": "PASS" if all_pass else "FAIL",
     }
+    if strategy_input_consumer is not None:
+        out["strategy_input_consumer_enabled"] = True
+        out["consumer_receipts"] = consumer_receipts
+        out["consumer_receipt_count"] = len(consumer_receipts)
+        out["exactly_once_consumption"] = len(consumer_receipts) == len(per_close)
+        if not out["exactly_once_consumption"]:
+            out["verdict"] = "FAIL"
+    return out
 
 
 def describe_candle_time_contract() -> dict[str, Any]:
