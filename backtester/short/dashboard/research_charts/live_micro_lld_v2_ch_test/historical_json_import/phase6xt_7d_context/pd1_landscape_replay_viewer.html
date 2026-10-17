@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>PD1 Landscape Replay V1</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="toolbar">
+    <label>Modus
+      <select id="mode">
+        <option value="strength">A — Original-Strength</option>
+        <option value="origin">B — Origin-Density</option>
+      </select>
+    </label>
+    <label>As-of <input type="datetime-local" id="asof" step="300" /></label>
+    <button type="button" id="btnAnch1">29.07 23:55</button>
+    <button type="button" id="btnAnch2">01.08 18:55</button>
+    <button type="button" id="btnAnch3">01.08 19:15</button>
+    <label><input type="checkbox" id="showEvents" checked /> Events</label>
+    <span id="hint"></span>
+  </div>
+  <div id="canvas-wrap"><canvas id="c"></canvas></div>
+  <div id="detail">Lade Daten…</div>
+  <script src="replay.js"></script>
+</body>
+</html>
