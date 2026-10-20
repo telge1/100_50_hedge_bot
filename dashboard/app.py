@@ -3049,6 +3049,7 @@ if str(_dashboard_dir) not in sys.path:
 from research_charts.api import build_router as _build_research_router  # noqa: E402
 from gold_shadow.api import build_router as _build_gold_shadow_router  # noqa: E402
 from market_profile_v1.api import build_router as _build_market_profile_router  # noqa: E402
+from pd1_landscape_viewer_v1.api import build_router as _build_pd1_landscape_viewer_router  # noqa: E402
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
 from symbol_onboarding.api import build_router as _build_symbol_onboarding_router  # noqa: E402
@@ -3061,6 +3062,9 @@ app.include_router(
 )
 app.include_router(
     _build_market_profile_router(require_auth=require_auth, render_template=render_template)
+)
+app.include_router(
+    _build_pd1_landscape_viewer_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(_build_collector_health_router(require_auth=require_auth))
 app.include_router(_build_footprint_candles_router(require_auth=require_auth))

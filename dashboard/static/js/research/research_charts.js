@@ -12,12 +12,26 @@
   const DEFAULT_TFS = { "pane-0": "1m", "pane-1": "5m", "pane-2": "15m", "pane-3": "1h" };
   const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h"];
   const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
+
+  /** Min/max unix seconds without Function.apply (safe for 100k+ candle arrays). */
+  function minMaxUnixSeconds(times) {
+    if (!times || !times.length) return null;
+    let min = times[0];
+    let max = times[0];
+    for (let i = 1; i < times.length; i++) {
+      const t = times[i];
+      if (t < min) min = t;
+      if (t > max) max = t;
+    }
+    return { min: min, max: max };
+  }
+
   const SYMBOL_KEY = "research.symbol";
   const LAYOUT_KEY = "research.layout";
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "lld-cull-25";
+  const ASSET_V = "phase6xt-density-fixed-tile-integration-v1";
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
@@ -551,8 +565,10 @@
     if (!candles.length) return null;
     const times = candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
     if (!times.length) return null;
-    const from = Math.min.apply(null, times);
-    const lastStart = Math.max.apply(null, times);
+    const mm = minMaxUnixSeconds(times);
+    if (!mm) return null;
+    const from = mm.min;
+    const lastStart = mm.max;
     let barSec = 60;
     if (times.length >= 2) {
       const sorted = times.slice().sort(function (a, b) { return a - b; });
@@ -700,6 +716,15 @@
         }
       }
     }
+    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+      try {
+        await PD1ExactOriginResearch.refreshAll({ force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin live restore", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
     if (statusMsg) setStatus(statusMsg);
   }
 
@@ -834,6 +859,19 @@
       } catch (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] historical-lmv2 go-to", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+      try {
+        await PD1ExactOriginResearch.refreshAll({
+          force: true,
+          fromUnix: goto_ts_utc - win.viewPad,
+          toUnix: goto_ts_utc + win.viewPad,
+        });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin go-to", err); } catch (e) { /* ignore */ }
         }
       }
     }
@@ -1154,6 +1192,9 @@
         scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
         scheduleLiveMicroLldV2ViewportSync(pane);
+        if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+          PD1ExactOriginResearch.scheduleViewport(pane, from, to);
+        }
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
@@ -1241,7 +1282,19 @@
       const v2OnChart = SC_HELPERS && SC_HELPERS.countLiveMicroLldV2Overlays
         ? SC_HELPERS.countLiveMicroLldV2Overlays(chartList)
         : 0;
-      if (v2OnChart > 0 || Object.keys(wanted).length > 120) {
+      const eodOnChart =
+        SC_HELPERS && SC_HELPERS.isExactOriginDensityOverlay
+          ? chartList.some(function (p) {
+            return SC_HELPERS.isExactOriginDensityOverlay(p);
+          })
+          : false;
+      const eodCanvasOn =
+        exactOriginDensityCanvasEnabled() &&
+        exactOriginDensityEnabled() &&
+        pane.exactOriginSegmentCache &&
+        pane.exactOriginSegmentCache.segments &&
+        pane.exactOriginSegmentCache.segments.length;
+      if (v2OnChart > 0 || eodOnChart || eodCanvasOn || Object.keys(wanted).length > 120) {
         pane._suppressOverlayViewportFeedback = true;
         try {
           chart.layoutOverlays();
@@ -1256,8 +1309,15 @@
     if (!pane || !SC_HELPERS) return;
     const v2On = liveMicroLldV2Enabled() && paneSupportsLiveMicroLldV2(pane);
     const chOn = liveMicroLldV2ChTestEnabled() && paneSupportsLiveMicroLldV2ChTest(pane);
-    const histOn = historicalLmv2PoolsEnabled() && paneSupportsHistoricalLmv2(pane);
-    if (!v2On && !chOn && !histOn) return;
+    const histOn =
+      historicalLmv2PoolsEnabled() &&
+      !exactOriginDensityEnabled() &&
+      paneSupportsHistoricalLmv2(pane);
+    const eodOn =
+      exactOriginDensityEnabled() &&
+      window.PD1ExactOriginResearch &&
+      PD1ExactOriginResearch.paneSupports(pane);
+    if (!v2On && !chOn && !histOn && !eodOn) return;
     if (histOn) scheduleHistoricalLmv2ViewportLoad(pane);
     if (!v2On && !chOn) return;
     if (!SC_HELPERS.liveMicroLldV2NeedsViewportChartSync(pane.pendingOverlays || [])) return;
@@ -1269,7 +1329,7 @@
   }
 
   function scheduleHistoricalLmv2ViewportLoad(pane) {
-    if (!pane || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
+    if (!pane || exactOriginDensityEnabled() || !historicalLmv2PoolsEnabled() || !paneSupportsHistoricalLmv2(pane)) return;
     const pl = state.historicalLmv2Preload || {};
     if (historicalLmv2PreloadedStaticEnabled() && pl.status === "LOADING") return;
     if (historicalLmv2PreloadReady()) {
@@ -1339,6 +1399,20 @@
   function historicalLmv2PoolsEnabled() {
     const cb = $("researchIndHistoricalLmv2Pools");
     return !!(cb && cb.checked);
+  }
+
+  function exactOriginDensityEnabled() {
+    return !!(window.PD1ExactOriginResearch && PD1ExactOriginResearch.isEnabled());
+  }
+
+  const EXACT_ORIGIN_CANVAS_FLAG_KEY = "phase6xt_eod_density_canvas_v1";
+
+  function exactOriginDensityCanvasEnabled() {
+    try {
+      return localStorage.getItem(EXACT_ORIGIN_CANVAS_FLAG_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
   }
 
   function historicalLmv2ActiveEnabled() {
@@ -5414,7 +5488,7 @@
     const step = TF_SEC[pane.tf] || 60;
     const lag = paneClosedTipLagSec(pane);
     if (lag == null || lag <= step * 2) return 50;
-    return Math.min(4000, Math.ceil(lag / step) + 20);
+    return Math.min(3000, Math.ceil(lag / step) + 20);
   }
 
   function mergePollCandlesIntoPane(pane, incoming, packed) {
@@ -5486,9 +5560,12 @@
     mergePollCandlesIntoPane(pane, incoming, packed);
     const times = (pane.pendingData.candles || []).map(function (c) { return Number(c.time); }).filter(Number.isFinite);
     if (times.length) {
-      state.history.loadedFrom = Math.min.apply(null, times);
-      state.history.loadedTo = Math.max.apply(null, times);
-      updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+      const mm = minMaxUnixSeconds(times);
+      if (mm) {
+        state.history.loadedFrom = mm.min;
+        state.history.loadedTo = mm.max;
+        updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+      }
     }
     if (liveMicroLldV2Enabled() && paneSupportsLiveMicroLldV2(pane)) {
       try {
@@ -5514,6 +5591,15 @@
       } catch (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] historical-lmv2 after gap-backfill", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
+    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch && PD1ExactOriginResearch.paneSupports(pane)) {
+      try {
+        await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin after gap-backfill", err); } catch (e) { /* ignore */ }
         }
       }
     }
@@ -5550,7 +5636,8 @@
         causalLldLandscapeEnabled(),
         liveMicroLldV2Enabled(),
         liveMicroLldV2ChTestEnabled(),
-        historicalLmv2PoolsEnabled()
+        historicalLmv2PoolsEnabled() && !exactOriginDensityEnabled(),
+        exactOriginDensityEnabled()
       )
       : packed.overlays || [];
     pane.el.querySelector(".trp-pane-symbol").textContent = packed.symbol || state.symbol;
@@ -5679,10 +5766,21 @@
         }
       });
     }
-    if (paneSupportsHistoricalLmv2(pane)) {
+    if (paneSupportsHistoricalLmv2(pane) && historicalLmv2PoolsEnabled() && !exactOriginDensityEnabled()) {
       void refreshHistoricalLmv2(pane, { gen, signal: opts && opts.signal }).catch(function (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] historical-lmv2", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }
+    if (
+      exactOriginDensityEnabled() &&
+      window.PD1ExactOriginResearch &&
+      PD1ExactOriginResearch.paneSupports(pane)
+    ) {
+      void PD1ExactOriginResearch.refreshPane(pane, { force: true }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
         }
       });
     }
@@ -5705,9 +5803,12 @@
       const candleRows = (pane.pendingData && pane.pendingData.candles) || packed.candles || [];
       const times = candleRows.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
       if (times.length) {
-        state.history.loadedFrom = Math.min.apply(null, times);
-        state.history.loadedTo = Math.max.apply(null, times);
-        updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+        const mm = minMaxUnixSeconds(times);
+        if (mm) {
+          state.history.loadedFrom = mm.min;
+          state.history.loadedTo = mm.max;
+          updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+        }
       }
     }
     if (force && !(opts && opts.jumpToUnix != null) && (opts && opts.sourceAction) !== "go-to") {
@@ -5788,6 +5889,15 @@
         }
       }
     }
+    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+      try {
+        await PD1ExactOriginResearch.refreshAll({ force: true });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin after indicators", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
   }
 
   async function loadOverlays(paneId) {
@@ -5797,7 +5907,39 @@
       "&timeframe=" + encodeURIComponent(pane.tf),
       { sourceAction: "overlays", pane: paneId, timeframe: pane.tf }
     );
-    syncOverlays(pane, body.overlays || []);
+    let nextOverlays = body.overlays || [];
+    if (SC_HELPERS) {
+      nextOverlays = SC_HELPERS.mergePaneOverlaysPreservingScannerCommon(
+        nextOverlays,
+        pane.pendingOverlays || [],
+        false,
+        false,
+        false,
+        false,
+        false,
+        exactOriginDensityEnabled()
+      );
+    }
+    syncOverlays(pane, nextOverlays);
+    if (
+      exactOriginDensityEnabled() &&
+      window.PD1ExactOriginResearch &&
+      PD1ExactOriginResearch.paneSupports(pane)
+    ) {
+      const hasEod =
+        SC_HELPERS && SC_HELPERS.isExactOriginDensityOverlay
+          ? (pane.pendingOverlays || []).some(function (p) {
+            return SC_HELPERS.isExactOriginDensityOverlay(p);
+          })
+          : false;
+      if (!hasEod) {
+        void PD1ExactOriginResearch.refreshPane(pane, { force: true }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] exact-origin after overlays load", err); } catch (e) { /* ignore */ }
+          }
+        });
+      }
+    }
     const chart = api(pane);
     if (chart && body.lld_ema) chart.setLldEma(body.lld_ema);
     if (body.clusters) renderLegend((state.workspace || {}).liquidity, body.clusters);
@@ -7889,6 +8031,9 @@
     }
     if ($("researchIndHistoricalLmv2Pools")) {
       $("researchIndHistoricalLmv2Pools").addEventListener("change", async function () {
+        if (historicalLmv2PoolsEnabled() && exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+          PD1ExactOriginResearch.disableExactOrigin();
+        }
         state.historicalLmv2Cache = {};
         state.historicalLmv2ChunkStore = { chunks: {}, order: [] };
         updateHistoricalLmv2UiChrome();
@@ -7995,6 +8140,24 @@
     if ($("researchStaticTimelinePreloadCancel")) {
       $("researchStaticTimelinePreloadCancel").addEventListener("click", function () {
         cancelHistoricalLmv2Preload();
+      });
+    }
+    if (window.PD1ExactOriginResearch && PD1ExactOriginResearch.install) {
+      PD1ExactOriginResearch.install({
+        $: $,
+        state: state,
+        visibleIds: visibleIds,
+        syncOverlays: syncOverlays,
+        api: api,
+        SC_HELPERS: SC_HELPERS,
+        isHistoricalReplay: isHistoricalReplay,
+        decisionContext: liveMicroLldV2DecisionContext,
+        historicalLmv2PoolsEnabled: historicalLmv2PoolsEnabled,
+        historicalLmv2HistoricalPoolDetail: historicalLmv2HistoricalPoolDetail,
+        updateHistoricalLmv2UiChrome: updateHistoricalLmv2UiChrome,
+        updateHistoricalLmv2Hint: updateHistoricalLmv2Hint,
+        VP_DEBOUNCE_MS: VP_DEBOUNCE_MS,
+        setStatus: setStatus,
       });
     }
     function onLiveMicroV2FilterChange() {
