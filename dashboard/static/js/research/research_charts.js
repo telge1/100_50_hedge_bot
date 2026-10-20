@@ -31,7 +31,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "phase6xt-density-fixed-tile-integration-v1";
+  const ASSET_V = "phase6xt-density-min-depth-slider-v1";
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";

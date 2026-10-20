@@ -30,15 +30,15 @@ def test_module_wiring():
     ad = (DASH / "static/js/research/pd1_exact_density_trp_adapter.js").read_text(encoding="utf-8")
     html = (DASH / "templates/research_charts.html").read_text(encoding="utf-8")
     rc = (DASH / "static/js/research/research_charts.js").read_text(encoding="utf-8")
-    assert 'VERSION = "phase6xt-density-fixed-tile-integration-v1"' in js
+    assert 'VERSION = "phase6xt-density-min-depth-slider-v1"' in js
     assert "phase6xt_eod_fixed_tile_48h_v1" in js
     assert "isFixedTile48hEnabled" in js
     assert "planExactOriginLoadWindows" in ad
     assert "planExactOriginFixedTiles" in ad
     assert "exactOriginCacheKeyForWindow" in ad
     assert "EOD_MAX_API_CHUNK_MS" in ad
-    assert "phase6xt-density-fixed-tile-integration-v1" in html
-    assert "phase6xt-density-fixed-tile-integration-v1" in rc
+    assert "phase6xt-density-min-depth-slider-v1" in html
+    assert "phase6xt-density-min-depth-slider-v1" in rc
     assert "drawEodDensity" not in js
 
 

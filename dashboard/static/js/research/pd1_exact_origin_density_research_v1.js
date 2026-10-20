@@ -16,7 +16,9 @@
   const DEFAULT_MAX_CHART_ZONES = 900;
   const EOD_CANVAS_FLAG_KEY = "phase6xt_eod_density_canvas_v1";
   const EOD_FIXED_TILE_48H_FLAG_KEY = "phase6xt_eod_fixed_tile_48h_v1";
-  const VERSION = "phase6xt-density-fixed-tile-integration-v1";
+  const MIN_ORIGINS_STORAGE_KEY = "phase6xt_eod_density_min_origins_v1";
+  const MIN_ORIGINS_SLIDER_MAX = 10;
+  const VERSION = "phase6xt-density-min-depth-slider-v1";
   const MAX_CONCURRENT_WINDOW_FETCH = 2;
 
   let deps = null;
@@ -86,11 +88,51 @@
     }
   }
 
+  function getMinOrigins() {
+    const slider = deps && deps.$("researchExactOriginMinDepth");
+    if (slider && slider.value) {
+      return Math.max(1, parseInt(slider.value, 10) || 1);
+    }
+    try {
+      const stored = localStorage.getItem(MIN_ORIGINS_STORAGE_KEY);
+      if (stored != null) return Math.max(1, parseInt(stored, 10) || 1);
+    } catch (e) {
+      /* ignore */
+    }
+    return 1;
+  }
+
+  function setMinOrigins(n) {
+    const v = Math.max(1, Math.min(MIN_ORIGINS_SLIDER_MAX, parseInt(n, 10) || 1));
+    const slider = deps && deps.$("researchExactOriginMinDepth");
+    const label = deps && deps.$("researchExactOriginMinDepthValue");
+    if (slider) slider.value = String(v);
+    if (label) label.textContent = String(v);
+    try {
+      localStorage.setItem(MIN_ORIGINS_STORAGE_KEY, String(v));
+    } catch (e) {
+      /* ignore */
+    }
+    return v;
+  }
+
+  function filterForDisplay(segments) {
+    const AD = window.PD1ExactDensityTrpAdapter;
+    if (!AD || !AD.filterSegmentsByMinOrigins) return segments || [];
+    return AD.filterSegmentsByMinOrigins(segments, getMinOrigins());
+  }
+
   function pushCanvasDensity(pane, segments, metrics) {
     const chart = deps.api(pane);
+    const unfiltered = segments || [];
+    const filtered = filterForDisplay(unfiltered);
     mergeOverlays(pane, []);
     if (chart && chart.setExactOriginDensity) {
-      chart.setExactOriginDensity({ segments: segments, metrics: metrics });
+      const m = metrics ? Object.assign({}, metrics) : {};
+      m.minOriginsFilter = getMinOrigins();
+      m.segmentsUnfiltered = unfiltered.length;
+      m.segmentsDisplayed = filtered.length;
+      chart.setExactOriginDensity({ segments: filtered, metrics: m });
     }
     if (chart && chart.layoutOverlays) chart.layoutOverlays();
     const drawStats =
@@ -583,7 +625,7 @@
       pushCanvasDensity(pane, mergedSegments, null);
     } else {
       clearCanvasOnPane(pane);
-      mergeOverlays(pane, zones);
+      mergeOverlays(pane, filterForDisplay(zones));
     }
 
     lastMetrics = {
@@ -626,9 +668,19 @@
         lastMetrics.canvasSegmentsDrawn = drawStats.segmentsDrawn;
         lastMetrics.canvasSegmentsTotal = drawStats.segmentsTotal;
       }
-      pane.exactOriginSegmentCache = { key: renderKey, segments: mergedSegments, metrics: lastMetrics };
+      pane.exactOriginSegmentCache = {
+        key: renderKey,
+        segments: mergedSegments,
+        zones: null,
+        metrics: lastMetrics,
+      };
     } else {
-      pane.exactOriginSegmentCache = null;
+      pane.exactOriginSegmentCache = {
+        key: renderKey,
+        segments: null,
+        zones: zones,
+        metrics: lastMetrics,
+      };
     }
     pane.exactOriginLastMetrics = lastMetrics;
 
@@ -699,11 +751,39 @@
     }, deps.VP_DEBOUNCE_MS || 400);
   }
 
+  function reapplyMinDepthFilterAllPanes() {
+    if (!isEnabled() || !deps) return;
+    deps.visibleIds().forEach(function (pid) {
+      const pane = deps.state.panes[pid];
+      if (!pane || !paneSupports(pane)) return;
+      const cache = pane.exactOriginSegmentCache;
+      if (!cache) return;
+      if (isCanvasPathEnabled() && cache.segments) {
+        pushCanvasDensity(pane, cache.segments, cache.metrics);
+      } else if (cache.zones) {
+        mergeOverlays(pane, filterForDisplay(cache.zones));
+      }
+    });
+  }
+
+  function syncMinDepthUiFromStorage() {
+    let v = 1;
+    try {
+      const stored = localStorage.getItem(MIN_ORIGINS_STORAGE_KEY);
+      if (stored != null) v = Math.max(1, parseInt(stored, 10) || 1);
+    } catch (e) {
+      /* ignore */
+    }
+    setMinOrigins(v);
+  }
+
   function updateUiChrome() {
     const on = isEnabled();
     const wrap = deps && deps.$("researchExactOriginDensityWrap");
     const hint = deps && deps.$("researchExactOriginDensityHint");
+    const depthWrap = deps && deps.$("researchExactOriginMinDepthWrap");
     if (wrap) wrap.classList.toggle("exact-origin-active", on);
+    if (depthWrap) depthWrap.hidden = !on;
     if (!on && hint) hint.hidden = true;
   }
 
@@ -755,6 +835,21 @@
         }
       });
     }
+    syncMinDepthUiFromStorage();
+    const depthSlider = deps.$("researchExactOriginMinDepth");
+    const depthReset = deps.$("researchExactOriginMinDepthReset");
+    if (depthSlider) {
+      depthSlider.addEventListener("input", function () {
+        setMinOrigins(depthSlider.value);
+        reapplyMinDepthFilterAllPanes();
+      });
+    }
+    if (depthReset) {
+      depthReset.addEventListener("click", function () {
+        setMinOrigins(1);
+        reapplyMinDepthFilterAllPanes();
+      });
+    }
     updateUiChrome();
   }
 
@@ -789,5 +884,15 @@
     getLastMetrics: function () {
       return lastMetrics;
     },
+    getMinOrigins: getMinOrigins,
+    setMinOrigins: setMinOrigins,
+    filterSegmentsByMinOrigins: function (segments, minOrigins) {
+      const AD = window.PD1ExactDensityTrpAdapter;
+      return AD && AD.filterSegmentsByMinOrigins
+        ? AD.filterSegmentsByMinOrigins(segments, minOrigins)
+        : segments || [];
+    },
+    reapplyMinDepthFilterAllPanes: reapplyMinDepthFilterAllPanes,
+    MIN_ORIGINS_STORAGE_KEY: MIN_ORIGINS_STORAGE_KEY,
   };
 })();

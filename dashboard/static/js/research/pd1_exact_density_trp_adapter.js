@@ -393,6 +393,15 @@
     return mergeExactOriginSegments((a || []).concat(b || []));
   }
 
+  /** Render-only: hide segments/zones below minimum unique-origin depth (metadata.depth). */
+  function filterSegmentsByMinOrigins(segments, minOrigins) {
+    const min = Math.max(1, parseInt(minOrigins, 10) || 1);
+    return (segments || []).filter(function (seg) {
+      const depth = seg && seg.metadata ? seg.metadata.depth : 0;
+      return Number(depth) >= min;
+    });
+  }
+
   function exactOriginWindowsFullyCached(store, planned) {
     if (!store || !planned || !planned.length) return false;
     return planned.every(function (w) {
@@ -434,5 +443,6 @@
     densityBucket: densityBucket,
     fillRgb: fillRgb,
     opacityForDepth: opacityForDepth,
+    filterSegmentsByMinOrigins: filterSegmentsByMinOrigins,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -199,6 +199,12 @@
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
                     <label class="trp-check trp-dock-ind" id="researchExactOriginDensityWrap" title="Exact independent origin depth (ACTIVE only) — nicht parallel zu Historical LLD V2"><input type="checkbox" id="researchIndExactOriginDensity" autocomplete="off"> B – Exact Origin-Density</label>
+                    <span id="researchExactOriginMinDepthWrap" class="trp-dock-ind" hidden title="Darstellung: schwache Überlappungen ausblenden (keine SSOT-Änderung)">
+                        <span class="trp-muted">Mindest-Origins</span>
+                        <input type="range" id="researchExactOriginMinDepth" min="1" max="10" step="1" value="1" aria-label="Mindest-Origins Density-Filter">
+                        <span id="researchExactOriginMinDepthValue" class="trp-muted">1</span>
+                        <button type="button" class="trp-text-btn" id="researchExactOriginMinDepthReset" title="Filter auf 1 (alle sichtbar)">Reset</button>
+                    </span>
                     <span id="researchHistoricalLmv2PreloadModeWrap" class="trp-dock-ind" hidden>
                         <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
                     </span>
@@ -551,9 +557,9 @@
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
     <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-density-canvas-recursion-hotfix-v1"></script>
-    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-density-min-depth-slider-v1"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-density-min-depth-slider-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase6xt-density-min-depth-slider-v1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
