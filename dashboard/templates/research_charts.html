@@ -198,6 +198,7 @@
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
+                    <label class="trp-check trp-dock-ind" id="researchExactOriginDensityWrap" title="Exact independent origin depth (ACTIVE only) — nicht parallel zu Historical LLD V2"><input type="checkbox" id="researchIndExactOriginDensity" autocomplete="off"> B – Exact Origin-Density</label>
                     <span id="researchHistoricalLmv2PreloadModeWrap" class="trp-dock-ind" hidden>
                         <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
                     </span>
@@ -209,6 +210,7 @@
                     </span>
                     <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
                     <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    <span id="researchExactOriginDensityHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint research-ui-legacy-hidden" hidden aria-hidden="true"></span>
                     <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
@@ -548,8 +550,10 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5z-1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase5z-1"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-density-canvas-recursion-hotfix-v1"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase6xt-density-fixed-tile-integration-v1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
