@@ -402,6 +402,9 @@
     width: "normal",
   };
   let vpHoverIndex = -1;
+  let eodDensityPayload = null;
+  const EOD_DENSITY_MAX_DRAW_SEGMENTS = 8000;
+  let eodDensityLastDraw = { ms: 0, segmentsDrawn: 0, segmentsTotal: 0 };
   let obpPayload = null;
   let obpSettings = {
     enabled: false,
@@ -821,10 +824,12 @@
       scheduleResearchMarkersPaint();
       scheduleTradeBubblesPaint();
       if (overlayRangeTimer) clearTimeout(overlayRangeTimer);
+      const ovN = overlayRegistry.size;
+      const debounceMs = ovN > 1200 ? 220 : (ovN > 500 ? 160 : (researchMarkers.size > 200 ? 140 : 90));
       overlayRangeTimer = setTimeout(function () {
         overlayRangeTimer = null;
         layoutOverlays();
-      }, researchMarkers.size > 200 ? 140 : 90);
+      }, debounceMs);
       if (!range || range.from == null || range.to == null) {
         return;
       }
@@ -901,7 +906,7 @@
     // (that would reset the user's zoom via applyDefaultView).
     if (wasInvalid && lastPayload && lastPayload.candles && lastPayload.candles.length) {
       applySeriesData(lastPayload);
-      applyDefaultView();
+      if (!(replayViewLock && replayViewLock.soft)) applyDefaultView();
     }
     if (wasInvalid) {
       recreateNativeOverlays();
@@ -1384,7 +1389,7 @@
       syncOscLogicalFromMain(savedRange);
       resize();
     } else {
-      if (replayViewLock) enforceReplayViewLock();
+      if (replayViewLock && !replayViewLock.soft) enforceReplayViewLock();
       resize();
     }
     if (lastSelectedUnix != null) {
@@ -1529,7 +1534,8 @@
       series.setData(clipPointsToCandleExtent(spec.data || []));
     });
     if (replayViewLock) {
-      enforceReplayViewLock();
+      // Soft: keep followLive off without yanking the visible range back.
+      if (!replayViewLock.soft) enforceReplayViewLock();
     } else if (followLive && !viewManual && !skipRangeRestore) {
       applyDefaultView();
     } else if (savedTimeRange && savedTimeRange.from != null && savedTimeRange.to != null) {
@@ -2395,8 +2401,11 @@
         from: Number(lock.from),
         to: Number(lock.to),
         center: lock.center != null ? Number(lock.center) : null,
+        soft: !!lock.soft,
       };
       followLive = false;
+      // Soft lock only blocks live follow / default-view; range is applied once by GO TO jump.
+      if (replayViewLock.soft) return true;
       return enforceReplayViewLock();
     }
     replayViewLock = null;
@@ -2410,7 +2419,11 @@
 
   function applyDefaultView() {
     if (!chart) return false;
-    if (replayViewLock) return enforceReplayViewLock();
+    if (replayViewLock) {
+      // Soft lock: never move the camera (GO TO owns focus). Hard lock: pin range.
+      if (replayViewLock.soft) return false;
+      return enforceReplayViewLock();
+    }
     // Center once; do not keep chasing the live tip afterwards.
     viewManual = false;
     followLive = false;
@@ -2690,38 +2703,38 @@
       el.style.border =
         bw + "px " + (p.border_style || "solid") + " " + hexAlpha(bc, bAlpha);
     }
-    el.textContent = "";
     if (p.label_text) {
-      const tag = document.createElement("div");
-      tag.className = "ov-zone-label";
-      tag.textContent = p.label_text;
+      let tag = el.querySelector(".ov-zone-label");
+      if (!tag) {
+        tag = document.createElement("div");
+        tag.className = "ov-zone-label";
+        el.appendChild(tag);
+      }
+      if (tag.textContent !== p.label_text) tag.textContent = p.label_text;
       tag.style.color = color;
       tag.style.background = hexAlpha(color, 0.18);
       tag.style.left = "4px";
       tag.style.top = "2px";
-      el.appendChild(tag);
+    } else {
+      const oldTag = el.querySelector(".ov-zone-label");
+      if (oldTag) oldTag.remove();
     }
-    // LLD causality tooltip: known_at vs source_timestamp (unix seconds).
+    // LLD causality tooltip once — rebuilding ISO strings every pan frame is costly.
     const meta = p.metadata || {};
-    if (meta.source === "lld" || meta.source === "lld-cluster") {
+    if ((meta.source === "lld" || meta.source === "lld-cluster") && el.dataset.lldTitle !== "1") {
       const known = meta.available_at != null ? meta.available_at : (meta.known_at != null ? meta.known_at : p.start_timestamp);
       const src = meta.source_timestamp != null ? meta.source_timestamp : null;
-      const cStart = meta.confirmation_bar_start != null ? meta.confirmation_bar_start : null;
-      const cEnd = meta.confirmation_bar_end != null ? meta.confirmation_bar_end : null;
       const lines = [];
       if (meta.pool_id) lines.push("pool: " + meta.pool_id);
       if (meta.cluster_id) lines.push("cluster: " + meta.cluster_id);
       if (known != null) lines.push("available_at: " + new Date(Number(known) * 1000).toISOString());
-      if (known != null) lines.push("known_at: " + new Date(Number(known) * 1000).toISOString());
-      if (cStart != null) lines.push("confirmation_bar_start: " + new Date(Number(cStart) * 1000).toISOString());
-      if (cEnd != null) lines.push("confirmation_bar_end: " + new Date(Number(cEnd) * 1000).toISOString());
       if (src != null) lines.push("source_timestamp: " + new Date(Number(src) * 1000).toISOString());
       if (meta.side) lines.push("side: " + meta.side);
       if (meta.strength != null) lines.push("strength: " + meta.strength);
       if (meta.pool_status) lines.push("status: " + meta.pool_status);
-      if (meta.closed_bar_confirmed) lines.push("CLOSED-BAR CONFIRMED");
       el.title = lines.join("\n");
-    } else {
+      el.dataset.lldTitle = "1";
+    } else if (meta.source !== "lld" && meta.source !== "lld-cluster") {
       el.removeAttribute("title");
     }
   }
@@ -4046,6 +4059,22 @@
       "<div>quality: " + (b.quality_flags || "—") + "</div>";
   }
 
+  function getVisiblePriceRange() {
+    if (!chart || !candleSeries) return null;
+    try {
+      const visible = candleSeries.priceScale && candleSeries.priceScale().getVisibleRange
+        ? candleSeries.priceScale().getVisibleRange()
+        : (chart.priceScale("right").getVisibleRange && chart.priceScale("right").getVisibleRange());
+      if (!visible || visible.from == null || visible.to == null) return null;
+      const lo = Math.min(Number(visible.from), Number(visible.to));
+      const hi = Math.max(Number(visible.from), Number(visible.to));
+      if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+      return { from: lo, to: hi };
+    } catch (e) {
+      return null;
+    }
+  }
+
   function getVisibleTimeRange() {
     if (!chart) return null;
     try {
@@ -4124,24 +4153,25 @@
       const target = Math.floor(Number(centerUnix));
       const firstT = Number(candles[0].time);
       const lastT = Number(candles[candles.length - 1].time);
-      if (!Number.isFinite(target) || target < firstT || target > lastT) return false;
+      const barSec = estimateBarSec(candles);
+      const lastExclusive = lastT + barSec;
+      if (!Number.isFinite(target) || target < firstT || target >= lastExclusive) return false;
       const center = snapUnixToBar(target);
       if (center < firstT || center > lastT) return false;
-      const pad = Math.max(Number(padSec) || 3600, estimateBarSec(candles) * 10);
-      const wantFrom = Math.max(firstT, center - pad);
-      const wantTo = Math.min(lastT, center + pad);
-      if (wantTo <= wantFrom) return false;
-      if (applyVisibleTimeRange(wantFrom, wantTo)) return true;
+      const pad = Math.max(Number(padSec) || 3600, barSec * 10);
+      // Logical range first — time-based setVisibleRange often no-ops / fits-all
+      // when the series just grew from a short live window to multi-day history.
       let idx = 0;
       for (let i = 0; i < candles.length; i++) {
         if (Number(candles[i].time) <= center) idx = i;
         else break;
       }
-      const barSec = estimateBarSec(candles);
       const padBars = Math.max(30, Math.ceil(pad / barSec));
       const fromIdx = Math.max(0, idx - padBars);
       const toIdx = Math.min(candles.length - 1, idx + padBars);
       try {
+        followLive = false;
+        viewManual = true;
         chart.timeScale().setVisibleLogicalRange({
           from: fromIdx,
           to: toIdx + DEFAULT_RIGHT_OFFSET,
@@ -4149,11 +4179,169 @@
         syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
         layoutOverlays();
         updateSelectedLine();
+        scheduleFitPriceScaleToCandles(true);
         return true;
       } catch (e) {
-        return false;
+        const wantFrom = Math.max(firstT, center - pad);
+        const wantTo = Math.min(lastT, center + pad);
+        if (wantTo <= wantFrom) return false;
+        return applyVisibleTimeRange(wantFrom, wantTo);
       }
     });
+  }
+
+  function eodDensityCanvas() {
+    return $("eod-density-overlay");
+  }
+
+  function clipEodDensityOverlayToPlot() {
+    const canvas = eodDensityCanvas();
+    if (!canvas) return;
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, size.w || 0);
+    const h = Math.max(1, size.h || 0);
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    canvas.style.top = "0";
+    canvas.style.right = "auto";
+    canvas.style.bottom = "auto";
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    canvas.style.pointerEvents = "none";
+    canvas.style.zIndex = "2";
+    const wantW = Math.max(1, Math.floor(w * dpr));
+    const wantH = Math.max(1, Math.floor(h * dpr));
+    if (canvas.width !== wantW || canvas.height !== wantH) {
+      canvas.width = wantW;
+      canvas.height = wantH;
+    }
+  }
+
+  function eodSegmentHitsViewport(seg, tLo, tHi, pLo, pHi) {
+    if (!seg) return false;
+    const zs = Number(seg.start_timestamp);
+    const ze = Number(seg.end_timestamp != null ? seg.end_timestamp : zs);
+    const zb = Number(seg.bottom_price);
+    const zt = Number(seg.top_price);
+    if (![zs, ze, zb, zt].every(Number.isFinite)) return false;
+    const t0 = Math.min(zs, ze);
+    const t1 = Math.max(zs, ze);
+    const p0 = Math.min(zb, zt);
+    const p1 = Math.max(zb, zt);
+    return t1 >= tLo && t0 <= tHi && p1 >= pLo && p0 <= pHi;
+  }
+
+  function drawEodDensity() {
+    const canvas = eodDensityCanvas();
+    if (!canvas) return;
+    clipEodDensityOverlayToPlot();
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const boxW = Math.max(1, size.w);
+    const boxH = Math.max(1, size.h);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, boxW, boxH);
+    eodDensityLastDraw = { ms: 0, segmentsDrawn: 0, segmentsTotal: 0 };
+    if (!eodDensityPayload || !eodDensityPayload.segments || !eodDensityPayload.segments.length) {
+      canvas.style.display = "none";
+      return;
+    }
+    if (!chart || boxW < 16 || boxH < 16) {
+      canvas.style.display = "none";
+      return;
+    }
+    canvas.style.display = "block";
+    const plotW = plotRightX();
+    const plotH = plotBottomY();
+    let visFrom = null;
+    let visTo = null;
+    try {
+      const vr = chart.timeScale().getVisibleRange();
+      if (vr && vr.from != null && vr.to != null) {
+        visFrom = Number(vr.from);
+        visTo = Number(vr.to);
+      }
+    } catch (e) { /* ignore */ }
+    const priceVis = getVisiblePriceRange();
+    let tLo = visFrom;
+    let tHi = visTo;
+    let pLo = priceVis ? priceVis.from : null;
+    let pHi = priceVis ? priceVis.to : null;
+    if (tLo != null && tHi != null) {
+      const tPad = Math.max(3600, (tHi - tLo) * 0.08);
+      tLo -= tPad;
+      tHi += tPad;
+    }
+    if (pLo != null && pHi != null) {
+      const pPad = Math.max((pHi - pLo) * 0.12, Math.abs(pHi + pLo) * 0.0005);
+      pLo -= pPad;
+      pHi += pPad;
+    }
+    const tDraw0 = typeof performance !== "undefined" ? performance.now() : 0;
+    const segments = eodDensityPayload.segments;
+    eodDensityLastDraw.segmentsTotal = segments.length;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, plotW, plotH);
+    ctx.clip();
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (tLo != null && tHi != null && pLo != null && pHi != null) {
+        if (!eodSegmentHitsViewport(seg, tLo, tHi, pLo, pHi)) continue;
+      }
+      const x1 = xOf(seg.start_timestamp);
+      const x2 = xOf(seg.end_timestamp != null ? seg.end_timestamp : seg.start_timestamp);
+      const yTop = yOf(seg.top_price);
+      const yBot = yOf(seg.bottom_price);
+      if (x1 == null || x2 == null || yTop == null || yBot == null) continue;
+      const left = Math.min(x1, x2);
+      const right = Math.max(x1, x2);
+      const top = Math.min(yTop, yBot);
+      const bot = Math.max(yTop, yBot);
+      if (right < -8 || left > plotW + 8 || bot < -8 || top > plotH + 8) continue;
+      const w = Math.max(1, right - left);
+      const h = Math.max(1, bot - top);
+      const color = (seg.style && seg.style.color) || seg.color || "#7986cb";
+      const alpha = seg.opacity != null ? Number(seg.opacity) : 0.55;
+      ctx.fillStyle = hexAlpha(color, alpha);
+      ctx.fillRect(left, top, w, h);
+      eodDensityLastDraw.segmentsDrawn += 1;
+    }
+    ctx.restore();
+    const tDraw1 = typeof performance !== "undefined" ? performance.now() : 0;
+    eodDensityLastDraw.ms = Math.round(tDraw1 - tDraw0);
+  }
+
+  function setExactOriginDensity(payload) {
+    if (!payload || !payload.segments || !payload.segments.length) {
+      eodDensityPayload = null;
+      drawEodDensity();
+      return false;
+    }
+    eodDensityPayload = {
+      segments: payload.segments,
+      warning: payload.warning || null,
+      metrics: payload.metrics || null,
+    };
+    drawEodDensity();
+    return true;
+  }
+
+  function clearExactOriginDensity() {
+    eodDensityPayload = null;
+    drawEodDensity();
+    return true;
+  }
+
+  function getExactOriginDensityDrawStats() {
+    return {
+      ms: eodDensityLastDraw.ms,
+      segmentsDrawn: eodDensityLastDraw.segmentsDrawn,
+      segmentsTotal: eodDensityLastDraw.segmentsTotal,
+    };
   }
 
   function drawVolumeProfile() {
@@ -4350,15 +4538,65 @@
     }, 120);
   }
 
+  function overlayTimeBounds(p) {
+    if (!p) return null;
+    const start = p.start_timestamp != null ? Number(p.start_timestamp)
+      : (p.timestamp != null ? Number(p.timestamp) : null);
+    let end = p.end_timestamp != null ? Number(p.end_timestamp) : null;
+    if (p.extend_right) end = null; // open-ended to the right
+    if (start == null && end == null && p.timestamp != null) {
+      return { start: Number(p.timestamp), end: Number(p.timestamp) };
+    }
+    if (start == null && end == null) return null;
+    return { start: start, end: end };
+  }
+
+  function overlayOutsideVisibleRange(p, visFrom, visTo) {
+    if (visFrom == null || visTo == null || !Number.isFinite(visFrom) || !Number.isFinite(visTo)) {
+      return false;
+    }
+    const b = overlayTimeBounds(p);
+    if (!b) return false;
+    const pad = Math.max(3600, (visTo - visFrom) * 0.05);
+    const lo = visFrom - pad;
+    const hi = visTo + pad;
+    const a = b.start != null ? b.start : b.end;
+    const c = b.end != null ? b.end : b.start;
+    if (a == null || c == null) return false;
+    // extend_right: visible if start <= hi
+    if (p && p.extend_right) return Number(a) > hi;
+    return Number(c) < lo || Number(a) > hi;
+  }
+
   function layoutOverlaysNow() {
     overlayLayoutCount += 1;
     clipOverlayLayerToPlot();
     clipResearchMarkersToPlot();
+    let visFrom = null;
+    let visTo = null;
+    try {
+      const vr = chart && chart.timeScale ? chart.timeScale().getVisibleRange() : null;
+      if (vr && vr.from != null && vr.to != null) {
+        visFrom = Number(vr.from);
+        visTo = Number(vr.to);
+      }
+    } catch (e) { /* ignore */ }
     overlayRegistry.forEach(function (rec) {
+      if (!rec || !rec.payload) return;
+      // Cull off-screen LLD/DOM overlays — full style pass on 2k+ nodes lags pans.
+      if (overlayOutsideVisibleRange(rec.payload, visFrom, visTo)) {
+        if (rec.el) hideEl(rec.el);
+        else if (rec.payload.type === "zone" || rec.payload.type === "label" || rec.payload.type === "marker") {
+          // Avoid creating DOM for off-screen items until they enter the view.
+          return;
+        }
+        return;
+      }
       renderOneOverlay(rec);
     });
     scheduleResearchMarkersPaint();
     layoutShiftMeasure();
+    drawEodDensity();
     drawVolumeProfile();
     drawOrderbookProfile();
     // Throttle OB level canvas wipe; coalesced layout already limits calls per frame.
@@ -6742,6 +6980,9 @@
     setHostShift: setHostShift,
     setVolumeProfile: setVolumeProfile,
     clearVolumeProfile: clearVolumeProfile,
+    setExactOriginDensity: setExactOriginDensity,
+    clearExactOriginDensity: clearExactOriginDensity,
+    getExactOriginDensityDrawStats: getExactOriginDensityDrawStats,
     setOrderbookProfile: setOrderbookProfile,
     clearOrderbookProfile: clearOrderbookProfile,
     debugOrderbookProfile: debugOrderbookProfile,
@@ -6761,6 +7002,7 @@
     tradeBubbleAtUnix: tradeBubbleAtUnix,
     tradeBubbleAtPoint: tradeBubbleAtPoint,
     getVisibleTimeRange: getVisibleTimeRange,
+    getVisiblePriceRange: getVisiblePriceRange,
     setVisibleTimeRange: setVisibleTimeRange,
     focusOnTime: focusOnTime,
     setFollowLive: setFollowLive,

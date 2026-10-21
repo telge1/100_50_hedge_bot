@@ -561,6 +561,84 @@ body.research-browser-fs .trp-workspace {
     border-color: #5b8def;
     color: #5b8def;
 }
+
+.research-fullscreen-host {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* Native Fullscreen API — TRP chrome + dock tools + chart workspace */
+#researchFullscreenHost:fullscreen,
+#researchFullscreenHost:-webkit-full-screen,
+#researchChartDock:fullscreen,
+#researchChartDock:-webkit-full-screen {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    background: #0f1218;
+    overflow: hidden;
+}
+#researchFullscreenHost:fullscreen .trp-chrome,
+#researchFullscreenHost:-webkit-full-screen .trp-chrome {
+    flex: 0 0 auto;
+    margin-bottom: 4px;
+}
+#researchFullscreenHost:fullscreen .trp-toolbar,
+#researchFullscreenHost:-webkit-full-screen .trp-toolbar,
+#researchFullscreenHost:fullscreen .trp-footerbar,
+#researchFullscreenHost:-webkit-full-screen .trp-footerbar {
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 6px 10px;
+}
+#researchFullscreenHost:fullscreen .research-status,
+#researchFullscreenHost:-webkit-full-screen .research-status,
+#researchFullscreenHost:fullscreen .research-selected,
+#researchFullscreenHost:-webkit-full-screen .research-selected {
+    flex: 0 0 auto;
+    margin: 0 8px 4px;
+}
+#researchFullscreenHost:fullscreen #researchChartDock,
+#researchFullscreenHost:-webkit-full-screen #researchChartDock {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin-top: 0;
+}
+#researchFullscreenHost:fullscreen .trp-dock-bar,
+#researchFullscreenHost:-webkit-full-screen .trp-dock-bar {
+    flex: 0 0 auto;
+    max-height: min(42vh, 420px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+}
+#researchFullscreenHost:fullscreen .trp-workspace,
+#researchFullscreenHost:-webkit-full-screen .trp-workspace,
+#researchChartDock:fullscreen .trp-workspace,
+#researchChartDock:-webkit-full-screen .trp-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto !important;
+}
+#researchChartDock:fullscreen,
+#researchChartDock:-webkit-full-screen {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+#researchChartDock:fullscreen .trp-dock-bar,
+#researchChartDock:-webkit-full-screen .trp-dock-bar {
+    flex: 0 0 auto;
+    max-height: min(42vh, 420px);
+    overflow-y: auto;
+}
 .trp-pane-status { margin-left: auto; color: #8b93a7; font-size: 11px; }
 .trp-pane-frame {
     flex: 1 1 auto;

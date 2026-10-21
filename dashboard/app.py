@@ -3049,10 +3049,12 @@ if str(_dashboard_dir) not in sys.path:
 from research_charts.api import build_router as _build_research_router  # noqa: E402
 from gold_shadow.api import build_router as _build_gold_shadow_router  # noqa: E402
 from market_profile_v1.api import build_router as _build_market_profile_router  # noqa: E402
+from pd1_landscape_viewer_v1.api import build_router as _build_pd1_landscape_viewer_router  # noqa: E402
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402
 from symbol_onboarding.api import build_router as _build_symbol_onboarding_router  # noqa: E402
 from wall_decision_v1.api import build_router as _build_wall_decision_router  # noqa: E402
+from shadow_signals.api import build_router as _build_shadow_signals_router  # noqa: E402
 app.include_router(
     _build_research_router(require_auth=require_auth, render_template=render_template)
 )
@@ -3060,7 +3062,13 @@ app.include_router(
     _build_gold_shadow_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(
+    _build_shadow_signals_router(require_auth=require_auth, render_template=render_template)
+)
+app.include_router(
     _build_market_profile_router(require_auth=require_auth, render_template=render_template)
+)
+app.include_router(
+    _build_pd1_landscape_viewer_router(require_auth=require_auth, render_template=render_template)
 )
 app.include_router(_build_collector_health_router(require_auth=require_auth))
 app.include_router(_build_footprint_candles_router(require_auth=require_auth))
@@ -3448,54 +3456,95 @@ async def daten_signale_redirect(request: Request, user: dict = Depends(require_
     return RedirectResponse(url=target, status_code=302)
 
 
-@app.get("/ema-signale", response_class=HTMLResponse)
-async def ema_signale_page(
+def _v2_backtester_page_context(
     request: Request,
-    page: int = Query(0, ge=0, description="Zero-based signal page"),
-    page_size: int = Query(50, ge=1, le=500, description="Signals per page"),
-    symbol: str | None = Query(None),
-    direction: str | None = Query(None),
-    state: str | None = Query(None, description="CREATED|COMPLETED|CANCELLED|ERROR"),
-    start_time: str | None = Query(None, description="Start datetime filter (UTC)"),
-    end_time: str | None = Query(None, description="End datetime filter (UTC)"),
+    user: dict,
+    *,
+    page: int,
+    page_size: int,
+) -> dict[str, Any]:
+    return {
+        "request": request,
+        "user": user,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_filtered": 0,
+            "has_prev": False,
+            "has_next": False,
+        },
+        "banner": {
+            "title": "V2 STRATEGY BACKTESTER",
+            "body": "Floor-Guard Short · Historical Live Micro LLD V2",
+        },
+        "window_label": "SMOKE / STATE_WARMUP_NOT_PROVEN",
+        "page_size": page_size,
+        "signal_page": page,
+    }
+
+
+@app.get("/backtester", response_class=HTMLResponse)
+async def backtester_page(
+    request: Request,
+    page: int = Query(0, ge=0, description="Zero-based trade page"),
+    page_size: int = Query(50, ge=1, le=500, description="Trades per page"),
     user: dict = Depends(require_auth),
 ):
-    """EMA-59 Band Signale aus dem Signal-Generator (thr × 3, 17.09.2026)."""
-    from ema_sg_signals.feed import paginated_live_signals
-
-    payload = paginated_live_signals(
-        symbol=symbol,
-        direction=direction,
-        state=state,
-        start_time=start_time,
-        end_time=end_time,
-        page=page,
-        page_size=page_size,
+    """V2 Strategy Backtester — historische Original-V2-Pools (read-only)."""
+    return HTMLResponse(
+        render_template(
+            "ema_signale.html",
+            _v2_backtester_page_context(request, user, page=page, page_size=page_size),
+        )
     )
-    pagination = payload.get("pagination") or {}
-    signals = payload.get("signals") or []
-    return HTMLResponse(render_template(
-        "ema_signale.html",
-        {
-            "request": request,
-            "user": user,
-            "signals": signals,
-            "symbols": payload.get("symbols") or [],
-            "summary": payload.get("page_summary") or {},
-            "pagination": pagination,
-            "feed_ready": bool(payload.get("feed_ready")),
-            "feed_message": payload.get("message") or "",
-            "banner": payload.get("banner") or {},
-            "window_label": payload.get("window_label") or "",
-            "filter_symbol": (symbol or "").strip().upper(),
-            "filter_direction": (direction or "").strip().upper(),
-            "filter_state": (state or "").strip().upper(),
-            "filter_start_time": start_time or "",
-            "filter_end_time": end_time or "",
-            "page_size": pagination.get("page_size") or page_size,
-            "signal_page": pagination.get("page") or 0,
-        },
-    ))
+
+
+@app.get("/ema-signale")
+async def ema_signale_legacy_redirect(
+    request: Request,
+    user: dict = Depends(require_auth),
+):
+    """Legacy bookmark → /backtester (V2 backtester UI)."""
+    target = "/backtester"
+    if request.url.query:
+        target = f"{target}?{request.url.query}"
+    return RedirectResponse(url=target, status_code=308)
+
+
+@app.get("/api/ema-signale/v2-backtest/runs")
+async def api_ema_signale_v2_runs(user: dict = Depends(require_auth)):
+    from ema_signale_v2_api import api_list_runs
+
+    return api_list_runs()
+
+
+@app.get("/api/ema-signale/v2-backtest/results")
+async def api_ema_signale_v2_results(
+    user: dict = Depends(require_auth),
+    run_id: str = Query(...),
+    variant_key: str = Query(...),
+    page: int = Query(0, ge=0),
+    page_size: int = Query(50, ge=1, le=500),
+):
+    from ema_signale_v2_api import api_results
+
+    try:
+        return api_results(run_id, variant_key, page, page_size)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/api/ema-signale/v2-backtest/resolve-config")
+async def api_ema_signale_v2_resolve_config(
+    user: dict = Depends(require_auth),
+    pool_detail: int = Query(10, ge=1, le=10),
+    guard_on: bool = Query(False),
+):
+    from ema_signale_v2_api import api_resolve_config
+
+    return api_resolve_config(pool_detail, guard_on)
 
 
 @app.get("/stoch-profite", response_class=HTMLResponse)
@@ -15666,13 +15715,15 @@ if __name__ == "__main__":
     
     logger.info("🐕 Watchdog-Autostart deaktiviert, um Fremd-Dashboard-Reaktivierung zu vermeiden")
     
+    # Pass the FastAPI instance directly — import string "app:app" can resolve
+    # trading_research_platform/app/ when PYTHONPATH omits this dashboard dir.
     uvicorn.run(
-        "app:app",
+        app,
         host="0.0.0.0",
         port=dashboard_port,
         reload=reload_enabled,
         log_level="info",
         access_log=True,
         timeout_keep_alive=75,  # Erhöhte Timeout-Werte für Stabilität
-        timeout_graceful_shutdown=30
+        timeout_graceful_shutdown=30,
     )

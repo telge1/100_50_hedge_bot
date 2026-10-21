@@ -207,6 +207,18 @@
     return !!(p && p.namespace === HISTORICAL_LMV2_NS);
   }
 
+  var EXACT_ORIGIN_DENSITY_NS = "PD1_EXACT_ORIGIN_DENSITY_V1";
+
+  function isExactOriginDensityOverlay(p) {
+    return !!(p && p.namespace === EXACT_ORIGIN_DENSITY_NS);
+  }
+
+  function stripExactOriginDensityOverlays(list) {
+    return (list || []).filter(function (p) {
+      return p && !isExactOriginDensityOverlay(p);
+    });
+  }
+
   function isLiveMicroPoolOverlay(p) {
     return (
       isLiveMicroLldV2Overlay(p) ||
@@ -371,7 +383,8 @@
     keepCausal,
     keepLiveMicroV2,
     keepLiveMicroChTest,
-    keepHistoricalLmv2
+    keepHistoricalLmv2,
+    keepExactOriginDensity
   ) {
     var base = newPaneOverlays || [];
     var keepC = !!keepCommon;
@@ -379,21 +392,25 @@
     var keepV2 = !!keepLiveMicroV2;
     var keepCh = !!keepLiveMicroChTest;
     var keepHist = !!keepHistoricalLmv2;
-    if (!keepC && !keepL && !keepV2 && !keepCh && !keepHist) return base;
+    var keepEod = !!keepExactOriginDensity;
+    if (!keepC && !keepL && !keepV2 && !keepCh && !keepHist && !keepEod) return base;
     var preserved = (previousPendingOverlays || []).filter(function (p) {
       return (
         (keepC && isScannerCommonFamilyOverlay(p)) ||
         (keepL && isCausalLldLandscapeOverlay(p)) ||
         (keepV2 && isLiveMicroLldV2Overlay(p)) ||
         (keepCh && isLiveMicroLldV2ChTestOverlay(p)) ||
-        (keepHist && isHistoricalLmv2Overlay(p))
+        (keepHist && isHistoricalLmv2Overlay(p)) ||
+        (keepEod && isExactOriginDensityOverlay(p))
       );
     });
     if (!preserved.length) return base;
     return stripScannerCommonOverlays(
       stripCausalLldLandscapeOverlays(
-        stripHistoricalLmv2Overlays(
-          stripLiveMicroLldV2ChTestOverlays(stripLiveMicroLldV2Overlays(base))
+        stripExactOriginDensityOverlays(
+          stripHistoricalLmv2Overlays(
+            stripLiveMicroLldV2ChTestOverlays(stripLiveMicroLldV2Overlays(base))
+          )
         )
       )
     ).concat(preserved);
@@ -1796,6 +1813,9 @@
     stripLiveMicroLldV2Overlays: stripLiveMicroLldV2Overlays,
     stripLiveMicroLldV2ChTestOverlays: stripLiveMicroLldV2ChTestOverlays,
     stripHistoricalLmv2Overlays: stripHistoricalLmv2Overlays,
+    EXACT_ORIGIN_DENSITY_NS: EXACT_ORIGIN_DENSITY_NS,
+    isExactOriginDensityOverlay: isExactOriginDensityOverlay,
+    stripExactOriginDensityOverlays: stripExactOriginDensityOverlays,
     countHistoricalLmv2Overlays: countHistoricalLmv2Overlays,
     normalizeScannerCommonZone: normalizeScannerCommonZone,
     selectPaneForScannerCommon: selectPaneForScannerCommon,

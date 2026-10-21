@@ -21,7 +21,7 @@ from .open_interest import load_open_interest_payload
 from .trp_import import load_trp
 
 DEFAULT_LIMIT = 1500
-MAX_LIMIT = 3000
+MAX_LIMIT = 50000
 # HTF panes need more completed bars so LLD can keep distant highs/lows.
 # Calendar coverage (approx): 5m ~5d, 15m ~17d, 30m ~38d, 1h ~92d, 4h ~10m.
 DEFAULT_LIMIT_BY_TF = {
@@ -49,7 +49,18 @@ LLD_AMOUNT_MULTIPLIER_BY_TF = {
     "1h": 3.0,
     "4h": 4.0,
 }
-MAX_LLD_AMOUNT = 4000
+# Newest-N display cap (Pine box.all). Research chart selection prefers
+# currently-active pools (few, deep history) then a small ghost budget —
+# dumping thousands of invalidated boxes freezes the browser (~4MB JSON).
+MAX_LLD_AMOUNT = 12000
+# Hard cap on pools shipped to the chart (active + ghosts). Above ~2.5k
+# overlays (~3MB) the research chart UI tends to freeze.
+MAX_LLD_CHART_POOLS = 2200
+# Recent window where we keep nearly all meaningful pools (not newest-N only).
+LLD_DENSE_LOOKBACK_DAYS = 21
+LLD_DENSE_MIN_LIFE_HOURS = 1.5
+LLD_DENSE_SHORT_KEEP_FRAC = 0.50
+LLD_OLDER_MIN_LIFE_HOURS = 8.0
 # Layout 4 default panes — 1m visible for smoke + HTF stack.
 DEFAULT_PANE_TIMEFRAMES = ("1m", "5m", "15m", "1h")
 DEFAULT_SOURCE_KIND = "clickhouse"
@@ -99,6 +110,13 @@ def _cache_ttl(start: int | None, end: int | None) -> float | None:
         return None
     if end is None:
         return _DEFAULT_WINDOW_TTL
+    # History windows pinned to "now" must not serve a 45s stale tip (looks like
+    # the chart stops days in the past until incremental poll catches up).
+    try:
+        if int(time.time()) - int(end) < 1800:
+            return None
+    except (TypeError, ValueError):
+        pass
     return _HISTORY_TTL
 
 
@@ -301,6 +319,153 @@ def scaled_lld_amount(amount: int, timeframe: str) -> int:
     return max(1, min(int(round(base * mult)), MAX_LLD_AMOUNT))
 
 
+def select_lld_pools_for_chart(
+    pools_all: list,
+    amount: int,
+    *,
+    tip: object | None = None,
+) -> list:
+    """Chart display slice optimized for research completeness without UI freeze.
+
+    Pine ``amount`` = newest N boxes floods 5m charts with short-lived ghosts and
+    drops older active liquidity. Research policy instead:
+
+    1. Keep **all currently-active** pools (few, deep history, extend to tip).
+    2. In the last ``LLD_DENSE_LOOKBACK_DAYS``: keep every ghost with lifetime
+       >= ``LLD_DENSE_MIN_LIFE_HOURS``, plus a fraction of shorter ones (evenly).
+    3. Further back: keep long-lived ghosts (>= ``LLD_OLDER_MIN_LIFE_HOURS``).
+    4. Cap total at ``min(amount, MAX_LLD_CHART_POOLS)`` by dropping shorts first.
+
+    Detection (``pools_all``) is unchanged — this only picks what we draw.
+    """
+    from datetime import timedelta
+
+    amount = max(1, min(int(amount), MAX_LLD_CHART_POOLS, MAX_LLD_AMOUNT))
+    all_pools = list(pools_all or [])
+    if not all_pools:
+        return []
+
+    def _order_key(p):
+        side = 0 if getattr(p, "side", "") == "upper" else 1
+        return (int(getattr(p, "created_index", 0) or 0), side, str(getattr(p, "pool_id", "")))
+
+    def _pid(p) -> str:
+        return str(getattr(p, "pool_id", id(p)))
+
+    def _life_hours(p) -> float:
+        if bool(getattr(p, "active", False)):
+            return 1e9
+        inv = getattr(p, "invalidated_timestamp", None)
+        created = getattr(p, "created_timestamp", None)
+        if inv is None or created is None:
+            return 0.0
+        try:
+            return max(0.0, (inv - created).total_seconds() / 3600.0)
+        except Exception:
+            return 0.0
+
+    def _strength(p) -> float:
+        s = getattr(p, "strength", None)
+        try:
+            return float(s) if s is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    tip_ts = tip
+    if tip_ts is None:
+        tip_ts = max(
+            (getattr(p, "created_timestamp", None) for p in all_pools),
+            default=None,
+        )
+    if tip_ts is None:
+        return sorted(all_pools, key=_order_key)[-amount:]
+
+    dense_from = tip_ts - timedelta(days=float(LLD_DENSE_LOOKBACK_DAYS))
+
+    def _intersects_dense(p) -> bool:
+        created = getattr(p, "created_timestamp", None)
+        if created is None:
+            return False
+        end = getattr(p, "invalidated_timestamp", None)
+        if bool(getattr(p, "active", False)) or end is None:
+            end = tip_ts
+        try:
+            return created <= tip_ts and end >= dense_from
+        except Exception:
+            return False
+
+    active = sorted([p for p in all_pools if bool(getattr(p, "active", False))], key=_order_key)
+    if len(active) >= amount:
+        return active[-amount:]
+
+    dense_inv = [p for p in all_pools if (not bool(getattr(p, "active", False))) and _intersects_dense(p)]
+    dense_long = [p for p in dense_inv if _life_hours(p) >= float(LLD_DENSE_MIN_LIFE_HOURS)]
+    dense_short = sorted(
+        [p for p in dense_inv if _life_hours(p) < float(LLD_DENSE_MIN_LIFE_HOURS)],
+        key=_order_key,
+    )
+    # Even subsample of short-lived noise in the dense window.
+    frac = max(0.0, min(1.0, float(LLD_DENSE_SHORT_KEEP_FRAC)))
+    if dense_short and frac < 1.0:
+        step = max(1, int(round(1.0 / max(frac, 1e-6))))
+        dense_short = dense_short[::step]
+    dense_keep = list(dense_long) + list(dense_short)
+    dense_ids = {_pid(p) for p in dense_keep} | {_pid(p) for p in active}
+
+    older = [
+        p
+        for p in all_pools
+        if (not bool(getattr(p, "active", False)))
+        and _pid(p) not in dense_ids
+        and _life_hours(p) >= float(LLD_OLDER_MIN_LIFE_HOURS)
+    ]
+    older = sorted(older, key=lambda p: (_life_hours(p), _strength(p), _order_key(p)), reverse=True)
+
+    picked: list = []
+    seen: set[str] = set()
+
+    def _add(seq):
+        for p in seq:
+            pid = _pid(p)
+            if pid in seen:
+                continue
+            seen.add(pid)
+            picked.append(p)
+            if len(picked) >= amount:
+                return True
+        return False
+
+    # Priority: active → dense window (long then short) → older long-lived.
+    # Dense window first so the signal period is not starved by ancient ghosts.
+    if _add(active):
+        return picked
+    dense_long_sorted = sorted(dense_long, key=lambda p: (_life_hours(p), _strength(p)), reverse=True)
+    if _add(dense_long_sorted):
+        return picked
+    dense_short_sorted = sorted(dense_short, key=lambda p: (_strength(p), _order_key(p)), reverse=True)
+    if _add(dense_short_sorted):
+        return picked
+    _add(older)
+    return picked
+
+
+def strip_lld_strength_labels(overlays: list) -> list:
+    """Drop per-pool strength text labels (keep zones + cluster labels).
+
+    Strength labels roughly double DOM overlay count and dominate pan lag;
+    the zone rectangles already show the liquidity.
+    """
+    out: list = []
+    for o in overlays or []:
+        name = type(o).__name__
+        meta = getattr(o, "metadata", None) or {}
+        src = meta.get("source") if isinstance(meta, dict) else None
+        if name == "OverlayLabel" and src == "lld":
+            continue
+        out.append(o)
+    return out
+
+
 def lld_config_for_timeframe(config, timeframe: str):
     """Copy LLD config with a TF-scaled display amount. Detection lengths stay as set."""
     trp = load_trp()
@@ -488,6 +653,136 @@ def _candles_from_packed(packed: dict[str, Any], *, allow_stale: bool = False) -
     ]
 
 
+def _timeframe_seconds(timeframe: str) -> int:
+    return int(_TF_SEC.get(str(timeframe), 60))
+
+
+def _max_indicator_warmup_bars(
+    ema: dict | None,
+    stochastic: dict | None,
+    liquidity: dict | None,
+) -> int:
+    """Bars needed before the visible window so EMA/Stoch seed correctly."""
+    warm = 0
+    ema_raw = dict(ema or {})
+    lines = ema_raw.get("lines")
+    if isinstance(lines, list):
+        for line in lines:
+            if not isinstance(line, dict):
+                continue
+            if line.get("enabled", True) is False:
+                continue
+            try:
+                warm = max(warm, int(line.get("period") or 0))
+            except (TypeError, ValueError):
+                continue
+    elif bool(ema_raw.get("enabled")):
+        # defaults(): EMA 9 / 20 / 59
+        warm = max(warm, 59)
+
+    stoch_raw = dict(stochastic or {})
+    if bool(stoch_raw.get("enabled")):
+        try:
+            k_len = int(stoch_raw.get("k_length") or 14)
+            k_s = int(stoch_raw.get("k_smoothing") or 3)
+            d_s = int(stoch_raw.get("d_smoothing") or 3)
+            warm = max(warm, k_len + k_s + d_s)
+        except (TypeError, ValueError):
+            warm = max(warm, 20)
+
+    lld_raw = dict(liquidity or {})
+    if bool(lld_raw.get("enabled")):
+        for key in ("lookback", "amount", "left_bars", "right_bars"):
+            try:
+                warm = max(warm, int(lld_raw.get(key) or 0))
+            except (TypeError, ValueError):
+                continue
+    return max(0, int(warm))
+
+
+def _trim_xy_series(points: list | None, start_unix: int) -> list:
+    out: list = []
+    for p in points or []:
+        if not isinstance(p, dict):
+            continue
+        try:
+            t = int(p.get("time"))
+        except (TypeError, ValueError):
+            continue
+        if t >= start_unix:
+            out.append(p)
+    return out
+
+
+def _trim_indicators_to_visible(
+    indicators: dict[str, Any],
+    *,
+    start_unix: int,
+) -> dict[str, Any]:
+    ema = dict(indicators.get("ema") or {})
+    series = []
+    for row in ema.get("series") or []:
+        if not isinstance(row, dict):
+            continue
+        trimmed = dict(row)
+        trimmed["data"] = _trim_xy_series(row.get("data"), start_unix)
+        series.append(trimmed)
+    ema["series"] = series
+
+    stoch = dict(indicators.get("stochastic") or {})
+    if isinstance(stoch.get("series"), list):
+        stoch_series = []
+        for row in stoch["series"]:
+            if not isinstance(row, dict):
+                continue
+            trimmed = dict(row)
+            trimmed["data"] = _trim_xy_series(row.get("data"), start_unix)
+            stoch_series.append(trimmed)
+        stoch["series"] = stoch_series
+
+    oi = dict(indicators.get("open_interest") or {})
+    if isinstance(oi.get("series"), list):
+        oi_series = []
+        for row in oi["series"]:
+            if not isinstance(row, dict):
+                continue
+            trimmed = dict(row)
+            trimmed["data"] = _trim_xy_series(row.get("data"), start_unix)
+            oi_series.append(trimmed)
+        oi["series"] = oi_series
+    elif isinstance(oi.get("data"), list):
+        oi["data"] = _trim_xy_series(oi.get("data"), start_unix)
+
+    return {
+        **indicators,
+        "ema": ema,
+        "stochastic": stoch,
+        "open_interest": oi,
+    }
+
+
+def _trim_packed_candles(packed: dict[str, Any], *, start_unix: int, end_unix: int | None) -> dict[str, Any]:
+    out = dict(packed)
+    candles = []
+    for c in packed.get("candles") or []:
+        if not isinstance(c, dict):
+            continue
+        try:
+            t = int(c.get("time"))
+        except (TypeError, ValueError):
+            continue
+        if t < start_unix:
+            continue
+        if end_unix is not None and t > int(end_unix):
+            continue
+        candles.append(c)
+    out["candles"] = candles
+    out["from"] = int(start_unix)
+    if end_unix is not None:
+        out["to"] = int(end_unix)
+    return out
+
+
 def candle_objects(
     symbol: str,
     timeframe: str,
@@ -587,6 +882,12 @@ def _indicators_from_candles(
     if bool(lld_cfg.enabled):
         lld_cfg = lld_config_for_timeframe(lld_cfg, packed.get("timeframe") or "")
         lld_result = trp["run_liquidity_location"](candles, lld_cfg)
+        # Prefer active pools for chart (deep history, small payload).
+        lld_result.pools = select_lld_pools_for_chart(
+            lld_result.pools_all,
+            int(lld_cfg.amount),
+            tip=getattr(lld_result, "last_timestamp", None),
+        )
         clusters = None
         if bool(lld_cfg.clusters_enabled):
             clusters = trp["cluster_pools"](
@@ -599,7 +900,9 @@ def _indicators_from_candles(
             )
             lld_clusters = trp["cluster_bucket_counts"](shown)
         overlays = trp["serialize_overlays"](
-            trp["compose_lld_overlays"](lld_result, lld_cfg, clusters=clusters)
+            strip_lld_strength_labels(
+                trp["compose_lld_overlays"](lld_result, lld_cfg, clusters=clusters)
+            )
         )
         lld_ema = trp["lld_ema_payload"](lld_result, lld_cfg)
 
@@ -735,18 +1038,35 @@ def pane_bundle(
     allow_stale: bool = False,
     liquidity_location_as_of: str | None = None,
 ) -> dict[str, Any]:
-    """One candle read, then EMA/Stoch/OI/LLD/overlays from that same payload."""
+    """One candle read, then EMA/Stoch/OI/LLD/overlays from that same payload.
+
+    When ``start``/``end`` pin a short window (GO TO ±4h), load extra warmup bars
+    before ``start`` so EMA/Stoch seed correctly, then trim the visible candles
+    and indicator series back to the requested window.
+    """
     from .workspace_session import get_workspace
 
-    packed = resolve_candle_pack(
-        symbol, timeframe, start=start, end=end, limit=limit, allow_stale=allow_stale
-    )
-    candles = _candles_from_packed(packed, allow_stale=True)
     ws = get_workspace()
     ema_cfg = ema if ema is not None else ws.ema_config.to_dict()
     stoch_cfg = stochastic if stochastic is not None else ws.stoch_config.to_dict()
     oi_cfg = open_interest if open_interest is not None else dict(ws.open_interest)
     lld_cfg = liquidity if liquidity is not None else ws.lld_config.to_dict()
+
+    visible_start = int(start) if start is not None else None
+    warm_bars = _max_indicator_warmup_bars(ema_cfg, stoch_cfg, lld_cfg)
+    load_start = visible_start
+    if visible_start is not None and warm_bars > 0:
+        load_start = int(visible_start) - warm_bars * _timeframe_seconds(timeframe)
+
+    packed = resolve_candle_pack(
+        symbol,
+        timeframe,
+        start=load_start,
+        end=end,
+        limit=limit,
+        allow_stale=allow_stale,
+    )
+    candles = _candles_from_packed(packed, allow_stale=True)
     indicators = _indicators_from_candles(
         packed,
         candles,
@@ -763,6 +1083,11 @@ def pane_bundle(
         end=end,
         workspace=ws,
     )
+    if visible_start is not None and load_start is not None and load_start < visible_start:
+        packed = _trim_packed_candles(packed, start_unix=visible_start, end_unix=end)
+        indicators = _trim_indicators_to_visible(indicators, start_unix=visible_start)
+        packed["indicator_warmup_from"] = int(load_start)
+        packed["indicator_warmup_bars"] = int(warm_bars)
     liquidity_meta = section["liquidity_meta"]
     return {
         **packed,

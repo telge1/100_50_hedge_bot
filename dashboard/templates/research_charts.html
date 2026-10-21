@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=phase5z-1">
+    <link rel="stylesheet" href="/static/css/research.css?v=phase6xt-research-fullscreen-tools-v3">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -31,6 +31,7 @@
             </div>
             <div class="research-banner historical" id="researchFeedBanner">{{ feed_message }}</div>
 
+            <div id="researchFullscreenHost" class="research-fullscreen-host">
             <div class="trp-chrome">
                 <div class="trp-toolbar" id="trpToolbar">
                     <div class="trp-title-box">
@@ -190,7 +191,7 @@
                     <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
                     <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
                     <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
-                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Chart aufziehen oder zurücksetzen">⛶</button>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Vollbild">⛶</button>
                     </div>
                     <div class="trp-dock-row trp-dock-row-historical" id="researchDockRowHistorical">
                     <span class="trp-dock-row-label">Hist. Pools</span>
@@ -198,6 +199,19 @@
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2ActiveWrap" hidden><input type="checkbox" id="researchIndHistoricalLmv2Active" checked autocomplete="off"> ACTIVE</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
+                    <label class="trp-check trp-dock-ind" id="researchExactOriginDensityWrap" title="Exact independent origin depth (ACTIVE only) — nicht parallel zu Historical LLD V2"><input type="checkbox" id="researchIndExactOriginDensity" autocomplete="off"> B – Exact Origin-Density</label>
+                    <span id="researchExactOriginPdWrap" class="trp-dock-ind" hidden title="Density pool detail — unabhängig von Historical LLD V2; Timeframe = Chart-Pane">
+                        <span class="trp-muted">Density PD:</span>
+                        <label class="trp-check trp-dock-ind" id="researchExactOriginPd1Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="1" autocomplete="off" checked> PD1</label>
+                        <label class="trp-check trp-dock-ind" id="researchExactOriginPd5Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="5" autocomplete="off" disabled> PD5</label>
+                        <label class="trp-check trp-dock-ind" id="researchExactOriginPd10Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="10" autocomplete="off" disabled> PD10</label>
+                    </span>
+                    <span id="researchExactOriginMinDepthWrap" class="trp-dock-ind" hidden title="Darstellung: schwache Überlappungen ausblenden (keine SSOT-Änderung)">
+                        <span class="trp-muted">Mindest-Origins</span>
+                        <input type="range" id="researchExactOriginMinDepth" min="1" max="10" step="1" value="1" aria-label="Mindest-Origins Density-Filter">
+                        <span id="researchExactOriginMinDepthValue" class="trp-muted">1</span>
+                        <button type="button" class="trp-text-btn" id="researchExactOriginMinDepthReset" title="Filter auf 1 (alle sichtbar)">Reset</button>
+                    </span>
                     <span id="researchHistoricalLmv2PreloadModeWrap" class="trp-dock-ind" hidden>
                         <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
                     </span>
@@ -209,6 +223,7 @@
                     </span>
                     <span id="researchHistoricalLmv2Banner" class="trp-muted research-lld-asof-hint" hidden>RESEARCH_HISTORICAL — Backfill, keine bestätigte Live-Verfügbarkeit</span>
                     <span id="researchHistoricalLmv2Hint" class="trp-muted research-lld-asof-hint" hidden></span>
+                    <span id="researchExactOriginDensityHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLiveMicroLldV2Hint" class="trp-muted research-lld-asof-hint research-ui-legacy-hidden" hidden aria-hidden="true"></span>
                     <span id="researchLiveMicroLldV2ChTestHint" class="trp-muted research-lld-asof-hint" hidden></span>
                     <span id="researchLldAsOfHint" class="trp-muted research-lld-asof-hint" hidden title="Research / OA pool layer (not Scanner Pools COMMON)"></span>
@@ -291,6 +306,7 @@
                 </div>
                 <div class="trp-workspace layout-1" id="researchWorkspace"></div>
             </div>
+            </div><!-- #researchFullscreenHost -->
         </div>
     </div>
 
@@ -548,8 +564,10 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase5z-1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase5z-1"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-density-canvas-recursion-hotfix-v1"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-exact-origin-canvas-planned-hotfix-v1"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-exact-origin-canvas-planned-hotfix-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase6xt-research-fullscreen-tools-v3"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
