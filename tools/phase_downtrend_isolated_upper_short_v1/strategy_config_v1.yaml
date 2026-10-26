@@ -1,0 +1,104 @@
+# downtrend_isolated_upper_short_v1 — research skeleton (fail-closed gates)
+# Provenance: trading parameters copied from configs/backtester.yaml (BT-D9 24h baseline)
+# Pool-first pilot reference: configs/pilot_bt_d21_pool_first_24h.yaml (signal_selection_mode only)
+
+isolated_strategy_v1:
+  contract: downtrend_isolated_upper_short_v1
+  strategy_id: downtrend_isolated_upper_short_v1
+  status: RESEARCH_SKELETON_FAIL_CLOSED
+  minimum_warmup_hours: 168
+  warmup_note: "Decision window must start >=168h after density history; older still-ACTIVE origins via canonical provider"
+  regime_classifier:
+    default_regime: UNCERTAIN
+    ema_order_rule: UNSET
+    ema_slope_rule: UNSET
+    sideways_range_rule: UNSET
+    price_structure_rule: UNSET
+  isolated_upper_eligibility:
+    default_eligible: false
+    pool_growth_filter: UNSET
+    upper_stack_density_filter: UNSET
+  short_pause:
+    initial_pause_state: SHORT_PAUSED
+    requalification_after_sl: UNSET
+    cooldown_timer: forbidden
+  entry_gate:
+    require_regime: DOWNTREND
+    require_pause_ready: true
+    require_isolated_eligible: true
+    require_baseline_signal: true
+  baseline_config_provenance:
+    primary: configs/backtester.yaml
+    pool_first_alternate: configs/pilot_bt_d21_pool_first_24h.yaml
+
+yaml_schema_version: bt_d16_yaml_v1
+config_version: bt_d6_strategy_backtest_config_v1
+
+strategy_identity:
+  strategy_id: downtrend_isolated_upper_short_v1
+  strategy_version: isolated_upper_short_skeleton_v1
+  frozen_source_reference: strategy_freeze/pool_landscape_v1_candidate/SOURCE_PROVENANCE.json
+  research_mode: depth2_density_research_v1
+
+backtest:
+  symbol: DOGEUSDT
+  symbols:
+    - DOGEUSDT
+  start_utc: "2026-09-02T16:00:00Z"
+  end_utc: "2026-09-09T22:00:00Z"
+  end_utc_exclusive: true
+  execution_timeframe: 5m
+  outcome_blind_signals: true
+  deterministic_seed: 20261026
+
+density:
+  timeframe: 5m
+  pool_detail: 1
+  method: exact_unique_origin
+  min_unique_origins: 2
+  density_source: canonical_provider
+
+short_entry:
+  entry_pool_selection_mode: nearest_upper_proximity_v1
+  entry_price_mode: pool_lower_edge
+  entry_offset_pct: null
+  pool_min_age_bars: 0
+  gap_min_pct: 0.5
+  upper_gap_measurement_mode: adjacent_union_interval_gap_pct_v1
+  pool_proximity_pct: 0.05
+  pending_limit: true
+  pending_limit_expiry_bars: null
+  pending_limit_fill_model: causal_sell_limit_v2
+
+long_entry:
+  enabled: false
+
+risk:
+  sl_above_upper_top_pct: 0.2
+  max_concurrent_positions: 1
+
+take_profit:
+  selection_mode: next_eligible_band
+  min_distance_pct: 0.5
+  distance_reference: actual_fill_to_lower_upper_edge
+  dense_cluster_semantics_approved: false
+  tp_pool_quality_gate_enabled: false
+
+pnl:
+  initial_equity_usdt: 10000.0
+  sizing_mode: fixed_notional_usdt
+  position_notional_usdt: 1000.0
+  risk_fraction_pct: null
+  leverage: 1.0
+  trading_fee_model:
+    model: roundtrip_pct_of_notional
+    roundtrip_pct: 0.11
+  slippage_model:
+    model: none
+    entry_slippage_pct: 0.0
+    exit_slippage_pct: 0.0
+  funding_model:
+    model: none
+    funding_rate_bps_per_8h: 0.0
+  intrabar_ambiguity_policy: no_trade_ambiguous
+  end_of_test_open_position_policy: exclude_from_realized_pnl
