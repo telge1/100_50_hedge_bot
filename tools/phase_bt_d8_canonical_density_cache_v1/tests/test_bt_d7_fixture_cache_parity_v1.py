@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import sys
-from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -18,8 +17,9 @@ for p in (str(BT_D6), str(BT_D7), str(BT_D8), str(ROOT / "tools/phase4d_pool_lan
         sys.path.insert(0, p)
 
 from cache_builder_v1 import build_cache_bundle  # noqa: E402
+from cache_session_v1 import ValidatedDensityCacheSessionV1  # noqa: E402
 from config_validate_v1 import load_and_validate_config  # noqa: E402
-from density_bridge_v1 import FixtureDensitySessionV1, create_density_session  # noqa: E402
+from density_bridge_v1 import FixtureDensitySessionV1  # noqa: E402
 from short_research_engine_v1 import run_short_research_backtest  # noqa: E402
 
 FIXTURE = BT_D7 / "fixtures/synthetic_integration_v1.json"
@@ -53,12 +53,19 @@ def test_fixture_provider_matches_cache_backtest(tmp_path):
     )
 
     cfg = load_and_validate_config(CFG)
-    cfg_cache = deepcopy(cfg)
-    cfg_cache["density"]["density_source"] = "validated_cache"
-    cfg_cache["density"]["validated_cache"] = {"bundle_path": str(bundle_dir)}
-
-    r_fix = run_short_research_backtest(cfg, FixtureDensitySessionV1(fix["snapshots"]), fix["prices"])
-    r_cache = run_short_research_backtest(cfg_cache, create_density_session(cfg_cache), fix["prices"])
+    # Same strategy config for both arms; density transport differs only via session injection
+    # (BT-D57: mutating cfg for validated_cache changes config_content_hash and signal_id).
+    enriched_by_close = snaps
+    r_fix = run_short_research_backtest(
+        cfg,
+        FixtureDensitySessionV1(enriched_by_close),
+        fix["prices"],
+    )
+    r_cache = run_short_research_backtest(
+        cfg,
+        ValidatedDensityCacheSessionV1(bundle_dir, strategy_config=cfg),
+        fix["prices"],
+    )
 
     assert r_fix["signals"] == r_cache["signals"]
     assert r_fix["orders"] == r_cache["orders"]
