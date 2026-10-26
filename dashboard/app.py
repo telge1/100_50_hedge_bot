@@ -2628,7 +2628,12 @@ async def timeout_and_error_handler(request: Request, call_next):
         
         try:
             # Führe Request mit Timeout aus
-            req_timeout = 300.0 if request.url.path.startswith("/api/market-profile/") else 150.0
+            if request.url.path.startswith("/api/market-profile/"):
+                req_timeout = 300.0
+            elif request.url.path == "/live-charts/viewer/api/window":
+                req_timeout = 240.0
+            else:
+                req_timeout = 150.0
             response = await asyncio.wait_for(call_next(request), timeout=req_timeout)
             
             # Request erfolgreich → reset Circuit Breaker (nur bei erfolgreichen Responses)
@@ -2651,7 +2656,12 @@ async def timeout_and_error_handler(request: Request, call_next):
             
             return response
         except asyncio.TimeoutError:
-            req_timeout = 300.0 if request.url.path.startswith("/api/market-profile/") else 150.0
+            if request.url.path.startswith("/api/market-profile/"):
+                req_timeout = 300.0
+            elif request.url.path == "/live-charts/viewer/api/window":
+                req_timeout = 240.0
+            else:
+                req_timeout = 150.0
             logger.error(f"⏱️ Timeout für {endpoint} nach {req_timeout:.0f}s")
             if not _is_circuit_breaker_exempt(request.url.path):
                 # Erhöhe Circuit Breaker Failures
@@ -3049,6 +3059,9 @@ if str(_dashboard_dir) not in sys.path:
 from research_charts.api import build_router as _build_research_router  # noqa: E402
 from gold_shadow.api import build_router as _build_gold_shadow_router  # noqa: E402
 from market_profile_v1.api import build_router as _build_market_profile_router  # noqa: E402
+# BT-D38: research_charts → pool_pattern.ensure_paths() prepends pools backtester mirror;
+# re-assert live dashboard package so pd1_landscape_viewer_v1 is not shadowed.
+sys.path.insert(0, str(_dashboard_dir))
 from pd1_landscape_viewer_v1.api import build_router as _build_pd1_landscape_viewer_router  # noqa: E402
 from collector_health.api import build_router as _build_collector_health_router  # noqa: E402
 from footprint_candles.api import build_router as _build_footprint_candles_router  # noqa: E402

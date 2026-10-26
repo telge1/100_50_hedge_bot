@@ -491,15 +491,99 @@
 }
 .trp-pane-header {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
-    height: 30px;
-    padding: 0 8px;
+    gap: 6px 8px;
+    min-height: 30px;
+    padding: 2px 8px;
     background: #1a2030;
     border-bottom: 1px solid #2a2e39;
     color: #d1d4dc;
     font-size: 12px;
-    flex: 0 0 30px;
+    flex: 0 0 auto;
+    max-height: none;
+    overflow: visible;
+}
+.trp-draw-toolbar-pool {
+    position: absolute;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+.trp-pane-draw-host {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex-wrap: wrap;
+}
+.trp-pane-draw-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.trp-pane-draw-toolbar .trp-tool-btn,
+.trp-pane-draw-toolbar .trp-text-btn {
+    height: 22px;
+}
+.trp-pane-draw-toolbar .trp-select.trp-width {
+    height: 22px;
+    min-height: 22px;
+}
+.trp-pane-draw-toolbar .trp-color {
+    width: 26px;
+    height: 22px;
+    padding: 0;
+}
+.trp-pane-nav-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+    min-width: 0;
+}
+.trp-pane-header-sep {
+    display: inline-block;
+    width: 10px;
+    flex: 0 0 10px;
+}
+.trp-pane-goto-input {
+    width: min(14rem, 32vw);
+    max-width: 220px;
+    height: 22px;
+    font-size: 11px;
+    padding: 0 6px;
+}
+.trp-pane-nav-controls .trp-text-btn {
+    height: 22px;
+    font-size: 11px;
+}
+.trp-pane-nav-controls .trp-layout-btn {
+    height: 22px;
+    min-width: 26px;
+    padding: 0 6px;
+}
+.trp-pane-nav-label {
+    font-size: 10px;
+}
+.trp-pane-nav-controls .trp-pane-min-origins {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-left: 1.35rem;
+    gap: 4px;
+}
+.trp-pane-nav-controls .trp-pane-min-origins[hidden] {
+    display: none !important;
+}
+.trp-pane-nav-controls .trp-pane-min-origins input[type="range"] {
+    width: 72px;
+    vertical-align: middle;
 }
 .trp-pane-symbol { font-weight: 600; }
 .trp-pane-sep { color: #8b93a7; }
@@ -535,6 +619,39 @@ body.research-browser-fs .research-selected,
 body.research-browser-fs .trp-footerbar {
     display: none !important;
 }
+/* Immersive chart fullscreen: only pane headers + chart grid (tools/GO TO/LAYOUT in header) */
+body.research-chart-immersive-fs .trp-chrome,
+body.research-chart-immersive-fs .trp-dock-bar,
+body.research-chart-immersive-fs .research-live-bar,
+body.research-chart-immersive-fs .research-banner,
+#researchFullscreenHost.research-chart-immersive-fs .trp-chrome,
+#researchFullscreenHost.research-chart-immersive-fs .trp-dock-bar {
+    display: none !important;
+}
+body.research-chart-immersive-fs .research-status,
+body.research-chart-immersive-fs .research-selected,
+#researchFullscreenHost.research-chart-immersive-fs .research-status,
+#researchFullscreenHost.research-chart-immersive-fs .research-selected {
+    display: none !important;
+}
+body.research-chart-immersive-fs .research-fullscreen-host,
+body.research-chart-immersive-fs #researchChartDock {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+body.research-chart-immersive-fs #researchChartDock {
+    margin-top: 0 !important;
+    border-radius: 0;
+    border: none;
+}
+body.research-chart-immersive-fs .trp-workspace {
+    flex: 1 1 auto;
+    min-height: 0 !important;
+    height: auto !important;
+    margin-top: 0 !important;
+}
 body.research-browser-fs .dashboard-content.research-trp-shell {
     position: fixed;
     inset: 0;
@@ -548,7 +665,7 @@ body.research-browser-fs .dashboard-content.research-trp-shell {
     background: #0f1218;
     box-sizing: border-box;
 }
-body.research-browser-fs .trp-chrome {
+body.research-browser-fs:not(.research-chart-immersive-fs) .trp-chrome {
     flex: 0 0 auto;
 }
 body.research-browser-fs .trp-workspace {
@@ -585,24 +702,16 @@ body.research-browser-fs .trp-workspace {
     overflow: hidden;
 }
 #researchFullscreenHost:fullscreen .trp-chrome,
-#researchFullscreenHost:-webkit-full-screen .trp-chrome {
-    flex: 0 0 auto;
-    margin-bottom: 4px;
-}
-#researchFullscreenHost:fullscreen .trp-toolbar,
-#researchFullscreenHost:-webkit-full-screen .trp-toolbar,
-#researchFullscreenHost:fullscreen .trp-footerbar,
-#researchFullscreenHost:-webkit-full-screen .trp-footerbar {
-    flex-wrap: wrap;
-    gap: 6px 10px;
-    padding: 6px 10px;
+#researchFullscreenHost:-webkit-full-screen .trp-chrome,
+#researchFullscreenHost:fullscreen .trp-dock-bar,
+#researchFullscreenHost:-webkit-full-screen .trp-dock-bar {
+    display: none !important;
 }
 #researchFullscreenHost:fullscreen .research-status,
 #researchFullscreenHost:-webkit-full-screen .research-status,
 #researchFullscreenHost:fullscreen .research-selected,
 #researchFullscreenHost:-webkit-full-screen .research-selected {
-    flex: 0 0 auto;
-    margin: 0 8px 4px;
+    display: none !important;
 }
 #researchFullscreenHost:fullscreen #researchChartDock,
 #researchFullscreenHost:-webkit-full-screen #researchChartDock {
@@ -611,14 +720,6 @@ body.research-browser-fs .trp-workspace {
     display: flex;
     flex-direction: column;
     margin-top: 0;
-}
-#researchFullscreenHost:fullscreen .trp-dock-bar,
-#researchFullscreenHost:-webkit-full-screen .trp-dock-bar {
-    flex: 0 0 auto;
-    max-height: min(42vh, 420px);
-    overflow-y: auto;
-    overflow-x: hidden;
-    overscroll-behavior: contain;
 }
 #researchFullscreenHost:fullscreen .trp-workspace,
 #researchFullscreenHost:-webkit-full-screen .trp-workspace,
@@ -633,13 +734,26 @@ body.research-browser-fs .trp-workspace {
     flex: 1 1 auto;
     min-height: 0;
 }
+#researchChartDock:fullscreen .trp-chrome,
+#researchChartDock:-webkit-full-screen .trp-chrome,
 #researchChartDock:fullscreen .trp-dock-bar,
-#researchChartDock:-webkit-full-screen .trp-dock-bar {
-    flex: 0 0 auto;
-    max-height: min(42vh, 420px);
-    overflow-y: auto;
+#researchChartDock:-webkit-full-screen .trp-dock-bar,
+#researchChartDock:fullscreen .research-status,
+#researchChartDock:-webkit-full-screen .research-status,
+#researchChartDock:fullscreen .research-selected,
+#researchChartDock:-webkit-full-screen .research-selected {
+    display: none !important;
 }
-.trp-pane-status { margin-left: auto; color: #8b93a7; font-size: 11px; }
+.trp-pane-status {
+    margin-left: auto;
+    color: #8b93a7;
+    font-size: 11px;
+    flex: 0 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 40%;
+}
 .trp-pane-frame {
     flex: 1 1 auto;
     width: 100%;

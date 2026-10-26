@@ -12,6 +12,47 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .boundary import PANE_COUNT, SUPPORTED_LAYOUTS, SUPPORTED_TIMEFRAMES
+from .exit_pool_backtester import (
+    BACKTESTER_SOURCE as EXIT_POOL_SOURCE,
+    DRAWING_PREFIX as EXIT_POOL_DRAWING_PREFIX,
+    STRATEGY_ID as EXIT_POOL_STRATEGY_ID,
+)
+from .bt_d7_short_research_backtester import (
+    BACKTESTER_SOURCE as BT_D7_SOURCE,
+    DRAWING_PREFIX as BT_D7_DRAWING_PREFIX,
+    HLINE_PREFIX as BT_D7_HLINE_PREFIX,
+    ARROW_PREFIX as BT_D7_ARROW_PREFIX,
+    STRATEGY_ID as BT_D7_STRATEGY_ID,
+    build_drawing_specs,
+)
+from .bt_d23_setup_scanner_backtester import (
+    BACKTESTER_SOURCE as BT_D23_SOURCE,
+    DRAWING_PREFIX as BT_D23_DRAWING_PREFIX,
+    STRATEGY_ID as BT_D23_STRATEGY_ID,
+    filter_setups_viewport as filter_d23_setups_viewport,
+    setup_to_position_spec as d23_setup_to_position_spec,
+)
+from .bt_d26_dynamic_selector_backtester import (
+    BACKTESTER_SOURCE as BT_D26_SOURCE,
+    DISPLAY_MODE_ALL_SETUPS as BT_D26_DISPLAY_ALL,
+    DISPLAY_MODE_CURRENT_CANDIDATE as BT_D26_DISPLAY_CURRENT,
+    DRAWING_PREFIX as BT_D26_DRAWING_PREFIX,
+    MARKER_PREFIX as BT_D26_MARKER_PREFIX,
+    STRATEGY_ID as BT_D26_STRATEGY_ID,
+    build_clean_view_draw_specs as d26_build_clean_view_draw_specs,
+    filter_setups_viewport as filter_d26_setups_viewport,
+    setup_to_position_spec as d26_setup_to_position_spec,
+)
+from .bt_d46_chronological_backtester import (
+    BACKTESTER_SOURCE as BT_D46_SOURCE,
+    BOX_PREFIX as BT_D46_BOX_PREFIX,
+    LABEL_PREFIX as BT_D46_LABEL_PREFIX,
+    LINK_PREFIX as BT_D46_LINK_PREFIX,
+    MARKER_PREFIX as BT_D46_MARKER_PREFIX,
+    STRATEGY_ID as BT_D46_STRATEGY_ID,
+    build_viewport_draw_specs as d46_build_viewport_draw_specs,
+    position_detail_panel as d46_position_detail_panel,
+)
 from .stoch_backtester import BACKTESTER_SOURCE, signal_to_position_spec
 from .trp_import import load_trp
 
@@ -209,6 +250,13 @@ class ResearchWorkspace:
         self._nested_ask_pool_visible: bool = False
         self._nested_ask_pool_show_rejected: bool = False
         self._pool_signals_display_mode: str = "off"
+        self._bt_d23_catalog: dict[str, Any] | None = None
+        self._bt_d23_rendered_ids: set[str] = set()
+        self._bt_d26_catalog: dict[str, Any] | None = None
+        self._bt_d26_rendered_ids: set[str] = set()
+        self._bt_d46_catalog: dict[str, Any] | None = None
+        self._bt_d46_rendered_ids: set[str] = set()
+        self._bt_d46_overlay_ids: set[str] = set()
         self._load_persisted_drawings()
 
     def _load_persisted_drawings(self) -> None:
@@ -311,7 +359,13 @@ class ResearchWorkspace:
             "ezm": self._ezm_snapshot(),
             "pool_signals": self._pool_signals_snapshot(),
             "nested_ask_pool": self._nested_ask_pool_snapshot(),
+            **self._scanner_settings_meta(),
         }
+
+    def _scanner_settings_meta(self) -> dict[str, Any]:
+        from .scanner_settings_guard_v1 import workspace_frozen_engine_parity
+
+        return workspace_frozen_engine_parity()
 
     def _cluster_sweep_snapshot(self) -> dict[str, Any]:
         run = self._cluster_sweep_run or {}
@@ -478,7 +532,10 @@ class ResearchWorkspace:
         if orderbook_levels is not None:
             self.orderbook_levels = normalize_orderbook_levels(orderbook_levels)
         self.persist_settings()
-        return self.snapshot()
+        snap = self.snapshot()
+        if liquidity is not None:
+            snap["settings_affects"] = ["research_lld_only"]
+        return snap
 
     def set_indicator_enabled(self, name: str, enabled: bool) -> dict[str, Any]:
         if name == "stochastic":
@@ -604,6 +661,898 @@ class ResearchWorkspace:
             "loaded": loaded,
             "skipped": skipped,
             "source": BACKTESTER_SOURCE,
+        }
+        return snap
+
+    def _clear_all_position_drawings(self, symbol: str) -> int:
+        """Remove every long/short position drawing for this symbol.
+
+        Research backtester mode should never mix leftover Stoch/NAP shorts with
+        the current exit-pool long report.
+        """
+        sym = str(symbol or "").strip().upper()
+        if not sym:
+            return 0
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            dtype = str(getattr(drawing, "drawing_type", "") or "")
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or meta.get("source") or "")
+            is_position = dtype in ("long_position", "short_position")
+            is_bt = (
+                did.startswith("stoch-")
+                or did.startswith(EXIT_POOL_DRAWING_PREFIX)
+                or "backtester" in origin
+                or origin in {
+                    BACKTESTER_SOURCE,
+                    EXIT_POOL_SOURCE,
+                    APS_SOURCE,
+                    NAP_SOURCE,
+                }
+            )
+            if is_position or is_bt:
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        if removed:
+            self.persist_drawings()
+        return removed
+
+    def _clear_exit_pool_drawings(self, symbol: str | None = None) -> int:
+        if not symbol:
+            return 0
+        return self._clear_all_position_drawings(symbol)
+
+    def clear_exit_pool_backtester(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_exit_pool_drawings(sym)
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": EXIT_POOL_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": EXIT_POOL_SOURCE,
+            "message": "Exit-Pool Overlays ausgeblendet",
+        }
+        return snap
+
+    def import_exit_pool_backtester(
+        self,
+        symbol: str,
+        specs: list[dict[str, Any]],
+        *,
+        meta: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Replace Exit-Pool long positions (Entry/TP/SL) for this symbol."""
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        sym = str(symbol or "").strip().upper()
+        self._clear_exit_pool_drawings(sym)
+        loaded = 0
+        skipped = 0
+        for spec in specs or []:
+            if not spec or spec.get("symbol") != sym:
+                skipped += 1
+                continue
+            factory = trp["make_long_position"]
+            drawing = factory(
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=spec["entry"],
+                timestamp_b=spec["end"],
+                price_b=spec["target"],
+                created_on_timeframe=spec.get("timeframe") or "5m",
+                timeframe_scope="all",
+                drawing_id=spec.get("drawing_id") or None,
+                entry_price=spec["entry"],
+                stop_price=spec["stop"],
+                target_price=spec["target"],
+            )
+            drawing = dc_replace(
+                drawing,
+                metadata={
+                    "origin": EXIT_POOL_SOURCE,
+                    "strategy_id": EXIT_POOL_STRATEGY_ID,
+                    "signal_id": spec.get("signal_id"),
+                    "direction": spec.get("direction") or "LONG",
+                    "exit_reason": spec.get("exit_reason"),
+                    "tp_mode": spec.get("tp_mode"),
+                    "pnl_pct": spec.get("pnl_pct"),
+                    "tier": spec.get("tier"),
+                },
+            )
+            if spec.get("drawing_id") and spec["drawing_id"] in self.drawings:
+                self.drawings.remove_drawing(spec["drawing_id"])
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+        self.persist_drawings()
+        snap = self.snapshot()
+        summary = (meta or {}).get("summary") or {}
+        by_exit_reason = summary.get("by_exit_reason") or {}
+        tp_count = int(by_exit_reason.get("tp") or 0)
+        sl_count = int(by_exit_reason.get("sl") or 0)
+        snap["backtester"] = {
+            "strategy_id": EXIT_POOL_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": loaded,
+            "skipped": skipped,
+            "visible": loaded > 0,
+            "source": EXIT_POOL_SOURCE,
+            "summary": summary,
+            "tp_sl": f"{tp_count}/{sl_count}",
+            "report_path": (meta or {}).get("report_path"),
+            "message": (meta or {}).get("message")
+            or f"TP/SL {tp_count}/{sl_count}",
+        }
+        return snap
+
+    def _clear_bt_d7_short_research_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if (
+                did.startswith(BT_D7_DRAWING_PREFIX)
+                or did.startswith(BT_D7_HLINE_PREFIX)
+                or did.startswith(BT_D7_ARROW_PREFIX)
+                or origin == BT_D7_SOURCE
+            ):
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        return removed
+
+    def clear_bt_d7_short_research(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": BT_D7_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": BT_D7_SOURCE,
+            "message": "Pool Landscape SHORT research overlays hidden",
+        }
+        snap["bt_d7_short_research"] = {"visible": False}
+        return snap
+
+    def import_bt_d7_short_research(
+        self,
+        symbol: str,
+        bundle: dict[str, Any],
+        summary: dict[str, Any],
+        *,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._bt_d23_catalog = None
+        self._bt_d26_catalog = None
+        self._bt_d46_catalog = None
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._clear_bt_d46_chronological_drawings(sym)
+        positions, hlines, markers = build_drawing_specs(bundle)
+        loaded_pos = 0
+        loaded_aux = 0
+        skipped = 0
+
+        for spec in positions:
+            if spec.get("symbol") != sym:
+                skipped += 1
+                continue
+            factory = (
+                trp["make_short_position"]
+                if spec.get("drawing_type") == "short_position"
+                else trp["make_long_position"]
+            )
+            drawing = factory(
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=spec["entry"],
+                timestamp_b=spec["end"],
+                price_b=spec["target"],
+                created_on_timeframe=spec.get("timeframe") or "5m",
+                timeframe_scope="all",
+                drawing_id=spec.get("drawing_id") or None,
+                entry_price=spec["entry"],
+                stop_price=spec["stop"],
+                target_price=spec["target"],
+            )
+            drawing = dc_replace(
+                drawing,
+                metadata={
+                    "origin": BT_D7_SOURCE,
+                    "strategy_id": BT_D7_STRATEGY_ID,
+                    "signal_id": spec.get("signal_id"),
+                    "direction": spec.get("direction") or "SHORT",
+                    **(spec.get("metadata") or {}),
+                },
+            )
+            self.drawings.add_drawing(drawing)
+            loaded_pos += 1
+
+        for hl in hlines:
+            if hl.get("symbol") != sym:
+                continue
+            drawing = trp["make_hline"](
+                symbol=sym,
+                price=float(hl["price"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=hl.get("drawing_id"),
+            )
+            drawing = dc_replace(drawing, metadata=dict(hl.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            loaded_aux += 1
+
+        for mk in markers:
+            if mk.get("symbol") != sym:
+                continue
+            ts = mk.get("timestamp")
+            if not ts:
+                continue
+            if isinstance(ts, str):
+                ts_dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            else:
+                ts_dt = ts
+            drawing = trp["make_vline"](
+                symbol=sym,
+                timestamp=ts_dt,
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=mk.get("drawing_id"),
+            )
+            drawing = dc_replace(
+                drawing,
+                metadata={
+                    "origin": BT_D7_SOURCE,
+                    "marker_kind": mk.get("kind"),
+                    "label": mk.get("label"),
+                },
+            )
+            self.drawings.add_drawing(drawing)
+            loaded_aux += 1
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        n_sig = int(summary.get("signal_count") or 0)
+        n_tr = int(summary.get("filled_trade_count") or 0)
+        net = summary.get("net_pnl_usdt")
+        msg = (
+            f"{n_sig} Signale · {n_tr} gefüllte Trades · {loaded_pos} Positionen gezeichnet"
+            if visible
+            else "ausgeblendet"
+        )
+        if n_tr == 0 and visible:
+            msg += " · 0 Trades / keine realisierten Handelsgewinne"
+        snap["bt_d7_short_research"] = {
+            "visible": visible and (loaded_pos > 0 or loaded_aux > 0 or n_sig > 0),
+            "summary": summary,
+            "loaded_positions": loaded_pos,
+            "loaded_aux": loaded_aux,
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D7_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": loaded_pos,
+            "loaded_aux": loaded_aux,
+            "skipped": skipped,
+            "visible": visible and (loaded_pos > 0 or loaded_aux > 0 or n_sig > 0),
+            "source": BT_D7_SOURCE,
+            "summary": summary,
+            "message": msg,
+            "time_span": summary.get("time_span"),
+            "net_pnl_usdt": net,
+            "return_pct": summary.get("return_pct"),
+        }
+        return snap
+
+    def _clear_bt_d23_setup_scanner_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if did.startswith(BT_D23_DRAWING_PREFIX) or origin == BT_D23_SOURCE:
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        self._bt_d23_rendered_ids.clear()
+        return removed
+
+    def clear_bt_d23_setup_scanner(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d23_catalog = None
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": BT_D23_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": BT_D23_SOURCE,
+            "payload_kind": "bt_d23_setup_scanner_chart_integration_v1",
+            "message": "Setup scanner planned overlays hidden",
+        }
+        snap["bt_d23_setup_scanner"] = {"visible": False}
+        return snap
+
+    def load_bt_d23_setup_scanner_catalog(
+        self,
+        symbol: str,
+        doc: dict[str, Any],
+        summary: dict[str, Any],
+        *,
+        run_id: str,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d26_catalog = None
+        self._bt_d46_catalog = None
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._clear_bt_d46_chronological_drawings(sym)
+        setups = list(doc.get("setups") or [])
+        self._bt_d23_catalog = {
+            "run_id": run_id,
+            "symbol": sym,
+            "config_hash": doc.get("config_hash"),
+            "setups": setups,
+            "summary": summary,
+            "visible": visible,
+        }
+        snap = self.snapshot()
+        n = len(setups)
+        snap["bt_d23_setup_scanner"] = {
+            "visible": visible,
+            "run_id": run_id,
+            "setup_count_total": n,
+            "setup_count_rendered": 0,
+            "summary": summary,
+            "payload_kind": "bt_d23_setup_scanner_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D23_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": visible,
+            "source": BT_D23_SOURCE,
+            "payload_kind": "bt_d23_setup_scanner_chart_integration_v1",
+            "summary": summary,
+            "plan_only": True,
+            "message": (
+                f"BT-D23 setup scanner · {n} PLANNED setups catalog loaded "
+                f"(viewport rendering; not executed)"
+            ),
+            "time_span": summary.get("time_span"),
+        }
+        return snap
+
+    def sync_bt_d23_setup_scanner_viewport(
+        self,
+        symbol: str,
+        *,
+        view_start_unix: int,
+        view_end_unix: int,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        cat = self._bt_d23_catalog
+        if not cat or not cat.get("visible") or cat.get("symbol") != sym:
+            return self.snapshot()
+        setups = cat.get("setups") or []
+        wanted = filter_d23_setups_viewport(
+            setups,
+            view_start_unix=int(view_start_unix),
+            view_end_unix=int(view_end_unix),
+        )
+        wanted_ids = {
+            d23_setup_to_position_spec(
+                s,
+                run_id=str(cat.get("run_id") or ""),
+                config_hash=cat.get("config_hash"),
+            )["drawing_id"]
+            for s in wanted
+        }
+        for did in list(self._bt_d23_rendered_ids - wanted_ids):
+            try:
+                self.drawings.remove_drawing(did)
+            except Exception:
+                pass
+            self._bt_d23_rendered_ids.discard(did)
+
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        run_id = str(cat.get("run_id") or "")
+        ch = cat.get("config_hash")
+        for s in wanted:
+            spec = d23_setup_to_position_spec(s, run_id=run_id, config_hash=ch)
+            did = spec["drawing_id"]
+            if did in self._bt_d23_rendered_ids:
+                continue
+            drawing = trp["make_short_position"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=spec["entry"],
+                timestamp_b=spec["end"],
+                price_b=spec["target"],
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=did,
+                entry_price=spec["entry"],
+                stop_price=spec["stop"],
+                target_price=spec["target"],
+            )
+            drawing = dc_replace(drawing, metadata=dict(spec.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            self._bt_d23_rendered_ids.add(did)
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["bt_d23_setup_scanner"] = {
+            "visible": True,
+            "run_id": run_id,
+            "setup_count_total": len(setups),
+            "setup_count_rendered": len(self._bt_d23_rendered_ids),
+            "setup_count_viewport": len(wanted),
+            "viewport": {"start_unix": view_start_unix, "end_unix": view_end_unix},
+            "summary": cat.get("summary"),
+            "payload_kind": "bt_d23_setup_scanner_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D23_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(self._bt_d23_rendered_ids),
+            "visible": True,
+            "source": BT_D23_SOURCE,
+            "payload_kind": "bt_d23_setup_scanner_chart_integration_v1",
+            "plan_only": True,
+            "message": (
+                f"Viewport: {len(wanted)} / {len(setups)} setups · "
+                f"{len(self._bt_d23_rendered_ids)} boxes drawn · PLANNED ONLY"
+            ),
+            "time_span": (cat.get("summary") or {}).get("time_span"),
+        }
+        return snap
+
+    def _clear_bt_d26_dynamic_selector_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if (
+                did.startswith(BT_D26_DRAWING_PREFIX)
+                or did.startswith(BT_D26_MARKER_PREFIX)
+                or origin == BT_D26_SOURCE
+            ):
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        self._bt_d26_rendered_ids.clear()
+        return removed
+
+    def clear_bt_d26_dynamic_selector(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._bt_d26_catalog = None
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": BT_D26_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": BT_D26_SOURCE,
+            "payload_kind": "bt_d26_dynamic_selector_chart_integration_v1",
+            "message": "Dynamic selector planned overlays hidden",
+        }
+        snap["bt_d26_dynamic_selector"] = {"visible": False}
+        return snap
+
+    def load_bt_d26_dynamic_selector_catalog(
+        self,
+        symbol: str,
+        doc: dict[str, Any],
+        summary: dict[str, Any],
+        *,
+        run_id: str,
+        visible: bool = True,
+        display_mode: str | None = None,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d23_catalog = None
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._bt_d46_catalog = None
+        self._clear_bt_d46_chronological_drawings(sym)
+        setups = list(doc.get("setups") or [])
+        mode = str(display_mode or BT_D26_DISPLAY_CURRENT)
+        if mode not in (BT_D26_DISPLAY_ALL, BT_D26_DISPLAY_CURRENT):
+            mode = BT_D26_DISPLAY_CURRENT
+        self._bt_d26_catalog = {
+            "run_id": run_id,
+            "symbol": sym,
+            "config_hash": doc.get("config_hash"),
+            "setups": setups,
+            "candidate_transitions": list(doc.get("candidate_transitions") or []),
+            "summary": summary,
+            "visible": visible,
+            "display_mode": mode,
+            "catalog_doc": {
+                "setups": setups,
+                "candidate_transitions": list(doc.get("candidate_transitions") or []),
+            },
+        }
+        snap = self.snapshot()
+        n = len(setups)
+        snap["bt_d26_dynamic_selector"] = {
+            "visible": visible,
+            "run_id": run_id,
+            "display_mode": mode,
+            "setup_count_total": n,
+            "setup_count_rendered": 0,
+            "summary": summary,
+            "payload_kind": "bt_d26_dynamic_selector_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D26_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": visible,
+            "source": BT_D26_SOURCE,
+            "payload_kind": "bt_d26_dynamic_selector_chart_integration_v1",
+            "summary": summary,
+            "plan_only": True,
+            "message": (
+                f"BT-D26 dynamic selector · {n} PLANNED setups catalog loaded "
+                f"(viewport rendering; not executed)"
+            ),
+            "time_span": summary.get("time_span"),
+        }
+        return snap
+
+    def sync_bt_d26_dynamic_selector_viewport(
+        self,
+        symbol: str,
+        *,
+        view_start_unix: int,
+        view_end_unix: int,
+        display_mode: str | None = None,
+        as_of_unix: int | None = None,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        cat = self._bt_d26_catalog
+        if not cat or not cat.get("visible") or cat.get("symbol") != sym:
+            return self.snapshot()
+        setups = cat.get("setups") or []
+        mode = str(display_mode or cat.get("display_mode") or BT_D26_DISPLAY_CURRENT)
+        if mode not in (BT_D26_DISPLAY_ALL, BT_D26_DISPLAY_CURRENT):
+            mode = BT_D26_DISPLAY_CURRENT
+        cat["display_mode"] = mode
+        run_id = str(cat.get("run_id") or "")
+        ch = cat.get("config_hash")
+        candidate_view: dict[str, Any] | None = None
+        marker_specs: list[dict[str, Any]] = []
+
+        if mode == BT_D26_DISPLAY_ALL:
+            wanted = filter_d26_setups_viewport(
+                setups,
+                view_start_unix=int(view_start_unix),
+                view_end_unix=int(view_end_unix),
+            )
+            position_specs = [
+                d26_setup_to_position_spec(s, run_id=run_id, config_hash=ch) for s in wanted
+            ]
+        else:
+            as_of = int(as_of_unix if as_of_unix is not None else view_end_unix)
+            doc = cat.get("catalog_doc") or {
+                "setups": setups,
+                "candidate_transitions": cat.get("candidate_transitions") or [],
+            }
+            clean = d26_build_clean_view_draw_specs(
+                doc,
+                run_id=run_id,
+                config_hash=ch,
+                view_start_unix=int(view_start_unix),
+                view_end_unix=int(view_end_unix),
+                as_of_unix=as_of,
+            )
+            position_specs = clean.get("position_specs") or []
+            marker_specs = clean.get("marker_specs") or []
+            candidate_view = clean.get("resolved") or {}
+            candidate_view["display_mode"] = mode
+            candidate_view["marker_count_viewport"] = len(marker_specs)
+            wanted = [s for s in setups if any(
+                ps.get("setup_id") == s.get("setup_id") for ps in position_specs
+            )]
+
+        wanted_ids = {ps["drawing_id"] for ps in position_specs}
+        wanted_ids.update(ms["drawing_id"] for ms in marker_specs)
+        for did in list(self._bt_d26_rendered_ids - wanted_ids):
+            try:
+                self.drawings.remove_drawing(did)
+            except Exception:
+                pass
+            self._bt_d26_rendered_ids.discard(did)
+
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        for spec in position_specs:
+            did = spec["drawing_id"]
+            if did in self._bt_d26_rendered_ids:
+                continue
+            drawing = trp["make_short_position"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=spec["entry"],
+                timestamp_b=spec["end"],
+                price_b=spec["target"],
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=did,
+                entry_price=spec["entry"],
+                stop_price=spec["stop"],
+                target_price=spec["target"],
+            )
+            drawing = dc_replace(drawing, metadata=dict(spec.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            self._bt_d26_rendered_ids.add(did)
+
+        for ms in marker_specs:
+            did = ms["drawing_id"]
+            if did in self._bt_d26_rendered_ids:
+                continue
+            ts = ms.get("timestamp")
+            drawing = trp["make_vline"](
+                symbol=sym,
+                timestamp=ts,
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=did,
+            )
+            drawing = dc_replace(drawing, metadata=dict(ms.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            self._bt_d26_rendered_ids.add(did)
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["bt_d26_dynamic_selector"] = {
+            "visible": True,
+            "run_id": run_id,
+            "display_mode": mode,
+            "setup_count_total": len(setups),
+            "setup_count_rendered": len(self._bt_d26_rendered_ids),
+            "setup_count_viewport": len(wanted),
+            "setup_count_boxes": len(position_specs),
+            "setup_count_markers": len(marker_specs),
+            "viewport": {"start_unix": view_start_unix, "end_unix": view_end_unix},
+            "as_of_unix": int(as_of_unix if as_of_unix is not None else view_end_unix)
+            if mode == BT_D26_DISPLAY_CURRENT
+            else None,
+            "candidate_view": candidate_view,
+            "summary": cat.get("summary"),
+            "payload_kind": "bt_d26_dynamic_selector_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D26_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(self._bt_d26_rendered_ids),
+            "visible": True,
+            "source": BT_D26_SOURCE,
+            "payload_kind": "bt_d26_dynamic_selector_chart_integration_v1",
+            "plan_only": True,
+            "message": (
+                f"Viewport: {len(wanted)} / {len(setups)} setups · "
+                f"{len(self._bt_d26_rendered_ids)} boxes drawn · PLANNED ONLY"
+            ),
+            "time_span": (cat.get("summary") or {}).get("time_span"),
+        }
+        return snap
+
+    def _clear_bt_d46_chronological_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if (
+                did.startswith(BT_D46_BOX_PREFIX)
+                or did.startswith(BT_D46_MARKER_PREFIX)
+                or did.startswith(BT_D46_LINK_PREFIX)
+                or origin == BT_D46_SOURCE
+            ):
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        self._bt_d46_rendered_ids.clear()
+        for oid in list(self._bt_d46_overlay_ids):
+            try:
+                self.overlays.remove_overlay(oid)
+            except Exception:
+                pass
+            self._bt_d46_overlay_ids.discard(oid)
+        return removed
+
+    def _clear_bt_d46_chronological_overlays(self) -> None:
+        for oid in list(self._bt_d46_overlay_ids):
+            try:
+                self.overlays.remove_overlay(oid)
+            except Exception:
+                pass
+            self._bt_d46_overlay_ids.discard(oid)
+
+    def clear_bt_d46_chronological_backtester(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d46_chronological_drawings(sym)
+        self._bt_d46_catalog = None
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": BT_D46_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": BT_D46_SOURCE,
+            "payload_kind": "bt_d46_chronological_chart_integration_v1",
+            "message": "Chronological backtester overlays hidden",
+        }
+        snap["bt_d46_chronological"] = {"visible": False}
+        return snap
+
+    def load_bt_d46_chronological_catalog(
+        self,
+        symbol: str,
+        doc: dict[str, Any],
+        summary: dict[str, Any],
+        audit_by_pid: dict[str, dict[str, Any]],
+        *,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d23_catalog = None
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._bt_d26_catalog = None
+        self._clear_bt_d46_chronological_drawings(sym)
+        self._bt_d46_catalog = {
+            "symbol": sym,
+            "overlay_doc": doc,
+            "summary": summary,
+            "audit_by_pid": audit_by_pid,
+            "visible": visible,
+        }
+        snap = self.snapshot()
+        snap["bt_d46_chronological"] = {
+            "visible": visible,
+            "summary": summary,
+            "marker_count_total": summary.get("marker_count_total"),
+            "event_counts": summary.get("event_counts"),
+            "fill_disclaimer": summary.get("fill_disclaimer"),
+            "scanner_boxes_included": False,
+            "payload_kind": "bt_d46_chronological_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D46_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": visible,
+            "source": BT_D46_SOURCE,
+            "payload_kind": "bt_d46_chronological_chart_integration_v1",
+            "summary": summary,
+            "plan_only": False,
+            "simulated_only": True,
+            "message": (
+                f"BT-D46 chronological backtester · {summary.get('trade_count', 19)} "
+                f"simulated trades · box-only chart (viewport; not exchange confirmed)"
+            ),
+            "time_span": summary.get("time_span"),
+        }
+        return snap
+
+    def sync_bt_d46_chronological_viewport(
+        self,
+        symbol: str,
+        *,
+        view_start_unix: int,
+        view_end_unix: int,
+        as_of_unix: int | None = None,
+        selected_position_id: str | None = None,
+    ) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        cat = self._bt_d46_catalog
+        if not cat or not cat.get("visible") or cat.get("symbol") != sym:
+            return self.snapshot()
+        doc = cat.get("overlay_doc") or {}
+        audit_by_pid = cat.get("audit_by_pid") or {}
+        as_of = int(as_of_unix if as_of_unix is not None else view_end_unix)
+        built = d46_build_viewport_draw_specs(
+            doc,
+            audit_by_pid,
+            view_start_unix=int(view_start_unix),
+            view_end_unix=int(view_end_unix),
+            as_of_unix=as_of,
+        )
+        position_specs = built.get("position_specs") or []
+        wanted_ids = {ps["drawing_id"] for ps in position_specs}
+
+        self._clear_bt_d46_chronological_overlays()
+
+        for did in list(self._bt_d46_rendered_ids - wanted_ids):
+            try:
+                self.drawings.remove_drawing(did)
+            except Exception:
+                pass
+            self._bt_d46_rendered_ids.discard(did)
+
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        for spec in position_specs:
+            did = spec["drawing_id"]
+            if did in self._bt_d46_rendered_ids:
+                continue
+            drawing = trp["make_short_position"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["entry"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["target"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=did,
+                entry_price=float(spec["entry"]),
+                stop_price=float(spec["stop"]),
+                target_price=float(spec["target"]),
+            )
+            drawing = dc_replace(drawing, metadata=dict(spec.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            self._bt_d46_rendered_ids.add(did)
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        detail = None
+        if selected_position_id:
+            detail = d46_position_detail_panel(
+                selected_position_id, audit_by_pid, doc
+            )
+        snap["bt_d46_chronological"] = {
+            "visible": True,
+            "summary": cat.get("summary"),
+            "viewport": {"start_unix": view_start_unix, "end_unix": view_end_unix},
+            "as_of_unix": as_of,
+            "as_of_utc": built.get("as_of_utc"),
+            "counts": built.get("counts"),
+            "same_bar_unresolved_positions": built.get("same_bar_unresolved_positions"),
+            "box_count_rendered": len(self._bt_d46_rendered_ids),
+            "display_mode": built.get("display_mode"),
+            "scanner_boxes_included": False,
+            "fill_disclaimer": (cat.get("summary") or {}).get("fill_disclaimer"),
+            "selected_position": detail,
+            "payload_kind": "bt_d46_chronological_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D46_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": len(self._bt_d46_rendered_ids),
+            "visible": True,
+            "source": BT_D46_SOURCE,
+            "payload_kind": "bt_d46_chronological_chart_integration_v1",
+            "simulated_only": True,
+            "message": (
+                f"Viewport: {built.get('counts', {}).get('viewport_boxes', 0)} trade boxes · "
+                f"causal as-of {built.get('as_of_utc', '')} · SIMULATED — NOT EXCHANGE CONFIRMED"
+            ),
+            "time_span": (cat.get("summary") or {}).get("time_span"),
         }
         return snap
 
@@ -1178,6 +2127,14 @@ class ResearchWorkspace:
                 for drawing in existing:
                     self.drawings.remove_drawing(drawing.drawing_id)
                 self.persist_drawings()
+        if (
+            not sid
+            or sid == EXIT_POOL_STRATEGY_ID
+            or sid == "exit_pool"
+            or sid == EXIT_POOL_SOURCE
+        ):
+            if sym:
+                self._clear_exit_pool_drawings(sym)
         return self.snapshot()
 
     def apply_style(self, *, color: Optional[str] = None, width: Optional[float] = None) -> dict[str, Any]:
@@ -1509,11 +2466,12 @@ class ResearchWorkspace:
         }
         if not cfg.enabled:
             return [], empty_ema, {"3": 0, "4-5": 0, "6+": 0}
-        from .service import lld_config_for_timeframe
+        from .lld_research_kernel import compute_lld_selected
+        from .service import strip_lld_strength_labels
 
         tf = str(getattr(candles[0], "timeframe", "") or "") if candles else ""
-        cfg = lld_config_for_timeframe(cfg, tf)
-        result = trp["run_liquidity_location"](candles, cfg)
+        selected, cfg, result, _tip = compute_lld_selected(candles, tf, cfg, tip=None)
+        result.pools = selected
         clusters = None
         counts = {"3": 0, "4-5": 0, "6+": 0}
         if cfg.clusters_enabled:
@@ -1524,7 +2482,9 @@ class ResearchWorkspace:
             )
             shown = trp["filter_clusters"](clusters, minimum_pools=int(cfg.minimum_cluster_pools))
             counts = trp["cluster_bucket_counts"](shown)
-        overlays = trp["compose_lld_overlays"](result, cfg, clusters=clusters)
+        overlays = strip_lld_strength_labels(
+            trp["compose_lld_overlays"](result, cfg, clusters=clusters)
+        )
         ema = trp["lld_ema_payload"](result, cfg)
         return overlays, ema, counts
 

@@ -33,6 +33,8 @@ def test_research_template_density_checkbox_and_scripts():
 def test_research_charts_wiring():
     js = _read("static/js/research/research_charts.js")
     assert "function exactOriginDensityEnabled()" in js
+    assert "function repaintExactOriginDensityFromCache(" in js
+    assert "repaintExactOriginDensityFromCache(pane)" in js
     assert "PD1ExactOriginResearch.install" in js
     assert "PD1ExactOriginResearch.scheduleViewport" in js
     assert "exactOriginDensityEnabled()" in js
@@ -48,6 +50,7 @@ def test_helpers_exact_origin_namespace():
 
 def test_integration_module_mutual_exclusion():
     mod = _read("static/js/research/pd1_exact_origin_density_research_v1.js")
+    assert "repaintPaneFromCache" in mod
     assert "disableHistoricalLmv2" in mod
     assert "disableExactOrigin" in mod
     assert "stripHistoricalLmv2Overlays" in mod

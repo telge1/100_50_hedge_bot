@@ -3014,16 +3014,31 @@
     return (value > 0 ? "+" : "\u2212") + Math.abs(value).toFixed(digits);
   }
 
-  function formatPositionLabels(stats) {
+  function formatPositionLabels(stats, options) {
+    options = options || {};
     if (!stats) return { entry: "", stop: "", target: "" };
     var tpPct = fmtSignedFixed(((stats.target - stats.entry) / stats.entry) * 100, 2) + "%";
     var slPct = fmtSignedFixed(((stats.stop - stats.entry) / stats.entry) * 100, 2) + "%";
+    var rr = stats.riskReward == null ? "—" : stats.riskReward.toFixed(2);
+    if (options.planOnly) {
+      var status = options.statusLabel || "PLANNED SHORT / UNFILLED";
+      return {
+        target: "TP: " + fmt(stats.target) + " \u00b7 " + tpPct + " \u00b7 R:R " + rr,
+        entry: status + " \u00b7 Entry: " + fmt(stats.entry) + " \u00b7 R:R " + rr,
+        stop: "SL: " + fmt(stats.stop) + " \u00b7 " + slPct,
+      };
+    }
     var pnl = stats.profitAtTarget != null ? fmtSignedFixed(stats.profitAtTarget, 2) + " USDT" : "";
     var loss = stats.lossAtStop != null ? fmtSignedFixed(-stats.lossAtStop, 2) + " USDT" : "";
-    var rr = stats.riskReward == null ? "—" : stats.riskReward.toFixed(2);
+    var entryPrefix = options.statusLabel ? options.statusLabel + " \u00b7 " : "";
+    if (options.realizedPnlUsdt != null && isFinite(Number(options.realizedPnlUsdt))) {
+      entryPrefix +=
+        "Netto " + fmtSignedFixed(Number(options.realizedPnlUsdt), 2) + " USDT \u00b7 ";
+    }
     return {
       target: ["Ziel: " + fmt(stats.target), tpPct, pnl].filter(Boolean).join(" \u00b7 "),
       entry:
+        entryPrefix +
         "Entry: " +
         fmt(stats.entry) +
         " \u00b7 Größe: " +
@@ -3043,7 +3058,13 @@
       Number(p.position_notional)
     );
     if (!stats) return;
-    var labels = formatPositionLabels(stats);
+    var meta = p.metadata || {};
+    var planOnly = !!(meta.plan_only || meta.preview_only);
+    var labels = formatPositionLabels(stats, {
+      planOnly: planOnly,
+      statusLabel: meta.status_label || null,
+      realizedPnlUsdt: meta.realized_net_pnl_usdt,
+    });
     p.entry_label = labels.entry;
     p.stop_label = labels.stop;
     p.target_label = labels.target;
@@ -4232,6 +4253,14 @@
     return t1 >= tLo && t0 <= tHi && p1 >= pLo && p0 <= pHi;
   }
 
+  function densityDrawUsesStrictViewportCull() {
+    if (shiftMeasure) return false;
+    if (interactionMode && interactionMode !== "select") return false;
+    if (overlayRegistry.has("__preview__")) return false;
+    if (dragState) return false;
+    return true;
+  }
+
   function drawEodDensity() {
     const canvas = eodDensityCanvas();
     if (!canvas) return;
@@ -4280,6 +4309,7 @@
       pLo -= pPad;
       pHi += pPad;
     }
+    const strictCull = densityDrawUsesStrictViewportCull();
     const tDraw0 = typeof performance !== "undefined" ? performance.now() : 0;
     const segments = eodDensityPayload.segments;
     eodDensityLastDraw.segmentsTotal = segments.length;
@@ -4289,7 +4319,7 @@
     ctx.clip();
     for (let i = 0; i < segments.length; i++) {
       const seg = segments[i];
-      if (tLo != null && tHi != null && pLo != null && pHi != null) {
+      if (strictCull && tLo != null && tHi != null && pLo != null && pHi != null) {
         if (!eodSegmentHitsViewport(seg, tLo, tHi, pLo, pHi)) continue;
       }
       const x1 = xOf(seg.start_timestamp);
@@ -5441,7 +5471,7 @@
   }
 
   function beginShiftMeasure(anchor, ev) {
-    abortDrawingPreview();
+    clearPreview();
     if (dragState) {
       dragState = null;
     }

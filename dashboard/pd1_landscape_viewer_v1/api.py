@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
@@ -93,20 +94,15 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         from .historical_window_v1 import landscape_capabilities, landscape_window_from_state_err
 
         try:
-            return landscape_capabilities()
+            return await asyncio.to_thread(landscape_capabilities)
         except HistoricalPoolStateError as exc:
             err = landscape_window_from_state_err(exc)
             return _window_error(err.code, err.message, err.details)
 
     @router.post("/live-charts/viewer/api/window")
     async def pd1_viewer_window(body: dict[str, Any], user: dict = Depends(require_auth)):
-        from research_charts.historical_pool_state_v1 import HistoricalPoolStateError
-
-        from .historical_window_v1 import (
-            LandscapeWindowError,
-            build_landscape_window,
-            landscape_window_from_state_err,
-        )
+        from .historical_window_v1 import LandscapeWindowError
+        from .window_service_v1 import get_landscape_window_response
 
         try:
             from_utc = body.get("from_utc") or body.get("from")
@@ -116,24 +112,24 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             timeframe = body.get("timeframe")
             pool_detail_raw = body.get("pool_detail")
             pool_detail = int(pool_detail_raw) if pool_detail_raw is not None else 1
-            return build_landscape_window(
-                str(from_utc),
-                str(to_utc),
+            response_mode = body.get("response_mode") or body.get("compute_mode")
+            return await asyncio.to_thread(
+                get_landscape_window_response,
+                from_utc=str(from_utc),
+                to_utc=str(to_utc),
                 timeframe=str(timeframe or "15m"),
                 pool_detail=pool_detail,
+                response_mode=response_mode,
             )
         except LandscapeWindowError as exc:
             return _window_error(exc.code, exc.message, exc.details)
-        except HistoricalPoolStateError as exc:
-            err = landscape_window_from_state_err(exc)
-            return _window_error(err.code, err.message, err.details)
 
     @router.get("/live-charts/viewer/api/membership")
     async def pd1_viewer_membership(asof_utc: str, user: dict = Depends(require_auth)):
         from .historical_window_v1 import LandscapeWindowError, membership_at_utc
 
         try:
-            return membership_at_utc(asof_utc)
+            return await asyncio.to_thread(membership_at_utc, asof_utc)
         except LandscapeWindowError as exc:
             return _window_error(exc.code, exc.message, exc.details)
 

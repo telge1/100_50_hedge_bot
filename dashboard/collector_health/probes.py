@@ -140,21 +140,41 @@ def probe_ob1000_materializer() -> dict[str, Any]:
             "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev",
         )
     )
-    heartbeat = root / "run" / "ob1000_materializer" / "heartbeat.json"
+    base = root / "run" / "ob1000_materializer"
+    heartbeat = base / "heartbeat.json"
+    shard_heartbeats = sorted(base.glob("shard*/heartbeat.json"))
     pids = find_pids_by_needle("ob1000_materializer_runner")
     hb: dict[str, Any] = {}
+    shards: list[dict[str, Any]] = []
+    for path in shard_heartbeats:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        shards.append({"path": str(path), "heartbeat": payload})
     if heartbeat.is_file():
         try:
             hb = json.loads(heartbeat.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             hb = {}
+    elif shards:
+        # Prefer freshest shard heartbeat as the primary signal.
+        shards_sorted = sorted(
+            shards,
+            key=lambda row: str((row.get("heartbeat") or {}).get("updated_at") or ""),
+            reverse=True,
+        )
+        hb = dict(shards_sorted[0].get("heartbeat") or {})
+        hb["shard_count"] = len(shards)
     running = bool(pids)
     return {
         "process_running": running,
         "pid": pids[0] if pids else None,
+        "pids": pids,
         "process_started_at": _proc_start_iso(pids[0]) if pids else None,
         "heartbeat": hb,
-        "heartbeat_path": str(heartbeat),
+        "heartbeat_path": str(heartbeat if heartbeat.is_file() else (shard_heartbeats[0] if shard_heartbeats else heartbeat)),
+        "shards": shards,
     }
 
 

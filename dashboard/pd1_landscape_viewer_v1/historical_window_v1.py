@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import inspect
 import json
+import logging
 import os
 import time
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -20,9 +23,6 @@ from research_charts.historical_lmv2_pd_contract_v1 import (
     HistoricalPdConfig,
     membership_slot_minutes,
     resolve_viewer_historical_scope,
-)
-from research_charts.historical_pool_state_batch_reader_v1 import (
-    historical_lmv2_batch_reader_enabled,
 )
 from research_charts.historical_pool_state_v1 import (
     HistoricalPoolStateError,
@@ -39,6 +39,16 @@ TIMEFRAME_5M = "5m"
 WARMUP_HOURS = 168
 MAX_EXPORT_HOURS = 72
 MAX_5M_BARS = MAX_EXPORT_HOURS * 12
+LANDSCAPE_LIFETIME_BUILDER_VERSION = "pd1_landscape_lifetime_v1_phase5s_batch_default"
+
+
+def _landscape_phase5s_prefill_enabled() -> bool:
+    """BT-D35: Phase 5S batch prefill on by default for landscape window (opt-out only)."""
+    if os.environ.get("PD1_LANDSCAPE_BATCH_READER", "").strip().lower() in ("0", "false", "no"):
+        return False
+    if os.environ.get("HISTORICAL_LMV2_BATCH_READER", "").strip().lower() in ("0", "false", "no"):
+        return False
+    return True
 
 _PROFILE = os.environ.get("PD1_LANDSCAPE_WINDOW_PROFILE") == "1"
 _LAST_PROFILE: dict[str, Any] | None = None
@@ -191,6 +201,12 @@ def landscape_capabilities() -> dict[str, Any]:
         "FILL_BY_CLASS": fill,
         "side_borders": borders,
         "dynamic_historical": True,
+        "runtime": {
+            "batch_prefill_gate_enabled": _landscape_phase5s_prefill_enabled(),
+            "lifetime_builder_version": LANDSCAPE_LIFETIME_BUILDER_VERSION,
+            "builder_module_file": __file__,
+            "window_response_cache_contract": "bt_d34_pd1_window_response_cache_v1",
+        },
     }
 
 
@@ -402,6 +418,7 @@ def build_landscape_window(
     *,
     timeframe: str = "15m",
     pool_detail: int = PD1_POOL_DETAIL,
+    compute_mode: str = "full",
     client: Any | None = None,
     database: str | None = None,
 ) -> dict[str, Any]:
@@ -472,7 +489,7 @@ def build_landscape_window(
     cache: dict[str, list[dict]] = {}
     phase5s_prefill: dict[str, Any] | None = None
     t_prefill = time.perf_counter()
-    if historical_lmv2_batch_reader_enabled():
+    if _landscape_phase5s_prefill_enabled():
         from .historical_window_batch_v1 import prefill_member_cache_phase5s
 
         pre = prefill_member_cache_phase5s(
@@ -509,13 +526,19 @@ def build_landscape_window(
         for t in vis_grid
         if t in bars
     ]
+    mode = str(compute_mode or "full").strip().lower()
+    skip_clusters = mode in ("exact_origin_v1", "exact_origin", "b_layer", "b-layer")
     t_cl = time.perf_counter()
-    clusters_by_dc = _build_clusters_by_dc(grid, cache, client, db, bars, hcfg, slot_minutes)
-    t_cl_done = time.perf_counter()
-    # Keep only DC keys overlapping visible window
-    clusters_by_dc = {
-        k: v for k, v in clusters_by_dc.items() if vis_from <= parse_decision_iso(k) <= vis_to
-    }
+    if skip_clusters:
+        clusters_by_dc = {}
+        t_cl_done = t_cl
+    else:
+        clusters_by_dc = _build_clusters_by_dc(grid, cache, client, db, bars, hcfg, slot_minutes)
+        t_cl_done = time.perf_counter()
+        # Keep only DC keys overlapping visible window
+        clusters_by_dc = {
+            k: v for k, v in clusters_by_dc.items() if vis_from <= parse_decision_iso(k) <= vis_to
+        }
 
     fill, borders = _load_style()
     payload = {
@@ -538,11 +561,14 @@ def build_landscape_window(
             "timeframe": hcfg.timeframe,
             "membership_slot_minutes": slot_minutes,
             "context_from": _iso(context_from),
+            "batch_prefill_gate_enabled": _landscape_phase5s_prefill_enabled(),
+            "builder_module_file": __file__,
             "membership_loader": (
                 "phase5s_episode_walk_batch_cache"
                 if phase5s_prefill
                 else "load_historical_pool_state_at_close"
             ),
+            "lifetime_builder_version": LANDSCAPE_LIFETIME_BUILDER_VERSION,
             "remaining": False,
             "phase5s_batch_reader_active": phase5s_prefill is not None,
             **(
@@ -550,6 +576,7 @@ def build_landscape_window(
                 if phase5s_prefill
                 else {}
             ),
+            "compute_mode": "full" if not skip_clusters else "exact_origin_v1",
         },
         "window": {
             "from_utc": _iso(vis_from),
@@ -570,12 +597,34 @@ def build_landscape_window(
 
     timing = {
         "clickhouse_candles": round((t_ch_done - t_ch) * 1000, 1),
+        "phase5s_prefill": round((t_life - t_prefill) * 1000, 1),
         "build_lifetimes": round((t_life_done - t_life) * 1000, 1),
         "build_clusters_by_dc": round((t_cl_done - t_cl) * 1000, 1),
         "json_serialize": round((t_json_done - t_json) * 1000, 1),
         "total": round((t_done - t0) * 1000, 1),
     }
     payload["timing_ms"] = timing
+    logger.info(
+        "[landscape_window] tf=%s pd=%s mode=%s batch_gate=%s batch_active=%s "
+        "prefill_ms=%s lifetimes_ms=%s total_ms=%s pools=%s module=%s",
+        hcfg.timeframe,
+        hcfg.pool_detail,
+        compute_mode,
+        _landscape_phase5s_prefill_enabled(),
+        phase5s_prefill is not None,
+        timing.get("phase5s_prefill"),
+        timing.get("build_lifetimes"),
+        timing.get("total"),
+        len(pools),
+        __file__,
+    )
+    if float(timing.get("build_lifetimes") or 0) > 30_000:
+        logger.warning(
+            "[landscape_window] LEGACY_SLOW_PATH lifetimes_ms=%s batch_gate=%s batch_active=%s",
+            timing.get("build_lifetimes"),
+            _landscape_phase5s_prefill_enabled(),
+            phase5s_prefill is not None,
+        )
     if _PROFILE:
         _profile_ctx["timing_ms"] = timing
         _profile_ctx["pools_out"] = len(pools)

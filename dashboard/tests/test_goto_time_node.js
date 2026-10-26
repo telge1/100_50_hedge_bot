@@ -55,6 +55,11 @@ function test_source_invariants() {
   assert.ok(js.includes("jumpToUnix: goto_ts_utc") || js.includes("jumpToUnix: goto_ts"));
   // After GO TO, must not force resetView without jump guard
   assert.ok(js.includes('opts.sourceAction) !== "go-to"') || js.includes('!== "go-to"'));
+  // Failed / finished GO TO must be able to leave historical replay without LLD as-of.
+  assert.ok(js.includes("restoreLiveCharts"), "GO TO must restore live on failure / clear");
+  assert.ok(js.includes("updateReplayExitUi"), "Replay exit button must show without LLD");
+  assert.ok(js.includes("toExclusive"), "Containment must cover last open bar");
+  assert.ok(js.includes("gotoCandleLoadRange"), "GO TO must load history context, not only ±4h");
 }
 
 test_seconds_preserved();

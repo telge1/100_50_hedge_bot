@@ -10,10 +10,7 @@ from research_charts.historical_lmv2_pd_contract_v1 import (
     membership_slot_minutes,
     resolve_historical_pd_config,
 )
-from research_charts.historical_pool_state_batch_reader_v1 import (
-    build_episode_walk_batch_cache,
-    historical_lmv2_batch_reader_enabled,
-)
+from research_charts.historical_pool_state_batch_reader_v1 import build_episode_walk_batch_cache
 from research_charts.historical_pool_state_v1 import _active_members_from_catalog
 
 PD1_POOL_DETAIL = 1
@@ -102,8 +99,6 @@ def prefill_member_cache_phase5s(
     One-shot Phase 5S batch load for all decision closes in [context_from, vis_to].
     Fills `cache` so `_load_members` avoids load_published / _load_catalog per close.
     """
-    if not historical_lmv2_batch_reader_enabled():
-        return None
     hcfg = resolve_historical_pd_config(pool_detail, timeframe=timeframe)
     slot_minutes = membership_slot_minutes(hcfg.timeframe)
     closes = unique_decision_closes_between(context_from, vis_to, slot_minutes=slot_minutes)

@@ -107,41 +107,57 @@ def load_ob1000_source_file(path: Path, root: Path) -> SourceFile:
     )
 
 
+def _segment_search_roots(
+    root: Path, symbols: frozenset[str] | None
+) -> list[Path]:
+    """Prefer per-symbol dirs so we never walk the whole archive tree."""
+    root = Path(root)
+    if not root.is_dir():
+        return []
+    if not symbols:
+        return [root]
+    bases = [root / symbol for symbol in sorted(symbols)]
+    return [base for base in bases if base.is_dir()]
+
+
 def iter_ob1000_segments(
     root: Path = OB1000_ROOT,
     *,
     symbols: frozenset[str] | None = None,
+    open_only: bool = False,
 ) -> Iterator[dict[str, Any]]:
     root = Path(root)
-    if not root.is_dir():
-        return
-    for path in sorted(root.rglob("*ob1000_v1*")):
-        if not path.is_file():
-            continue
-        name = path.name
-        m = CLOSED_RE.match(name)
-        is_open = False
-        if not m:
-            m = OPEN_RE.match(name)
-            is_open = True
-        if not m:
-            continue
-        symbol = m.group("symbol")
-        if symbols and symbol not in symbols:
-            continue
-        start = _parse_stamp(m.group("start"))
-        if is_open:
-            end = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=1)
-        else:
-            end = _parse_stamp(m.group("end"))
-        yield {
-            "path": path,
-            "symbol": symbol,
-            "start": start,
-            "end": end,
-            "is_open": is_open,
-            "relative_path": str(path.relative_to(root)),
-        }
+    pattern = "*_open_ob1000_v1.zst.tmp" if open_only else "*ob1000_v1*"
+    for base in _segment_search_roots(root, symbols):
+        for path in sorted(base.rglob(pattern)):
+            if not path.is_file():
+                continue
+            name = path.name
+            m = CLOSED_RE.match(name)
+            is_open = False
+            if not m:
+                m = OPEN_RE.match(name)
+                is_open = True
+            if not m:
+                continue
+            if open_only and not is_open:
+                continue
+            symbol = m.group("symbol")
+            if symbols and symbol not in symbols:
+                continue
+            start = _parse_stamp(m.group("start"))
+            if is_open:
+                end = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(seconds=1)
+            else:
+                end = _parse_stamp(m.group("end"))
+            yield {
+                "path": path,
+                "symbol": symbol,
+                "start": start,
+                "end": end,
+                "is_open": is_open,
+                "relative_path": str(path.relative_to(root)),
+            }
 
 
 def _ensure_table(client: Any) -> None:
@@ -251,14 +267,22 @@ def materialize_segment(
     root: Path = OB1000_ROOT,
     now: datetime | None = None,
     expected_depth: int = OB1000_MAX_DEPTH,
+    emit_after: datetime | None = None,
+    max_new_seconds: int | None = None,
 ) -> dict[str, Any]:
     now = utc(now or datetime.now(timezone.utc))
     symbol = validate_ob1000_live_symbol(segment["symbol"])
     start = utc(segment["start"])
     end = utc(segment["end"])
+    # Book replay still starts at segment start; emit/idempotency window can be tighter.
+    window_start = start
+    if emit_after is not None:
+        ea = utc(emit_after).replace(microsecond=0)
+        if ea > window_start:
+            window_start = ea
     source = load_ob1000_source_file(Path(segment["path"]), root)
     build_id = _build_id(symbol, start, end, source.fingerprint)
-    existing = _existing_seconds(client, symbol, start, end, OB1000_PRODUCER_ID)
+    existing = _existing_seconds(client, symbol, window_start, end, OB1000_PRODUCER_ID)
     warmup, warmup_path = _warmup_sources_for_segment(
         root, symbol, Path(segment["path"]), start
     )
@@ -271,17 +295,23 @@ def materialize_segment(
     by_second: dict[datetime, tuple[Any, int]] = {}
     counts: dict[datetime, int] = {}
     parse_error: str | None = None
+    budget = None if max_new_seconds is None else max(0, int(max_new_seconds))
     try:
+        # Always replay from segment start so book state is continuous; only emit
+        # inside [window_start, end).
         for event in reader.iter_full_books(
             start, end, emit="second_end", warmup_sources=warmup
         ):
             second = event.event_time.replace(microsecond=0)
-            if second < start or second >= end:
+            if second < window_start or second >= end:
                 continue
             if second in existing:
                 continue
             counts[second] = counts.get(second, 0) + 1
             by_second[second] = (event, counts[second])
+            if budget is not None and len(by_second) >= budget:
+                # Stop early once we have enough new seconds to insert this cycle.
+                break
     except ValueError as exc:
         # Restart / rotation seams can briefly lack checkpoint continuity.
         # Keep other symbols/segments flowing; retry next cycle.
@@ -289,6 +319,7 @@ def materialize_segment(
 
     batch: list[tuple[Any, ...]] = []
     skipped = len(existing)
+    truncated = bool(budget is not None and len(by_second) >= (budget or 0) and budget)
     for second in sorted(by_second):
         event, event_count = by_second[second]
         # Allow short books near open-segment warmup; mark genuine_depth=0.
@@ -334,7 +365,13 @@ def materialize_segment(
         insert(client, OB1000_TABLE, batch, OB1000_SNAPSHOT_1S_COLUMNS)
     seconds_seen = len(existing) + len(by_second)
     # Closed + no pending new seconds after full parse ⇒ safe to cache-skip later.
-    complete = (not bool(segment["is_open"])) and len(by_second) == 0 and len(existing) > 0
+    # Truncated open catch-up must not mark watermark as fully drained.
+    complete = (
+        (not bool(segment["is_open"]))
+        and len(by_second) == 0
+        and len(existing) > 0
+        and not truncated
+    )
     return {
         "symbol": symbol,
         "relative_path": segment["relative_path"],
@@ -347,6 +384,9 @@ def materialize_segment(
         "complete": complete,
         "warmup_relative_path": warmup_path,
         "error": parse_error,
+        "truncated": truncated,
+        "source_size": int(source.size),
+        "source_mtime_ns": int(Path(segment["path"]).stat().st_mtime_ns),
     }
 
 
@@ -355,7 +395,11 @@ def materialize_all(
     symbols: tuple[str, ...] = ("BTCUSDT", "DOGEUSDT"),
     root: Path = OB1000_ROOT,
     include_open: bool = True,
+    open_only: bool = False,
     skip_completed: dict[str, str] | None = None,
+    open_watermarks: dict[str, dict[str, int]] | None = None,
+    emit_after_by_symbol: dict[str, datetime] | None = None,
+    max_new_seconds_open: int | None = 120,
 ) -> dict[str, Any]:
     client = connect()
     _ensure_table(client)
@@ -370,8 +414,14 @@ def materialize_all(
     wanted = frozenset(accepted)
     results = []
     skipped_completed = 0
-    for segment in iter_ob1000_segments(root, symbols=wanted):
+    skipped_unchanged_open = 0
+    updated_open_watermarks: dict[str, dict[str, int]] = dict(open_watermarks or {})
+    for segment in iter_ob1000_segments(
+        root, symbols=wanted, open_only=bool(open_only)
+    ):
         if segment["is_open"] and not include_open:
+            continue
+        if (not segment["is_open"]) and open_only:
             continue
         rel = str(segment["relative_path"])
         if skip_completed is not None and not segment["is_open"] and rel in skip_completed:
@@ -392,7 +442,58 @@ def materialize_all(
                 }
             )
             continue
-        results.append(materialize_segment(client, segment=segment, root=root))
+        if segment["is_open"] and open_watermarks is not None:
+            path = Path(segment["path"])
+            try:
+                st = path.stat()
+            except OSError:
+                st = None
+            prev = open_watermarks.get(rel)
+            if (
+                st is not None
+                and isinstance(prev, dict)
+                and int(prev.get("size", -1)) == int(st.st_size)
+                and int(prev.get("mtime_ns", -1)) == int(st.st_mtime_ns)
+            ):
+                skipped_unchanged_open += 1
+                results.append(
+                    {
+                        "symbol": segment["symbol"],
+                        "relative_path": rel,
+                        "is_open": True,
+                        "seconds_seen": 0,
+                        "rows_inserted": 0,
+                        "rows_skipped_existing": 0,
+                        "build_id": "",
+                        "source_fingerprint": "",
+                        "complete": False,
+                        "skipped_unchanged_open": True,
+                        "source_size": int(st.st_size),
+                        "source_mtime_ns": int(st.st_mtime_ns),
+                    }
+                )
+                continue
+        emit_after = None
+        if emit_after_by_symbol:
+            emit_after = emit_after_by_symbol.get(str(segment["symbol"]))
+        max_new = max_new_seconds_open if segment["is_open"] else None
+        row = materialize_segment(
+            client,
+            segment=segment,
+            root=root,
+            emit_after=emit_after,
+            max_new_seconds=max_new,
+        )
+        results.append(row)
+        if (
+            segment["is_open"]
+            and not row.get("error")
+            and not row.get("truncated")
+        ):
+            size = row.get("source_size")
+            mtime_ns = row.get("source_mtime_ns")
+            if isinstance(size, int) and isinstance(mtime_ns, int):
+                updated_open_watermarks[rel] = {"size": size, "mtime_ns": mtime_ns}
     return {
         "table": f"{TARGET_DATABASE}.{OB1000_TABLE}",
         "root": str(root),
@@ -400,6 +501,8 @@ def materialize_all(
         "segments": len(results),
         "rows_inserted": sum(int(r["rows_inserted"]) for r in results),
         "skipped_completed": skipped_completed,
+        "skipped_unchanged_open": skipped_unchanged_open,
+        "open_watermarks": updated_open_watermarks,
         "results": results,
     }
 

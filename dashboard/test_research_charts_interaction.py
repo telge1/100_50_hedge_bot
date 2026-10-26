@@ -157,7 +157,12 @@ def test_host_generation_guard():
     assert "state.loadGen" in host
     assert "pane.paneGen" in host
     assert "state.loadAbort.abort" in host
-    assert "if (gen !== state.loadGen || paneGen !== pane.paneGen) return" in host
+    assert "function paneLoadGenerationStale" in host
+    assert "function discardPaneLoadResult" in host
+    assert "function exitSupersededPaneLoad" in host
+    assert "function updatePaneLoadStatusFromBundle" in host
+    assert "catch (applyErr)" in host
+    assert "gen !== state.loadGen || paneGen !== pane.paneGen" in host
     assert "packed.timeframe !== pane.tf" in host
 
 
@@ -169,7 +174,7 @@ def test_host_iframe_ready_handshake():
     assert "INTERACTION_READY" in host
     assert "function whenReady" in host
     assert 'pane.html?v=" + ASSET_V' in host
-    assert 'const ASSET_V = "ob-levels-19"' in host
+    assert "const ASSET_V =" in host
     build = host[host.index("function buildPanes") : host.index("function applyLayout")]
     assert build.index("addEventListener(\"load\"") < build.index("iframe.src")
     assert 'src="/static/research_trp/pane.html"' not in build
@@ -244,7 +249,7 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "cursor: crosshair" in css
     assert "flex: 1" in css
     assert "height: 100%" in css
-    assert "chart.js?v=ob-levels-19" in pane
+    assert "chart.js?v=" in pane
     assert "updateFormingBar._stickAt" in js
     assert "getVisibleRange()" in js
     assert "if (!force && !autoScaleOn) return false" in js

@@ -17,7 +17,7 @@
   const EOD_FIXED_TILE_48H_FLAG_KEY = "phase6xt_eod_fixed_tile_48h_v1";
   const MIN_ORIGINS_STORAGE_KEY = "phase6xt_eod_density_min_origins_v1";
   const MIN_ORIGINS_SLIDER_MAX = 10;
-  const VERSION = "phase6xt-exact-origin-canvas-planned-hotfix-v1";
+  const VERSION = "phase6xt-bt-d36-density-supersede-v1";
   /** Viewer API release matrix (no silent fallbacks). */
   const RELEASED_VIEWER_SCOPES = [
     { timeframe: "15m", pool_detail: 1 },
@@ -540,7 +540,6 @@
         const ck = AD.exactOriginCacheKeyForWindow(w);
         try {
           const data = await fetchWindow(w.fromMs, w.toMs, scope);
-          if (loadSerial !== pane.exactOriginLoadSerial) return;
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
           AD.touchExactOriginWindowCache(store, ck, {
             status: "ok",
@@ -549,8 +548,9 @@
             toMs: w.toMs,
             at: Date.now(),
           });
-          fetched += 1;
+          if (loadSerial === pane.exactOriginLoadSerial) fetched += 1;
         } catch (err) {
+          if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
           AD.touchExactOriginWindowCache(store, ck, {
             status: "error",
             error: String(err && err.message ? err.message : err),
@@ -558,7 +558,7 @@
             toMs: w.toMs,
             at: Date.now(),
           });
-          failed += 1;
+          if (loadSerial === pane.exactOriginLoadSerial) failed += 1;
         }
       }
     }
@@ -598,6 +598,7 @@
         to_utc: isoFromMs(toMs),
         timeframe: sc.timeframe,
         pool_detail: sc.pool_detail,
+        response_mode: "exact_origin_v1",
       }),
     })
       .then(async (res) => {
@@ -773,7 +774,10 @@
       fetchStats.fetched += one.fetched;
       fetchStats.failed += one.failed;
       fetchStats.cacheHits += one.cacheHits;
-      if (loadSerial !== pane.exactOriginLoadSerial) return;
+      if (loadSerial !== pane.exactOriginLoadSerial) {
+        scheduleSupersededDensityRefresh(pane, opts);
+        return;
+      }
       if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
     }
 
@@ -872,7 +876,10 @@
       registeredZones = zones.length;
     }
 
-    if (loadSerial !== pane.exactOriginLoadSerial) return;
+    if (loadSerial !== pane.exactOriginLoadSerial) {
+      scheduleSupersededDensityRefresh(pane, opts);
+      return;
+    }
     if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
 
     if (canvasOn) {
@@ -1002,8 +1009,23 @@
     }
   }
 
+  function scheduleSupersededDensityRefresh(pane, opts) {
+    if (!pane) return;
+    if (pane.exactOriginSupersedeTimer) clearTimeout(pane.exactOriginSupersedeTimer);
+    pane.exactOriginSupersedeTimer = setTimeout(function () {
+      pane.exactOriginSupersedeTimer = null;
+      if (!isEnabled() || !paneSupports(pane)) return;
+      refreshPane(pane, Object.assign({ viewport: true }, opts || {})).catch(function (err) {
+        if (!(err && err.name === "AbortError") && deps && deps.setStatus) {
+          deps.setStatus("Exact Origin: " + (err.message || err), "error");
+        }
+      });
+    }, 48);
+  }
+
   function scheduleViewport(pane, from, to) {
     if (!isEnabled() || !paneSupports(pane)) return;
+    if (pane._suppressExactOriginViewport) return;
     if (pane.exactOriginViewportTimer) clearTimeout(pane.exactOriginViewportTimer);
     pane.exactOriginViewportTimer = setTimeout(function () {
       pane.exactOriginViewportTimer = null;
@@ -1019,15 +1041,23 @@
     if (!isEnabled() || !deps) return;
     deps.visibleIds().forEach(function (pid) {
       const pane = deps.state.panes[pid];
-      if (!pane || !paneSupports(pane)) return;
-      const cache = pane.exactOriginSegmentCache;
-      if (!cache) return;
-      if (isCanvasPathEnabled() && cache.segments) {
-        pushCanvasDensity(pane, cache.segments, cache.metrics);
-      } else if (cache.zones) {
-        mergeOverlays(pane, filterForDisplay(cache.zones));
-      }
+      repaintPaneFromCache(pane);
     });
+  }
+
+  function repaintPaneFromCache(pane) {
+    if (!isEnabled() || !pane || !paneSupports(pane)) return false;
+    const cache = pane.exactOriginSegmentCache;
+    if (!cache) return false;
+    if (isCanvasPathEnabled() && cache.segments) {
+      pushCanvasDensity(pane, cache.segments, cache.metrics);
+      return true;
+    }
+    if (cache.zones) {
+      mergeOverlays(pane, filterForDisplay(cache.zones));
+      return true;
+    }
+    return false;
   }
 
   function syncMinDepthUiFromStorage() {
@@ -1041,6 +1071,18 @@
     setMinOrigins(v);
   }
 
+  function ensureMinDepthInPaneToolbar() {
+    const depthWrap = deps && deps.$("researchExactOriginMinDepthWrap");
+    const nav = deps && deps.$("trpPaneNavControls");
+    const layouts = deps && deps.$("trpLayouts");
+    if (!depthWrap || !nav || !layouts) return;
+    if (depthWrap.parentElement !== nav) nav.appendChild(depthWrap);
+    if (depthWrap.previousElementSibling !== layouts) {
+      layouts.insertAdjacentElement("afterend", depthWrap);
+    }
+    if (deps.mountDrawToolbar) deps.mountDrawToolbar();
+  }
+
   function updateUiChrome() {
     const on = isEnabled();
     const wrap = deps && deps.$("researchExactOriginDensityWrap");
@@ -1048,6 +1090,7 @@
     const depthWrap = deps && deps.$("researchExactOriginMinDepthWrap");
     const pdWrap = deps && deps.$("researchExactOriginPdWrap");
     if (wrap) wrap.classList.toggle("exact-origin-active", on);
+    if (on) ensureMinDepthInPaneToolbar();
     if (depthWrap) depthWrap.hidden = !on;
     if (pdWrap) pdWrap.hidden = !on;
     if (on) syncPoolDetailUi(referencePaneForPdUi());
@@ -1102,6 +1145,8 @@
       });
     }
     syncMinDepthUiFromStorage();
+    ensureMinDepthInPaneToolbar();
+    updateUiChrome();
     const depthSlider = deps.$("researchExactOriginMinDepth");
     const depthReset = deps.$("researchExactOriginMinDepthReset");
     if (depthSlider) {
@@ -1183,6 +1228,7 @@
         : segments || [];
     },
     reapplyMinDepthFilterAllPanes: reapplyMinDepthFilterAllPanes,
+    repaintPaneFromCache: repaintPaneFromCache,
     MIN_ORIGINS_STORAGE_KEY: MIN_ORIGINS_STORAGE_KEY,
     syncPoolDetailUi: syncPoolDetailUi,
     onPaneTimeframeChange: onPaneTimeframeChange,

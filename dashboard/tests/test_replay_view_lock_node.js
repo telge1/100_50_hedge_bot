@@ -18,7 +18,10 @@ const chart = fs.readFileSync(
 assert.ok(js.includes("if (isHistoricalReplay()) return"), "poll skipped in replay");
 assert.ok(js.includes("stopPoll()"), "poll stopped on enter replay");
 assert.ok(chart.includes("if (followLive && !replayViewLock)"), "EMA no default view when replay locked");
-assert.ok(chart.includes("if (followLive && !replayViewLock) stickToLiveEdge"), "no stickToLive in replay");
+assert.ok(
+  /if \(followLive && !replayViewLock\)[\s\S]{0,260}stickToLiveEdge\(/.test(chart),
+  "no stickToLive in replay"
+);
 
 // Root cause B: pollPane setData preserveView + stickToLiveEdge
 assert.ok(js.includes("skipDefaultView: isHistoricalReplay()"), "poll setData skip default in replay");

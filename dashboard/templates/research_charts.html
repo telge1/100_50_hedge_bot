@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=phase6xt-research-fullscreen-tools-v3">
+    <link rel="stylesheet" href="/static/css/research.css?v=phase6xt-chart-immersive-fs-v2">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -46,7 +46,29 @@
                     <select id="researchBtStrategy" class="trp-select" title="Research-Strategie">
                         <option value="ob_exit_pool_liquidity_v1_phase1h" selected>Exit Pool phase1h (mass+fee, +6.71%)</option>
                         <option value="ob_exit_pool_liquidity_v1_phase1e">Exit Pool phase1e (5m meaningful, +7.98%)</option>
+                        <option value="pool_landscape_v1_candidate_bt_d7">Pool Landscape SHORT · Depth 2 (Research)</option>
+                        <option value="pool_first_setup_scanner_bt_d23">Pool-First Setup Scanner · PLANNED only (BT-D23)</option>
+                        <option value="pool_dynamic_selector_bt_d26">Dynamic Upper Pool Selector · PLANNED (BT-D26/BT-D28)</option>
+                        <option value="chronological_short_backtester_bt_d46">Chronological Short Backtester · BT-D46</option>
                     </select>
+                    <span id="researchBtD23Wrap" class="research-ezm-layer-wrap" hidden>
+                        <span class="trp-field-label">Setup Scanner Run</span>
+                        <select id="researchBtD23Run" class="trp-select" title="BT-D23 setups.json (keine Fills/PnL)">
+                            <option value="bt_d23_pilot_sep11_24h_v1">bt_d23_pilot_sep11_24h_v1</option>
+                        </select>
+                    </span>
+                    <span id="researchBtD26Wrap" class="research-ezm-layer-wrap" hidden>
+                        <span class="trp-field-label">Dynamic Selector Run</span>
+                        <select id="researchBtD26Run" class="trp-select" title="BT-D26/BT-D28 setups.json (keine Fills/PnL)">
+                            <option value="bt_d26_dynamic_referenz_sep11_24h_v1">bt_d26_dynamic_referenz_sep11_24h_v1</option>
+                            <option value="bt_d26_entry_offset_0p1_sep11_24h_v1">bt_d26_entry_offset_0p1_sep11_24h_v1</option>
+                        </select>
+                        <span class="trp-field-label">Dynamic Anzeige</span>
+                        <select id="researchBtD26DisplayMode" class="trp-select" title="BT-D30: ein aktiver Kandidat vs. alle Setups">
+                            <option value="current_candidate" selected>Aktueller Kandidat</option>
+                            <option value="all_setups">Alle Setups</option>
+                        </select>
+                    </span>
                     <span id="researchPoolSignalsWrap" class="research-ezm-layer-wrap" hidden>
                         <span class="trp-field-label">A+ Pool Signals</span>
                         <select id="researchPoolSignalsMode" class="trp-select" title="A+ Pool Signal Anzeige (kein neuer Scanner-Job)">
@@ -117,7 +139,65 @@
                     </div>
                 </div>
             </div>
+            <div class="research-bt-d7-summary trp-muted" id="researchBtD7Summary" hidden aria-live="polite"></div>
+            <pre class="research-bt-d26-detail trp-muted" id="researchBtD26CandidateDetail" hidden aria-live="polite"></pre>
+            <pre class="research-bt-d46-detail trp-muted" id="researchBtD46PositionDetail" hidden aria-live="polite"></pre>
 
+            <div id="trpDrawToolbarPool" class="trp-draw-toolbar-pool" aria-hidden="true">
+                <div class="trp-pane-draw-toolbar" id="trpDrawToolbar">
+                    <div class="trp-tools" id="trpTools"></div>
+                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
+                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
+                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
+                </div>
+                <div class="trp-pane-nav-controls" id="trpPaneNavControls">
+                    <span class="trp-field-label trp-pane-nav-label">GO TO</span>
+                    <input type="text" id="researchGoTo" class="research-goto-input trp-pane-goto-input" size="22"
+                           value="2026-08-26 11:34:51 UTC"
+                           placeholder="2026-08-26 11:34:51 UTC"
+                           spellcheck="false"
+                           autocomplete="off"
+                           title="UTC-Vorlage: Jahr-Monat-Tag Stunde:Minute:Sekunde UTC — nur Zahlen ändern"
+                           aria-label="Go To UTC with seconds">
+                    <button type="button" class="trp-text-btn" id="researchGoToBtn" title="Zu Datum springen">Springen</button>
+                    <span class="trp-pane-header-sep" aria-hidden="true"></span>
+                    <span class="trp-field-label">LAYOUT</span>
+                    <div class="trp-layout-group" id="trpLayouts">
+                        <button type="button" class="trp-layout-btn active" data-layout="1">1</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2H">2H</button>
+                        <button type="button" class="trp-layout-btn" data-layout="2V">2V</button>
+                        <button type="button" class="trp-layout-btn" data-layout="4">4</button>
+                    </div>
+                    <span id="researchExactOriginMinDepthWrap" class="trp-dock-ind trp-pane-min-origins" hidden title="Darstellung: schwache Überlappungen ausblenden (keine SSOT-Änderung)">
+                        <span class="trp-muted">Mindest-Origins</span>
+                        <input type="range" id="researchExactOriginMinDepth" min="1" max="10" step="1" value="1" aria-label="Mindest-Origins Density-Filter">
+                        <span id="researchExactOriginMinDepthValue" class="trp-muted">1</span>
+                        <button type="button" class="trp-text-btn" id="researchExactOriginMinDepthReset" title="Filter auf 1 (alle sichtbar)">Reset</button>
+                    </span>
+                </div>
+            </div>
+            <div id="researchHistoryHidden" class="visually-hidden" aria-hidden="true">
+                <select id="researchHistoryPreset" class="trp-select">
+                    <option value="rolling">Rolling (~17d)</option>
+                    <option value="7d">7 Tage</option>
+                    <option value="30d" selected>30 Tage</option>
+                    <option value="90d">90 Tage</option>
+                    <option value="custom">Custom</option>
+                </select>
+                <span id="researchHistoryCustomWrap">
+                    <input type="datetime-local" id="researchHistoryStart" aria-label="History Start UTC">
+                    <input type="datetime-local" id="researchHistoryEnd" aria-label="History Ende UTC">
+                </span>
+                <button type="button" id="researchHistoryApply">Laden</button>
+                <span id="researchGotoSyncHint" class="research-goto-sync-hint"></span>
+                <span id="researchHistoryHint" class="research-history-hint"></span>
+                <input type="checkbox" id="researchSyncChartAfterBt" checked>
+                <button type="button" id="researchFullscreenBtn" title="Vollbild">⛶</button>
+            </div>
             <div class="research-status" id="researchStatus"></div>
             <div class="research-selected" id="researchSelected">hover —  ·  sel —</div>
             <div class="trp-chart-dock" id="researchChartDock">
@@ -147,52 +227,6 @@
                     <label class="trp-check trp-dock-ind" title="Stärke Extreme"><input type="checkbox" class="research-lmv2-strength" value="Extreme" checked> Ex</label>
                     <label class="trp-check trp-dock-ind" title="Unverbrauchter Rest derselben Live-Micro-LLD-V2-Pools"><input type="checkbox" id="researchIndLiveMicroLldV2Remaining" autocomplete="off"> Remaining Pools</label>
                     </span>
-                    <div class="trp-dock-row trp-dock-row-time" id="researchDockRowTime">
-                    <div class="trp-resize-n" id="researchHeightHandle" title="Leiste nach oben/unten ziehen"></div>
-                    <span class="trp-dock-row-label">Zeit</span>
-                    <span class="trp-field-label">HISTORY</span>
-                    <select id="researchHistoryPreset" class="trp-select" title="Candle-History on demand (UTC)">
-                        <option value="rolling">Rolling (~17d)</option>
-                        <option value="7d">7 Tage</option>
-                        <option value="30d" selected>30 Tage</option>
-                        <option value="90d">90 Tage</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    <span id="researchHistoryCustomWrap" class="research-history-custom" hidden>
-                        <input type="datetime-local" id="researchHistoryStart" title="History Start UTC" aria-label="History Start UTC">
-                        <input type="datetime-local" id="researchHistoryEnd" title="History Ende UTC" aria-label="History Ende UTC">
-                    </span>
-                    <button type="button" class="trp-text-btn" id="researchHistoryApply" title="History für sichtbare Panes laden">Laden</button>
-                    <span class="trp-field-label">GO TO</span>
-                    <input type="text" id="researchGoTo" class="research-goto-input" size="24"
-                           value="2026-08-26 11:34:51 UTC"
-                           placeholder="2026-08-26 11:34:51 UTC"
-                           spellcheck="false"
-                           autocomplete="off"
-                           title="UTC-Vorlage: Jahr-Monat-Tag Stunde:Minute:Sekunde UTC — nur Zahlen ändern"
-                           aria-label="Go To UTC with seconds">
-                    <button type="button" class="trp-text-btn" id="researchGoToBtn" title="Zu Datum springen">Springen</button>
-                    <span id="researchGotoSyncHint" class="trp-muted research-goto-sync-hint" hidden></span>
-                    <span id="researchHistoryHint" class="trp-muted research-history-hint"></span>
-                    <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchSyncChartAfterBt" checked> Chart nach Backtest</label>
-                    <span class="trp-dock-sep" aria-hidden="true"></span>
-                    <span class="trp-field-label">LAYOUT</span>
-                    <div class="trp-layout-group" id="trpLayouts">
-                        <button type="button" class="trp-layout-btn active" data-layout="1">1</button>
-                        <button type="button" class="trp-layout-btn" data-layout="2H">2H</button>
-                        <button type="button" class="trp-layout-btn" data-layout="2V">2V</button>
-                        <button type="button" class="trp-layout-btn" data-layout="4">4</button>
-                    </div>
-                    <div class="trp-tools" id="trpTools"></div>
-                    <input type="color" id="trpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Farbe">
-                    <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
-                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
-                    </select>
-                    <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
-                    <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
-                    <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
-                    <button type="button" class="trp-text-btn trp-fs-dock" id="researchFullscreenBtn" title="Vollbild">⛶</button>
-                    </div>
                     <div class="trp-dock-row trp-dock-row-historical" id="researchDockRowHistorical">
                     <span class="trp-dock-row-label">Hist. Pools</span>
                     <label class="trp-check trp-dock-ind" title="ClickHouse historical LMV2 (Original publications, Apr–Sep 2026)"><input type="checkbox" id="researchIndHistoricalLmv2Pools" autocomplete="off"> Historical LLD V2 Pools</label>
@@ -205,12 +239,6 @@
                         <label class="trp-check trp-dock-ind" id="researchExactOriginPd1Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="1" autocomplete="off" checked> PD1</label>
                         <label class="trp-check trp-dock-ind" id="researchExactOriginPd5Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="5" autocomplete="off" disabled> PD5</label>
                         <label class="trp-check trp-dock-ind" id="researchExactOriginPd10Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="10" autocomplete="off" disabled> PD10</label>
-                    </span>
-                    <span id="researchExactOriginMinDepthWrap" class="trp-dock-ind" hidden title="Darstellung: schwache Überlappungen ausblenden (keine SSOT-Änderung)">
-                        <span class="trp-muted">Mindest-Origins</span>
-                        <input type="range" id="researchExactOriginMinDepth" min="1" max="10" step="1" value="1" aria-label="Mindest-Origins Density-Filter">
-                        <span id="researchExactOriginMinDepthValue" class="trp-muted">1</span>
-                        <button type="button" class="trp-text-btn" id="researchExactOriginMinDepthReset" title="Filter auf 1 (alle sichtbar)">Reset</button>
                     </span>
                     <span id="researchHistoricalLmv2PreloadModeWrap" class="trp-dock-ind" hidden>
                         <label class="trp-check trp-dock-ind" title="Phase 5P: preload full range once, no CH on pan/zoom inside READY"><input type="checkbox" id="researchIndHistoricalLmv2PreloadedStatic" autocomplete="off"> Preloaded static (5P)</label>
@@ -564,10 +592,10 @@
     </div>
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
-    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-density-canvas-recursion-hotfix-v1"></script>
-    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-exact-origin-canvas-planned-hotfix-v1"></script>
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-exact-origin-canvas-planned-hotfix-v1"></script>
-    <script src="/static/js/research/research_charts.js?v=phase6xt-research-fullscreen-tools-v3"></script>
+    <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-bt-d34-density-cache-v1"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-bt-d34-density-cache-v1"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-bt-d36-density-supersede-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=phase6xt-bt-d49-box-only-v1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

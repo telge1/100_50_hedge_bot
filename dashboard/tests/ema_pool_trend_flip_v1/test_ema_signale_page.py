@@ -74,9 +74,10 @@ def test_nav_dropdown_daten_signale():
     nav = (DASHBOARD / "templates" / "partials" / "nav.html").read_text(encoding="utf-8")
     assert "📉 Daten & Signale" in nav
     assert "Datenhub" in nav
-    assert "Ema-Signal" in nav
+    assert "Backtester" in nav
     assert 'href="/stoch-signale"' in nav
-    assert 'href="/ema-signale"' in nav
+    assert 'href="/backtester"' in nav
+    assert "Ema-Signal" not in nav
     assert nav.count("Daten & Signale") == 2
     assert 'aria-label="Daten & Signale"' in nav
     assert "📉 Stoch-Signale" not in nav
@@ -95,51 +96,35 @@ def test_ema_signal_template_renders():
     env = Environment(loader=FileSystemLoader(str(DASHBOARD / "templates")))
     html = env.get_template("ema_signale.html").render(
         user={"username": "tester"},
-        signals=[],
-        symbols=[],
-        summary={"signals": 0, "created": 0, "completed": 0, "cancelled": 0},
-        pagination={
-            "page": 0,
-            "page_size": 50,
-            "total_filtered": 0,
-            "has_prev": False,
-            "has_next": False,
-        },
-        feed_ready=False,
-        feed_message="Signal-Generator Datenbank nicht erreichbar",
-        banner={"title": "EMA 59 BAND · MULTIPLIKATOR 3"},
-        window_label="",
-        filter_symbol="",
-        filter_direction="",
-        filter_state="",
-        filter_start_time="",
-        filter_end_time="",
+        banner={"title": "V2 STRATEGY BACKTESTER"},
+        window_label="SMOKE / STATE_WARMUP_NOT_PROVEN",
         page_size=50,
         signal_page=0,
     )
-    assert "Keine Signale" in html
-    assert "Ema-Signal" in html
-    assert "page_size" in html
+    assert "V2 Strategy Backtester" in html
+    assert "<title>V2 Strategy Backtester</title>" in html
+    assert "SMOKE / STATE_WARMUP_NOT_PROVEN" in html
+    assert "ema_signale_v2_chart.js" in html
+    assert "v2KpiTrades" in html
 
 
 def test_ema_signal_template_contract():
     html = (DASHBOARD / "templates" / "ema_signale.html").read_text(encoding="utf-8")
     js = (DASHBOARD / "static" / "js" / "ema_signale.js").read_text(encoding="utf-8")
     app = (DASHBOARD / "app.py").read_text(encoding="utf-8")
-    assert "set nav_active = 'daten-signale-ema-signal'" in html
-    assert "Timestamp (UTC)" in html
+    assert "set nav_active = 'daten-signale-backtester'" in html
+    assert "Decision-Close (UTC)" in html
     assert ">Symbol<" in html
-    assert ">THR<" in html
-    assert "Signal-Generator" in html
-    assert "paginated_live_signals" in app
-    assert 'id="emaFilterForm"' in html
-    assert 'name="page"' in html
-    assert 'name="page_size"' in html
-    assert "Zeige" in html
+    assert "v2-backtest" in app
+    assert 'id="v2FilterForm"' in html
     assert "emaPagePrev" in html
     assert "emaPageNext" in js
+    assert '@app.get("/backtester"' in app
     assert '@app.get("/ema-signale"' in app
+    assert "status_code=308" in app
+    assert "ema_signale_legacy_redirect" in app
     assert '@app.get("/daten-signale"' in app
+    assert "paginated_live_signals" not in app.split("def backtester_page")[1].split("@app.get")[0]
 
 
 def test_pagination_newest_first(tmp_path, monkeypatch):

@@ -31,7 +31,9 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "phase6xt-research-fullscreen-tools-v3";
+  const ASSET_V = "phase6xt-bt-d36-density-supersede-v1";
+  const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
+  const PANE_LOAD_RECOVERY_MAX = 2;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
@@ -132,12 +134,15 @@
     loadAbort: null,
     initialLoadDone: false,
     requestLog: [],
+    paneSendJsonDiagLog: [],
+    paneSendJsonDiagSeq: 0,
     liveStatus: null,
     workspace: null,
     hoverUnix: null,
     hoverPane: null,
     selectedUnix: null,
     selectedPane: null,
+    drawToolbarPane: null,
     syncGeneration: 0,
     emaDraft: null,
     overlayTest: false,
@@ -451,6 +456,215 @@
       const pane = state.panes[pid];
       if (pane) pane.paneGen += 1;
     });
+  }
+
+  function paneStatusEl(pane) {
+    return pane && pane.el ? pane.el.querySelector(".trp-pane-status") : null;
+  }
+
+  function paneStatusFromPendingData(pane) {
+    const rows = (pane.pendingData && pane.pendingData.candles) || [];
+    if (rows.length) return rows.length + " · ready";
+    return "no data";
+  }
+
+  function updatePaneLoadStatusFromBundle(pane, packed, skipCandles) {
+    const st = paneStatusEl(pane);
+    if (!st) return;
+    const rows = skipCandles && pane.pendingData
+      ? (pane.pendingData.candles || [])
+      : (packed.candles || []);
+    st.textContent = rows.length + " · " + (packed.cache || "load");
+  }
+
+  function paneLoadOwnerIsCurrent(pane, owner) {
+    return !!(pane && owner && pane._paneLoadOwner === owner);
+  }
+
+  function logPaneLoadFailure(paneId, pane, owner, err, phase) {
+    const row = {
+      kind: "pane_load",
+      phase: phase || "apply",
+      pane: paneId,
+      symbol: state.symbol,
+      timeframe: pane && pane.tf,
+      message: err && err.message ? String(err.message) : String(err || "error"),
+      stack: err && err.stack ? String(err.stack) : "",
+      owner_seq: owner && owner.seq,
+      load_gen: owner && owner.loadGen,
+      pane_gen: owner && owner.paneGen,
+    };
+    try { console.warn("[research] pane load failure", row); } catch (e) { /* ignore */ }
+    postLiveDiag(row);
+  }
+
+  function setPaneLoadApplyError(pane, paneGen, gen, owner, err) {
+    if (!paneLoadOwnerIsCurrent(pane, owner)) return;
+    if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
+    const el = paneStatusEl(pane);
+    if (el) {
+      const rows = (pane.pendingData && pane.pendingData.candles) || [];
+      if (rows.length) {
+        el.textContent = paneStatusFromPendingData(pane);
+      } else {
+        const msg = err && err.message ? String(err.message) : String(err || "error");
+        el.textContent = "error · " + msg.slice(0, 56);
+      }
+    }
+    pane._paneLoadOwner = null;
+    if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
+    clearPaneLoadRecoveryTimer(pane);
+  }
+
+  function resetPaneLoadRecoveryCount(pane) {
+    if (pane) pane._paneLoadRecoveryCount = 0;
+  }
+
+  function registerPaneLoadOwner(pane, paneId, paneGen, gen) {
+    const owner = {
+      paneId: paneId,
+      paneGen: paneGen,
+      loadGen: gen,
+      seq: (pane._paneLoadSeq || 0) + 1,
+    };
+    pane._paneLoadSeq = owner.seq;
+    pane._paneLoadOwner = owner;
+    pane._paneLoadInFlight = owner;
+    return owner;
+  }
+
+  function clearPaneLoadRecoveryTimer(pane) {
+    if (pane._paneLoadRecoveryTimer) {
+      clearTimeout(pane._paneLoadRecoveryTimer);
+      pane._paneLoadRecoveryTimer = null;
+    }
+  }
+
+  function schedulePaneLoadRecovery(paneId, owner) {
+    const pane = state.panes[paneId];
+    if (!pane || pane._paneLoadOwner !== owner) return;
+    if (pane._paneLoadRecoveryTimer) return;
+    pane._paneLoadRecoveryTimer = setTimeout(function () {
+      pane._paneLoadRecoveryTimer = null;
+      if (pane._paneLoadOwner !== owner) return;
+      const st = paneStatusEl(pane);
+      if (!st || st.textContent !== "loading…") return;
+      if (pane.pendingData && (pane.pendingData.candles || []).length) {
+        st.textContent = paneStatusFromPendingData(pane);
+        pane._paneLoadOwner = null;
+        resetPaneLoadRecoveryCount(pane);
+        return;
+      }
+      const attempts = pane._paneLoadRecoveryCount || 0;
+      if (attempts >= PANE_LOAD_RECOVERY_MAX) {
+        st.textContent = "error · load recovery limit";
+        pane._paneLoadOwner = null;
+        return;
+      }
+      pane._paneLoadRecoveryCount = attempts + 1;
+      void loadPane(paneId, {
+        force: true,
+        sourceAction: "pane-load-recovery",
+        gen: state.loadGen,
+      }).catch(function (err) {
+        const activeOwner = pane._paneLoadOwner;
+        if (err && err.name === "AbortError") {
+          if (activeOwner) discardPaneLoadResult(pane, paneId, activeOwner);
+          return;
+        }
+        logPaneLoadFailure(paneId, pane, activeOwner || owner, err, "recovery");
+        const el = paneStatusEl(pane);
+        if (el && activeOwner && pane._paneLoadOwner === activeOwner) {
+          el.textContent = "error · load failed";
+        }
+      });
+    }, 0);
+  }
+
+  function discardPaneLoadResult(pane, paneId, owner) {
+    if (!pane || pane._paneLoadOwner !== owner) return;
+    schedulePaneLoadRecovery(paneId, owner);
+  }
+
+  function scheduleOrphanPaneLoadRecovery(paneId) {
+    const pane = state.panes[paneId];
+    if (!pane || pane._paneLoadOwner) return;
+    if (pane._paneLoadRecoveryTimer) return;
+    pane._paneLoadRecoveryTimer = setTimeout(function () {
+      pane._paneLoadRecoveryTimer = null;
+      if (pane._paneLoadOwner) return;
+      const st = paneStatusEl(pane);
+      if (!st || st.textContent !== "loading…") return;
+      if (pane.pendingData && (pane.pendingData.candles || []).length) {
+        st.textContent = paneStatusFromPendingData(pane);
+        resetPaneLoadRecoveryCount(pane);
+        return;
+      }
+      const attempts = pane._paneLoadRecoveryCount || 0;
+      if (attempts >= PANE_LOAD_RECOVERY_MAX) {
+        st.textContent = "error · load recovery limit";
+        return;
+      }
+      pane._paneLoadRecoveryCount = attempts + 1;
+      void loadPane(paneId, {
+        force: true,
+        sourceAction: "pane-load-orphan-recovery",
+        gen: state.loadGen,
+      }).catch(function (err) {
+        const activeOwner = pane._paneLoadOwner;
+        if (err && err.name === "AbortError") {
+          if (activeOwner) discardPaneLoadResult(pane, paneId, activeOwner);
+          return;
+        }
+        logPaneLoadFailure(paneId, pane, activeOwner, err, "orphan-recovery");
+        const el = paneStatusEl(pane);
+        if (el && !activeOwner && st.textContent === "loading…") {
+          el.textContent = "error · load failed";
+        } else if (el && activeOwner && pane._paneLoadOwner === activeOwner) {
+          el.textContent = "error · load failed";
+        }
+      });
+    }, 0);
+  }
+
+  function paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen) {
+    if (gen !== state.loadGen || paneGen !== pane.paneGen) return true;
+    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return true;
+    return false;
+  }
+
+  function setPaneLoadHttpError(pane, paneGen, gen, owner, err) {
+    if (pane._paneLoadOwner !== owner) return;
+    if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
+    const el = paneStatusEl(pane);
+    if (el) {
+      const msg = err && err.message ? String(err.message) : String(err || "error");
+      el.textContent = "error · " + msg.slice(0, 56);
+    }
+    pane._paneLoadOwner = null;
+    if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
+  }
+
+  function releasePaneLoadOwner(pane, owner) {
+    if (!paneLoadOwnerIsCurrent(pane, owner)) return;
+    if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
+    pane._paneLoadOwner = null;
+    clearPaneLoadRecoveryTimer(pane);
+    resetPaneLoadRecoveryCount(pane);
+  }
+
+  function exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen) {
+    if (paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen)) {
+      discardPaneLoadResult(pane, paneId, owner);
+      return true;
+    }
+    if (!paneLoadOwnerIsCurrent(pane, owner)) {
+      if (!pane._paneLoadOwner) {
+        scheduleOrphanPaneLoadRecovery(paneId);
+      }
+      return true;
+    }
+    return false;
   }
 
   function enterHistoricalReplay(goto_ts_utc, win) {
@@ -863,6 +1077,10 @@
       }
     }
     if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p) p._suppressExactOriginViewport = true;
+      });
       try {
         await PD1ExactOriginResearch.refreshAll({
           force: true,
@@ -873,6 +1091,49 @@
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] exact-origin go-to", err); } catch (e) { /* ignore */ }
         }
+      } finally {
+        visibleIds().forEach(function (pid) {
+          const p = state.panes[pid];
+          if (p) p._suppressExactOriginViewport = false;
+        });
+      }
+    }
+    if (isBtD26DynamicSelectorStrategy(btStrategy())) {
+      const cat = (state.workspace && state.workspace.bt_d26_dynamic_selector) || {};
+      if (cat.visible) {
+        const lo = goto_ts_utc - win.viewPad;
+        const hi = goto_ts_utc + win.viewPad;
+        await Promise.all(
+          visibleIds().map(function (pid) {
+            const pane = state.panes[pid];
+            if (!pane || pane.tf !== "5m") return Promise.resolve();
+            return syncBtD26ViewportRange(pane, lo, hi);
+          })
+        );
+      } else {
+        visibleIds().forEach(function (pid) {
+          const pane = state.panes[pid];
+          if (pane) scheduleBtD26DynamicSelector(pane);
+        });
+      }
+    }
+    if (isBtD46ChronologicalBacktesterStrategy(btStrategy())) {
+      const cat = (state.workspace && state.workspace.bt_d46_chronological) || {};
+      if (cat.visible) {
+        const lo = goto_ts_utc - win.viewPad;
+        const hi = goto_ts_utc + win.viewPad;
+        await Promise.all(
+          visibleIds().map(function (pid) {
+            const pane = state.panes[pid];
+            if (!pane || pane.tf !== "5m") return Promise.resolve();
+            return syncBtD46ViewportRange(pane, lo, hi);
+          })
+        );
+      } else {
+        visibleIds().forEach(function (pid) {
+          const pane = state.panes[pid];
+          if (pane) scheduleBtD46Chronological(pane);
+        });
       }
     }
     setStatus(
@@ -1102,6 +1363,96 @@
     }
   }
 
+  function paneSendJsonDiagEnabled() {
+    try {
+      if (window.__researchPaneSendJsonDiag) return true;
+      return localStorage.getItem("research.paneSendJsonDiag") === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function isPanePostSendJson(url, method) {
+    return method === "POST" && String(url || "").indexOf("/api/research/pane") >= 0;
+  }
+
+  function paneSendJsonDiagContext(meta, payload) {
+    const paneId = meta && meta.pane;
+    const pane = paneId && state.panes ? state.panes[paneId] : null;
+    const owner = pane && pane._paneLoadOwner;
+    const signal = meta && meta.signal;
+    return {
+      paneId: paneId || null,
+      loadGen: owner && owner.loadGen != null ? owner.loadGen : state.loadGen,
+      paneGen: owner && owner.paneGen != null ? owner.paneGen : (pane && pane.paneGen),
+      ownerSeq: owner && owner.seq != null ? owner.seq : null,
+      sourceAction: meta && meta.sourceAction,
+      timeframe: meta && meta.timeframe,
+      symbol: (payload && payload.symbol) || state.symbol,
+      signal: signal,
+      _t0: Date.now(),
+    };
+  }
+
+  function paneSendJsonDiagEmit(reqId, phase, ctx, extra) {
+    if (!paneSendJsonDiagEnabled()) return;
+    const t0 = ctx && ctx._t0;
+    const aborted = !!(ctx && ctx.signal && ctx.signal.aborted);
+    const row = Object.assign({
+      phase: phase,
+      reqId: reqId,
+      t: Date.now(),
+      elapsedMs: t0 != null ? Date.now() - t0 : 0,
+      paneId: ctx && ctx.paneId,
+      loadGen: ctx && ctx.loadGen,
+      paneGen: ctx && ctx.paneGen,
+      ownerSeq: ctx && ctx.ownerSeq,
+      aborted: aborted,
+    }, extra || {});
+    state.paneSendJsonDiagLog.push(row);
+    if (state.paneSendJsonDiagLog.length > 240) state.paneSendJsonDiagLog.shift();
+    try { console.debug("[pane-sendjson-diag]", row); } catch (e) { /* ignore */ }
+  }
+
+  function nextPaneSendJsonReqId() {
+    state.paneSendJsonDiagSeq = (state.paneSendJsonDiagSeq || 0) + 1;
+    return "psd-" + state.paneSendJsonDiagSeq;
+  }
+
+  async function parsePanePostResponseForDiag(res, reqId, ctx) {
+    paneSendJsonDiagEmit(reqId, "RESPONSE_BODY_READ_START", ctx, { httpStatus: res.status });
+    let text = "";
+    try {
+      text = await res.text();
+    } catch (readErr) {
+      const aborted = readErr && readErr.name === "AbortError";
+      paneSendJsonDiagEmit(reqId, aborted ? "SENDJSON_ABORT" : "SENDJSON_ERROR", ctx, {
+        httpStatus: res.status,
+        errorName: readErr && readErr.name,
+        message: readErr && readErr.message ? String(readErr.message).slice(0, 200) : "",
+      });
+      throw readErr;
+    }
+    paneSendJsonDiagEmit(reqId, "RESPONSE_BODY_READ_DONE", ctx, {
+      httpStatus: res.status,
+      bodyBytes: text.length,
+    });
+    let body;
+    let jsonParseError = false;
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch (parseErr) {
+      jsonParseError = true;
+      body = {};
+    }
+    paneSendJsonDiagEmit(reqId, "JSON_PARSE_DONE", ctx, {
+      httpStatus: res.status,
+      jsonParseError: jsonParseError,
+      candleCount: body && Array.isArray(body.candles) ? body.candles.length : null,
+    });
+    return body;
+  }
+
   async function sendJson(url, method, payload, meta) {
     const key = method + " " + url + "\n" + JSON.stringify(payload || {});
     const info = logReq(Object.assign({
@@ -1113,20 +1464,64 @@
       pane: meta && meta.pane,
       generation: state.loadGen,
     }, meta || {}));
+    const paneDiag = isPanePostSendJson(url, method) && paneSendJsonDiagEnabled();
     if (inflightPosts[key]) {
       info.coalesced = true;
+      if (paneDiag) {
+        const reqId = nextPaneSendJsonReqId();
+        const ctx = paneSendJsonDiagContext(meta, payload);
+        paneSendJsonDiagEmit(reqId, "SEND_COALESCED", ctx, { coalesced: true });
+      }
       return inflightPosts[key];
     }
     const pending = (async function () {
-      const res = await fetch(url, {
-        method: method,
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload || {}),
-        signal: meta && meta.signal,
-      });
-      const body = await res.json().catch(function () { return {}; });
-      if (!res.ok) throw httpError(res, body, url);
+      const diagOn = paneDiag;
+      const reqId = diagOn ? nextPaneSendJsonReqId() : null;
+      const ctx = diagOn ? paneSendJsonDiagContext(meta, payload) : null;
+      if (diagOn) paneSendJsonDiagEmit(reqId, "SEND_START", ctx, {});
+      let res;
+      try {
+        res = await fetch(url, {
+          method: method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload || {}),
+          signal: meta && meta.signal,
+        });
+      } catch (fetchErr) {
+        if (diagOn) {
+          const aborted = fetchErr && fetchErr.name === "AbortError";
+          paneSendJsonDiagEmit(reqId, aborted ? "SENDJSON_ABORT" : "SENDJSON_ERROR", ctx, {
+            errorName: fetchErr && fetchErr.name,
+            message: fetchErr && fetchErr.message ? String(fetchErr.message).slice(0, 200) : "",
+          });
+        }
+        throw fetchErr;
+      }
+      if (diagOn) {
+        paneSendJsonDiagEmit(reqId, "FETCH_RESOLVED", ctx, { httpStatus: res.status });
+      }
+      let body;
+      if (diagOn) {
+        body = await parsePanePostResponseForDiag(res, reqId, ctx);
+      } else {
+        body = await res.json().catch(function () { return {}; });
+      }
+      if (!res.ok) {
+        if (diagOn) {
+          paneSendJsonDiagEmit(reqId, "SENDJSON_ERROR", ctx, {
+            httpStatus: res.status,
+            httpError: true,
+          });
+        }
+        throw httpError(res, body, url);
+      }
+      if (diagOn) {
+        paneSendJsonDiagEmit(reqId, "SENDJSON_RETURN", ctx, {
+          httpStatus: res.status,
+          candleCount: body && Array.isArray(body.candles) ? body.candles.length : null,
+        });
+      }
       return body;
     })();
     inflightPosts[key] = pending;
@@ -1177,6 +1572,7 @@
         if (pane.pendingOi && chart.setOiPane) chart.setOiPane(pane.pendingOi);
         if (pane.pendingLldEma) chart.setLldEma(pane.pendingLldEma);
         if (pane.pendingOverlays) syncOverlays(pane, pane.pendingOverlays);
+        repaintExactOriginDensityFromCache(pane);
         chart.setInteractionMode(toolMode());
         pane.phase = "INTERACTION_READY";
         chart.resize();
@@ -1191,6 +1587,9 @@
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
+        scheduleBtD23SetupScanner(pane, from, to);
+        scheduleBtD26DynamicSelector(pane, from, to);
+        scheduleBtD46Chronological(pane, from, to);
         scheduleLiveMicroLldV2ViewportSync(pane);
         if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
           PD1ExactOriginResearch.scheduleViewport(pane, from, to);
@@ -1413,6 +1812,27 @@
     } catch (e) {
       return true;
     }
+  }
+
+  /** Re-push cached exact-origin canvas segments after iframe/chart or overlay sync. */
+  function repaintExactOriginDensityFromCache(pane) {
+    if (
+      !exactOriginDensityEnabled() ||
+      !window.PD1ExactOriginResearch ||
+      !PD1ExactOriginResearch.paneSupports(pane) ||
+      !PD1ExactOriginResearch.repaintPaneFromCache
+    ) {
+      return false;
+    }
+    return PD1ExactOriginResearch.repaintPaneFromCache(pane);
+  }
+
+  function repaintExactOriginDensityAllVisiblePanes() {
+    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane) repaintExactOriginDensityFromCache(pane);
+    });
   }
 
   function historicalLmv2ActiveEnabled() {
@@ -3785,6 +4205,29 @@
     }, SCANNER_COMMON_POLL_DEBOUNCE_MS);
   }
 
+  function drawToolbarTargetPaneId() {
+    if (state.paneFs && state.panes[state.paneFs]) return state.paneFs;
+    if (state.drawToolbarPane && visibleIds().indexOf(state.drawToolbarPane) >= 0) {
+      return state.drawToolbarPane;
+    }
+    const vis = visibleIds();
+    return vis.length ? vis[0] : PANE_IDS[0];
+  }
+
+  function mountDrawToolbar(paneId) {
+    const pid = paneId || drawToolbarTargetPaneId();
+    if (!pid || visibleIds().indexOf(pid) < 0) return;
+    state.drawToolbarPane = pid;
+    const pane = state.panes[pid];
+    const bar = $("trpDrawToolbar");
+    if (!pane || !bar) return;
+    const host = pane.el.querySelector(".trp-pane-draw-host");
+    if (!host) return;
+    if (bar.parentElement !== host) host.appendChild(bar);
+    const nav = $("trpPaneNavControls");
+    if (nav && nav.parentElement !== host) host.appendChild(nav);
+  }
+
   function buildTools() {
     const host = $("trpTools");
     if (!host) return;
@@ -3826,6 +4269,7 @@
         '<select class="trp-pane-tf"></select>' +
         '<button type="button" class="trp-reset" title="Chartansicht zurücksetzen" aria-label="Chartansicht zurücksetzen">⟲</button>' +
         '<button type="button" class="trp-fs" title="Chart Vollbild" aria-label="Chart Vollbild">⛶</button>' +
+        '<div class="trp-pane-draw-host"></div>' +
         '<span class="trp-pane-status"></span></div>' +
         '<iframe class="trp-pane-frame" title="' + pid + '"></iframe>';
       const tfSel = wrap.querySelector(".trp-pane-tf");
@@ -3906,6 +4350,9 @@
         ev.stopPropagation();
         onResearchFullscreenUserClick();
       });
+      wrap.querySelector(".trp-pane-header").addEventListener("mousedown", function () {
+        mountDrawToolbar(pid);
+      });
       let resizeTimer = null;
       let lastBox = "0x0";
       new ResizeObserver(function () {
@@ -3922,6 +4369,7 @@
       root.appendChild(wrap);
     });
     applyLayout(state.layout, true);
+    mountDrawToolbar();
   }
 
   function applyLayout(layout, force) {
@@ -3944,6 +4392,7 @@
       btn.classList.toggle("active", btn.dataset.layout === layout);
     });
     requestAnimationFrame(function () {
+      mountDrawToolbar();
       visibleIds().forEach(function (pid) {
         if (state.paneFs && pid !== state.paneFs) return;
         const chart = api(state.panes[pid]);
@@ -4001,8 +4450,29 @@
     return document.body.classList.contains("research-browser-fs");
   }
 
+  function setResearchChartImmersiveFs(on) {
+    const host = researchFullscreenRoot();
+    document.body.classList.toggle("research-chart-immersive-fs", !!on);
+    if (host) host.classList.toggle("research-chart-immersive-fs", !!on);
+  }
+
+  function applyResearchImmersiveWorkspaceGeom() {
+    const root = $("researchWorkspace");
+    const dock = $("researchChartDock");
+    if (!root || !dock) return;
+    dock.style.marginTop = "0";
+    const shell = document.querySelector(".dashboard-content.research-trp-shell");
+    const rect = shell ? shell.getBoundingClientRect() : null;
+    const top = rect ? Math.max(0, Math.floor(rect.top)) : 0;
+    const h = Math.max(240, window.innerHeight - top - 8);
+    root.style.height = h + "px";
+    root.style.minHeight = h + "px";
+  }
+
   function setBrowserFs(on) {
     document.body.classList.toggle("research-browser-fs", !!on);
+    setResearchChartImmersiveFs(!!on);
+    if (on) applyResearchImmersiveWorkspaceGeom();
     const btn = $("researchFullscreenBtn");
     if (btn) btn.classList.toggle("active", !!on);
     requestAnimationFrame(function () {
@@ -4063,7 +4533,10 @@
     document.querySelectorAll(".trp-pane .trp-fs").forEach(function (el) {
       el.classList.toggle("active", fsActive);
     });
-    if (!nativeOn && !cssOn) {
+    setResearchChartImmersiveFs(fsActive);
+    if (fsActive) {
+      applyResearchImmersiveWorkspaceGeom();
+    } else {
       restoreWorkspaceGeomFromFs();
     }
     resizeVisibleCharts();
@@ -4101,18 +4574,20 @@
       return;
     }
     rememberWorkspaceGeomForFs();
-    expandWorkspaceUp();
     setBrowserFs(true);
+    applyResearchImmersiveWorkspaceGeom();
     if (btn) btn.title = "Vollbild beenden (Fallback)";
     setStatus(
-      "Vollbild: natives Browser-Fullscreen nicht möglich — nur Aufziehen-Modus (kein Tab/URL-Vollbild).",
-      "warn"
+      "Vollbild: Chart-Modus (obere Leisten ausgeblendet).",
+      ""
     );
     syncResearchFullscreenUi();
   }
 
   /** Must call requestFullscreen synchronously inside the user click stack. */
   function enterNativeResearchFullscreenFromUserGesture() {
+    setResearchChartImmersiveFs(true);
+    applyResearchImmersiveWorkspaceGeom();
     const root = researchFullscreenRoot();
     if (!root) {
       applyResearchFullscreenCssFallback();
@@ -4165,6 +4640,7 @@
     }
     if (isBrowserFs()) {
       setBrowserFs(false);
+      setResearchChartImmersiveFs(false);
       restoreWorkspaceGeomFromFs();
       applyLayout(state.layout, true);
       syncResearchFullscreenUi();
@@ -5403,6 +5879,683 @@
     );
   }
 
+  function isBtD7PoolLandscapeStrategy(sid) {
+    return String(sid || "") === "pool_landscape_v1_candidate_bt_d7";
+  }
+
+  function isBtD23SetupScannerStrategy(sid) {
+    return String(sid || "") === "pool_first_setup_scanner_bt_d23";
+  }
+
+  function isBtD26DynamicSelectorStrategy(sid) {
+    return String(sid || "") === "pool_dynamic_selector_bt_d26";
+  }
+
+  function isBtD46ChronologicalBacktesterStrategy(sid) {
+    return String(sid || "") === "chronological_short_backtester_bt_d46";
+  }
+
+  const BT_D23_DEFAULT_RUN = "bt_d23_pilot_sep11_24h_v1";
+  const BT_D26_DEFAULT_RUN = "bt_d26_dynamic_referenz_sep11_24h_v1";
+  const BT_D23_VIEWPORT_DEBOUNCE_MS = 180;
+  const BT_D26_VIEWPORT_DEBOUNCE_MS = 180;
+  const BT_D46_VIEWPORT_DEBOUNCE_MS = 180;
+
+  async function loadBtD23Runs() {
+    if (!state.symbol) return;
+    const sel = $("researchBtD23Run");
+    if (!sel) return;
+    try {
+      const url = "/api/research/backtester/bt-d23-setup-scanner/runs?symbol="
+        + encodeURIComponent(state.symbol);
+      const res = await fetch(url, { method: "GET", credentials: "same-origin" }).then(function (r) {
+        return r.json();
+      });
+      const runs = (res && res.runs) || [];
+      sel.innerHTML = "";
+      if (!runs.length) {
+        const opt = document.createElement("option");
+        opt.value = BT_D23_DEFAULT_RUN;
+        opt.textContent = BT_D23_DEFAULT_RUN + " (default)";
+        sel.appendChild(opt);
+        return;
+      }
+      runs.forEach(function (r) {
+        const opt = document.createElement("option");
+        opt.value = r.run_id;
+        opt.textContent = r.run_id + " · " + (r.setup_count || 0) + " PLANNED setups";
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      sel.innerHTML = "<option value=\"" + BT_D23_DEFAULT_RUN + "\">" + BT_D23_DEFAULT_RUN + "</option>";
+    }
+  }
+
+  function renderBtD23Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d23_setup_scanner) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (!isBtD23SetupScannerStrategy(btStrategy()) || !bt.visible) {
+      if (!isBtD7PoolLandscapeStrategy(btStrategy())) {
+        el.hidden = true;
+        el.textContent = "";
+      }
+      return;
+    }
+    const parts = [
+      "Pool-First Setup Scanner · PLANNED SHORT — NOT EXECUTED",
+      sum.run_id ? ("run " + sum.run_id) : "",
+      sum.config_hash ? ("hash " + String(sum.config_hash).slice(0, 12) + "…") : "",
+      "depth 2 · 5m PD1",
+      sum.time_span && sum.time_span.start
+        ? (String(sum.time_span.start).slice(0, 16) + " … " + String(sum.time_span.end || "").slice(0, 16))
+        : "",
+      (bt.setup_count_total != null ? (bt.setup_count_total + " setups (catalog)") : ""),
+      (bt.setup_count_rendered != null ? (bt.setup_count_rendered + " gezeichnet (viewport)") : ""),
+      "kein PnL · keine Fills",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+  }
+
+  async function syncBtD23ViewportRange(pane, startUnix, endUnix) {
+    if (!pane || pane.tf !== "5m") return;
+    if (!isBtD23SetupScannerStrategy(btStrategy())) return;
+    const cat = (state.workspace && state.workspace.bt_d23_setup_scanner) || {};
+    if (!cat.visible) return;
+    if (!(endUnix > startUnix)) return;
+    const gen = (pane.btD23Gen = (pane.btD23Gen || 0) + 1);
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d23-setup-scanner/sync-viewport", "POST", {
+        symbol: state.symbol,
+        view_start_unix: Math.floor(startUnix),
+        view_end_unix: Math.floor(endUnix),
+      }, { sourceAction: "bt-d23-viewport" });
+      if (gen !== pane.btD23Gen) return;
+      applyWorkspace(snap);
+      renderBtD23Summary(snap);
+      await refreshOverlaysVisible();
+    } catch (e) { /* ignore */ }
+  }
+
+  function scheduleBtD23SetupScanner(pane, from, to) {
+    if (!pane) return;
+    if (pane.btD23Timer) clearTimeout(pane.btD23Timer);
+    pane.btD23Timer = setTimeout(function () {
+      pane.btD23Timer = null;
+      let start = from;
+      let end = to;
+      if (start == null || end == null) {
+        const chart = api(pane);
+        if (!chart || !chart.getVisibleTimeRange) return;
+        const range = chart.getVisibleTimeRange();
+        if (!range || range.firstCandle == null || range.lastCandle == null) return;
+        const step = TF_SEC[pane.tf] || 300;
+        start = Number(range.firstCandle);
+        end = Number(range.lastCandle) + step;
+      }
+      syncBtD23ViewportRange(pane, start, end);
+    }, BT_D23_VIEWPORT_DEBOUNCE_MS);
+  }
+
+  async function loadBtD26Runs() {
+    if (!state.symbol) return;
+    const sel = $("researchBtD26Run");
+    if (!sel) return;
+    try {
+      const url = "/api/research/backtester/bt-d26-dynamic-selector/runs?symbol="
+        + encodeURIComponent(state.symbol);
+      const res = await fetch(url, { method: "GET", credentials: "same-origin" }).then(function (r) {
+        return r.json();
+      });
+      const runs = (res && res.runs) || [];
+      sel.innerHTML = "";
+      if (!runs.length) {
+        [
+          { run_id: "bt_d26_dynamic_referenz_sep11_24h_v1", setup_count: 102 },
+          { run_id: "bt_d26_entry_offset_0p1_sep11_24h_v1", setup_count: 102 },
+        ].forEach(function (r) {
+          const opt = document.createElement("option");
+          opt.value = r.run_id;
+          opt.textContent = r.run_id + " · " + r.setup_count + " PLANNED";
+          sel.appendChild(opt);
+        });
+        return;
+      }
+      runs.forEach(function (r) {
+        const opt = document.createElement("option");
+        opt.value = r.run_id;
+        const label = r.display_label || r.run_id;
+        opt.textContent = label + " · " + (r.setup_count || 0) + " PLANNED";
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      sel.innerHTML = ""
+        + "<option value=\"bt_d26_dynamic_referenz_sep11_24h_v1\">bt_d26_dynamic_referenz_sep11_24h_v1</option>"
+        + "<option value=\"bt_d26_entry_offset_0p1_sep11_24h_v1\">bt_d26_entry_offset_0p1_sep11_24h_v1</option>";
+    }
+  }
+
+  function btD26DisplayMode() {
+    const sel = $("researchBtD26DisplayMode");
+    const v = sel && sel.value ? String(sel.value) : "current_candidate";
+    return v === "all_setups" ? "all_setups" : "current_candidate";
+  }
+
+  function syncBtD26DisplayModeUi() {
+    const sel = $("researchBtD26DisplayMode");
+    if (!sel) return;
+    try {
+      const stored = localStorage.getItem(BT_D26_DISPLAY_MODE_KEY);
+      if (stored && (stored === "all_setups" || stored === "current_candidate")) {
+        sel.value = stored;
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function resolveBtD26AsOfUnix(viewEndUnix) {
+    if (isHistoricalReplay() && state.replayTargetTs != null) {
+      return Math.floor(Number(state.replayTargetTs));
+    }
+    if (viewEndUnix != null && Number.isFinite(Number(viewEndUnix))) {
+      return Math.floor(Number(viewEndUnix));
+    }
+    return Math.floor(Date.now() / 1000);
+  }
+
+  function renderBtD26CandidateDetail(snap) {
+    const box = $("researchBtD26CandidateDetail");
+    if (!box) return;
+    const bt = (snap && snap.bt_d26_dynamic_selector) || {};
+    if (!isBtD26DynamicSelectorStrategy(btStrategy()) || !bt.visible) {
+      box.hidden = true;
+      box.textContent = "";
+      return;
+    }
+    if (bt.display_mode === "all_setups") {
+      box.hidden = true;
+      box.textContent = "";
+      return;
+    }
+    const cv = bt.candidate_view || {};
+    const lines = [
+      "PLANNED SHORT — NOT EXECUTED",
+      "Modus: Aktueller Kandidat (kausal as-of)",
+      cv.as_of_utc ? ("as-of UTC " + cv.as_of_utc) : "",
+      cv.status ? ("Status " + cv.status) : "",
+    ];
+    if (cv.status === "UNRESOLVED") {
+      lines.push("Keine eindeutige Kandidatenzuordnung — UNRESOLVED");
+    } else if (cv.status === "NONE") {
+      lines.push("Kein aktiver Kandidat zu diesem Zeitpunkt");
+    } else if (cv.active) {
+      const a = cv.active;
+      lines.push(
+        "Auswahl UTC " + (a.decision_utc || "—"),
+        "pool_lower " + a.pool_lower + " · pool_upper " + a.pool_upper,
+        "origins " + (a.upper_origin_ids || a.origin_set_key || "—"),
+        "gap_pct " + (a.upper_gap_pct != null ? a.upper_gap_pct : "—"),
+        "entry_mode " + (a.entry_price_mode || "—") +
+          (a.entry_offset_pct != null ? (" · offset_pct " + a.entry_offset_pct) : ""),
+        "entry " + a.planned_entry + " · SL " + a.planned_sl + " · TP " + a.planned_tp,
+        "selection_reason " + (a.selection_reason || "—"),
+        "dynamic_state " + (a.dynamic_state || "—"),
+        a.invalidation_reason ? ("invalidation " + a.invalidation_reason) : ""
+      );
+    }
+    if (bt.setup_count_markers != null) {
+      lines.push("Prior markers in viewport: " + bt.setup_count_markers);
+    }
+    box.textContent = lines.filter(Boolean).join("\n");
+    box.hidden = !lines.length;
+  }
+
+  function renderBtD26Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d26_dynamic_selector) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (!isBtD26DynamicSelectorStrategy(btStrategy()) || !bt.visible) {
+      if (!isBtD7PoolLandscapeStrategy(btStrategy()) && !isBtD23SetupScannerStrategy(btStrategy())) {
+        el.hidden = true;
+        el.textContent = "";
+      }
+      renderBtD26CandidateDetail(snap || state.workspace);
+      return;
+    }
+    const modeLabel =
+      bt.display_mode === "all_setups" ? "Alle Setups" : "Aktueller Kandidat";
+    const parts = [
+      "Dynamic Upper Pool Selector · PLANNED SHORT — NOT EXECUTED",
+      "Anzeige " + modeLabel,
+      sum.run_id ? ("run " + sum.run_id) : "",
+      sum.config_hash ? ("hash " + String(sum.config_hash).slice(0, 12) + "…") : "",
+      sum.config_path ? ("yaml " + String(sum.config_path).split("/").pop()) : "",
+      sum.entry_offset_pct != null ? ("entry_offset_pct " + sum.entry_offset_pct) : "entry at pool lower edge",
+      "depth 2 · 5m PD1",
+      sum.time_span && sum.time_span.start
+        ? (String(sum.time_span.start).slice(0, 16) + " … " + String(sum.time_span.end || "").slice(0, 16))
+        : "",
+      (bt.setup_count_total != null ? (bt.setup_count_total + " setups (catalog)") : ""),
+      bt.display_mode === "current_candidate" && bt.setup_count_boxes != null
+        ? (bt.setup_count_boxes + " Kandidaten-Box · " + (bt.setup_count_markers || 0) + " Marker")
+        : (bt.setup_count_rendered != null ? (bt.setup_count_rendered + " gezeichnet (viewport)") : ""),
+      "kein PnL · keine Fills",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+    renderBtD26CandidateDetail(snap);
+  }
+
+  async function syncBtD26ViewportRange(pane, startUnix, endUnix) {
+    if (!pane || pane.tf !== "5m") return;
+    if (!isBtD26DynamicSelectorStrategy(btStrategy())) return;
+    const cat = (state.workspace && state.workspace.bt_d26_dynamic_selector) || {};
+    if (!cat.visible) return;
+    if (!(endUnix > startUnix)) return;
+    const gen = (pane.btD26Gen = (pane.btD26Gen || 0) + 1);
+    try {
+      const endUx = Math.floor(endUnix);
+      const snap = await sendJson("/api/research/backtester/bt-d26-dynamic-selector/sync-viewport", "POST", {
+        symbol: state.symbol,
+        view_start_unix: Math.floor(startUnix),
+        view_end_unix: endUx,
+        display_mode: btD26DisplayMode(),
+        as_of_unix: resolveBtD26AsOfUnix(endUx),
+      }, { sourceAction: "bt-d26-viewport" });
+      if (gen !== pane.btD26Gen) return;
+      applyWorkspace(snap);
+      renderBtD26Summary(snap);
+      await refreshOverlaysVisible();
+      repaintExactOriginDensityFromCache(pane);
+    } catch (e) {
+      try {
+        console.warn("[research] bt-d26 viewport sync", e);
+      } catch (ignore) { /* ignore */ }
+    }
+  }
+
+  function scheduleBtD26DynamicSelector(pane, from, to) {
+    if (!pane) return;
+    if (pane.btD26Timer) clearTimeout(pane.btD26Timer);
+    pane.btD26Timer = setTimeout(function () {
+      pane.btD26Timer = null;
+      let start = from;
+      let end = to;
+      if (start == null || end == null) {
+        const chart = api(pane);
+        if (!chart || !chart.getVisibleTimeRange) return;
+        const range = chart.getVisibleTimeRange();
+        if (!range || range.firstCandle == null || range.lastCandle == null) return;
+        const step = TF_SEC[pane.tf] || 300;
+        start = Number(range.firstCandle);
+        end = Number(range.lastCandle) + step;
+      }
+      syncBtD26ViewportRange(pane, start, end);
+    }, BT_D26_VIEWPORT_DEBOUNCE_MS);
+  }
+
+  async function applyBtD26DynamicSelectorBacktester(visible) {
+    if (!state.symbol) return null;
+    const runSel = $("researchBtD26Run");
+    const runId = (runSel && runSel.value) ? runSel.value : BT_D26_DEFAULT_RUN;
+    const snap = await sendJson("/api/research/backtester/bt-d26-dynamic-selector/load", "POST", {
+      symbol: state.symbol,
+      run_id: runId,
+      visible: visible !== false,
+      display_mode: btD26DisplayMode(),
+    }, { sourceAction: "backtester" });
+    applyWorkspace(snap);
+    syncBtD7Ui(snap);
+    await refreshOverlaysVisible();
+    repaintExactOriginDensityAllVisiblePanes();
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane) scheduleBtD26DynamicSelector(pane);
+    });
+    setStatus((snap.backtester && snap.backtester.message) || "BT-D26 Dynamic Selector geladen");
+    const span = (snap.backtester && snap.backtester.summary && snap.backtester.summary.time_span) || {};
+    if (span.start && span.end) {
+      try {
+        await zoomChartToIsoRange(span.start, span.end, span.start);
+      } catch (zoomErr) {
+        try {
+          console.warn("[research] bt-d26 zoom after load", zoomErr);
+        } catch (ignore) { /* ignore */ }
+      }
+    }
+    repaintExactOriginDensityAllVisiblePanes();
+    return snap;
+  }
+
+  function renderBtD46PositionDetail(snap) {
+    const box = $("researchBtD46PositionDetail");
+    if (!box) return;
+    const bt = (snap && snap.bt_d46_chronological) || {};
+    if (!isBtD46ChronologicalBacktesterStrategy(btStrategy()) || !bt.visible) {
+      box.hidden = true;
+      box.textContent = "";
+      return;
+    }
+    const sel = bt.selected_position;
+    if (!sel) {
+      box.hidden = true;
+      box.textContent = "";
+      return;
+    }
+    const lines = [
+      "SIMULATED TOUCH FILL — NOT EXCHANGE CONFIRMED",
+      "position_id " + (sel.position_id || "—"),
+      "order_id " + (sel.order_id || "—"),
+      "pool_lower " + sel.pool_lower + " · pool_upper " + sel.pool_upper,
+      "origins " + (sel.origin_set_key || "—"),
+      "decision_close " + (sel.decision_close_utc || "—"),
+      "pending_activation " + (sel.pending_activation_utc || "—"),
+      "entry_bar " + (sel.entry_bar_utc || "—") + " · entry " + (sel.entry_price || "—"),
+      "frozen SL " + (sel.frozen_sl || "—") + " · frozen TP " + (sel.frozen_tp || "—"),
+      "exit " + (sel.exit_reason || "—") + " @ " + (sel.exit_bar_utc || "—"),
+      sel.execution_assumption || "",
+      sel.data_resolution_limitation || "",
+      sel.same_bar_order_unresolved ? "SAME_BAR_ORDER_UNRESOLVED" : "",
+    ];
+    box.textContent = lines.filter(Boolean).join("\n");
+    box.hidden = !lines.length;
+  }
+
+  function renderBtD46Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d46_chronological) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (!isBtD46ChronologicalBacktesterStrategy(btStrategy()) || !bt.visible) {
+      if (
+        !isBtD7PoolLandscapeStrategy(btStrategy()) &&
+        !isBtD23SetupScannerStrategy(btStrategy()) &&
+        !isBtD26DynamicSelectorStrategy(btStrategy())
+      ) {
+        el.hidden = true;
+        el.textContent = "";
+      }
+      renderBtD46PositionDetail(snap || state.workspace);
+      return;
+    }
+    const ec = sum.event_counts || {};
+    const parts = [
+      "Chronological Short Backtester · BT-D46/D47",
+      "SIMULATED TOUCH FILL — NOT EXCHANGE CONFIRMED",
+      sum.run_id ? ("run " + sum.run_id) : "",
+      (sum.marker_count_total != null ? (sum.marker_count_total + " modeled events") : ""),
+      ec.SIMULATED_ENTRY != null ? (ec.SIMULATED_ENTRY + " ENTRY") : "",
+      ec.SIMULATED_EXIT_SL != null ? (ec.SIMULATED_EXIT_SL + " SL") : "",
+      ec.SIMULATED_EXIT_TP != null ? (ec.SIMULATED_EXIT_TP + " TP") : "",
+      ec.SIMULATED_POSITION_OPEN != null ? (ec.SIMULATED_POSITION_OPEN + " OPEN") : "",
+      "box-only · no scanner · no PnL",
+      bt.display_mode ? String(bt.display_mode) : "box_only_short_position_v1",
+      bt.as_of_utc ? ("as-of " + bt.as_of_utc) : "",
+      bt.box_count_rendered != null ? (bt.box_count_rendered + " trade boxes (viewport)") : "",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+    renderBtD46PositionDetail(snap);
+  }
+
+  function resolveBtD46AsOfUnix(viewEndUnix) {
+    return resolveBtD26AsOfUnix(viewEndUnix);
+  }
+
+  async function syncBtD46ViewportRange(pane, startUnix, endUnix, positionId) {
+    if (!pane || pane.tf !== "5m") return;
+    if (!isBtD46ChronologicalBacktesterStrategy(btStrategy())) return;
+    const cat = (state.workspace && state.workspace.bt_d46_chronological) || {};
+    if (!cat.visible) return;
+    if (!(endUnix > startUnix)) return;
+    const gen = (pane.btD46Gen = (pane.btD46Gen || 0) + 1);
+    try {
+      const endUx = Math.floor(endUnix);
+      const body = {
+        symbol: state.symbol,
+        view_start_unix: Math.floor(startUnix),
+        view_end_unix: endUx,
+        as_of_unix: resolveBtD46AsOfUnix(endUx),
+      };
+      if (positionId) body.position_id = positionId;
+      const snap = await sendJson(
+        "/api/research/backtester/bt-d46-chronological/sync-viewport",
+        "POST",
+        body,
+        { sourceAction: "bt-d46-viewport" }
+      );
+      if (gen !== pane.btD46Gen) return;
+      applyWorkspace(snap);
+      renderBtD46Summary(snap);
+      await refreshOverlaysVisible();
+      repaintExactOriginDensityFromCache(pane);
+    } catch (e) {
+      try {
+        console.warn("[research] bt-d46 viewport sync", e);
+      } catch (ignore) { /* ignore */ }
+    }
+  }
+
+  function scheduleBtD46Chronological(pane, from, to) {
+    if (!pane) return;
+    if (pane.btD46Timer) clearTimeout(pane.btD46Timer);
+    pane.btD46Timer = setTimeout(function () {
+      pane.btD46Timer = null;
+      let start = from;
+      let end = to;
+      if (start == null || end == null) {
+        const chart = api(pane);
+        const range = chart && chart.getVisibleTimeRange && chart.getVisibleTimeRange();
+        if (!range || range.firstCandle == null || range.lastCandle == null) return;
+        const step = TF_SEC[pane.tf] || 300;
+        start = Number(range.firstCandle);
+        end = Number(range.lastCandle) + step;
+      }
+      syncBtD46ViewportRange(pane, start, end);
+    }, BT_D46_VIEWPORT_DEBOUNCE_MS);
+  }
+
+  async function clearBtD26DynamicSelectorLayer() {
+    if (!state.symbol) return null;
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d26-dynamic-selector/load", "POST", {
+        symbol: state.symbol,
+        visible: false,
+      }, { sourceAction: "bt-d26-clear" });
+      applyWorkspace(snap);
+      await refreshOverlaysVisible();
+      return snap;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function clearBtD46ChronologicalLayer() {
+    if (!state.symbol) return null;
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d46-chronological/load", "POST", {
+        symbol: state.symbol,
+        visible: false,
+      }, { sourceAction: "bt-d46-clear" });
+      applyWorkspace(snap);
+      await refreshOverlaysVisible();
+      return snap;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function clearBtD23SetupScannerLayer() {
+    if (!state.symbol) return null;
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d23-setup-scanner/load", "POST", {
+        symbol: state.symbol,
+        visible: false,
+      }, { sourceAction: "bt-d23-clear" });
+      applyWorkspace(snap);
+      await refreshOverlaysVisible();
+      return snap;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  async function syncResearchBacktesterLayersOnStrategyChange(sid) {
+    if (!state.symbol) return;
+    if (isBtD46ChronologicalBacktesterStrategy(sid)) {
+      await clearBtD26DynamicSelectorLayer();
+      await clearBtD23SetupScannerLayer();
+      return;
+    }
+    if (isBtD26DynamicSelectorStrategy(sid)) {
+      await clearBtD46ChronologicalLayer();
+      await clearBtD23SetupScannerLayer();
+      return;
+    }
+    if (isBtD23SetupScannerStrategy(sid)) {
+      await clearBtD26DynamicSelectorLayer();
+      await clearBtD46ChronologicalLayer();
+      return;
+    }
+    await clearBtD26DynamicSelectorLayer();
+    await clearBtD46ChronologicalLayer();
+    await clearBtD23SetupScannerLayer();
+  }
+
+  async function applyBtD46ChronologicalBacktester(visible) {
+    if (!state.symbol) return null;
+    await clearBtD26DynamicSelectorLayer();
+    await clearBtD23SetupScannerLayer();
+    const snap = await sendJson("/api/research/backtester/bt-d46-chronological/load", "POST", {
+      symbol: state.symbol,
+      visible: visible !== false,
+    }, { sourceAction: "backtester" });
+    applyWorkspace(snap);
+    syncBtD7Ui(snap);
+    await refreshOverlaysVisible();
+    repaintExactOriginDensityAllVisiblePanes();
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane) scheduleBtD46Chronological(pane);
+    });
+    setStatus(
+      (snap.backtester && snap.backtester.message) ||
+      "BT-D46 Chronological Backtester geladen"
+    );
+    const span = (snap.backtester && snap.backtester.time_span) ||
+      (snap.backtester && snap.backtester.summary && snap.backtester.summary.time_span) || {};
+    if (span.start && span.end) {
+      try {
+        await zoomChartToIsoRange(span.start, span.end, span.start);
+      } catch (zoomErr) {
+        try {
+          console.warn("[research] bt-d46 zoom after load", zoomErr);
+        } catch (ignore) { /* ignore */ }
+      }
+    }
+    repaintExactOriginDensityAllVisiblePanes();
+    return snap;
+  }
+
+  async function applyBtD23SetupScannerBacktester(visible) {
+    if (!state.symbol) return null;
+    const runSel = $("researchBtD23Run");
+    const runId = (runSel && runSel.value) ? runSel.value : BT_D23_DEFAULT_RUN;
+    const snap = await sendJson("/api/research/backtester/bt-d23-setup-scanner/load", "POST", {
+      symbol: state.symbol,
+      run_id: runId,
+      visible: visible !== false,
+    }, { sourceAction: "backtester" });
+    applyWorkspace(snap);
+    syncBtD7Ui(snap);
+    await refreshOverlaysVisible();
+    const span = (snap.backtester && snap.backtester.summary && snap.backtester.summary.time_span) || {};
+    if (span.start && span.end) {
+      await zoomChartToIsoRange(span.start, span.end, span.start);
+    }
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane) {
+        scheduleBtD23SetupScanner(pane);
+        scheduleBtD26DynamicSelector(pane);
+      }
+    });
+    setStatus((snap.backtester && snap.backtester.message) || "BT-D23 Setup Scanner geladen");
+    return snap;
+  }
+
+  function renderBtD7Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d7_short_research) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (isBtD23SetupScannerStrategy(btStrategy())) {
+      renderBtD23Summary(snap);
+      return;
+    }
+    if (isBtD26DynamicSelectorStrategy(btStrategy())) {
+      renderBtD26Summary(snap);
+      return;
+    }
+    if (isBtD46ChronologicalBacktesterStrategy(btStrategy())) {
+      renderBtD46Summary(snap);
+      return;
+    }
+    if (!isBtD7PoolLandscapeStrategy(btStrategy()) || !bt.visible) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    const parts = [
+      "Pool Landscape SHORT · latest_result.json · NOT_FINAL_APPROVED",
+      sum.run_id ? ("run " + sum.run_id) : "",
+      (sum.signal_count != null ? (sum.signal_count + " Signale") : ""),
+      (sum.filled_trade_count != null ? (sum.filled_trade_count + " Trades") : ""),
+      sum.net_pnl_usdt != null ? ("Netto " + Number(sum.net_pnl_usdt).toFixed(2) + " USDT") : "",
+      sum.zero_trades_note || "",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+  }
+
+  function syncBtD7Ui(snap) {
+    const wrapD23 = $("researchBtD23Wrap");
+    const wrapD26 = $("researchBtD26Wrap");
+    const onD23 = isBtD23SetupScannerStrategy(btStrategy());
+    const onD26 = isBtD26DynamicSelectorStrategy(btStrategy());
+    if (wrapD23) wrapD23.hidden = !onD23;
+    if (wrapD26) wrapD26.hidden = !onD26;
+    if (onD23) loadBtD23Runs();
+    if (onD26) {
+      loadBtD26Runs();
+      syncBtD26DisplayModeUi();
+    }
+    renderBtD7Summary(snap || state.workspace);
+    renderBtD23Summary(snap || state.workspace);
+    renderBtD26Summary(snap || state.workspace);
+    renderBtD46Summary(snap || state.workspace);
+  }
+
+  async function applyBtD12PoolLandscapeBacktester(visible) {
+    if (!state.symbol) return null;
+    const snap = await sendJson("/api/research/backtester/bt-d12/load-latest", "POST", {
+      symbol: state.symbol,
+      visible: visible !== false,
+    }, { sourceAction: "backtester" });
+    applyWorkspace(snap);
+    syncBtD7Ui(snap);
+    await refreshOverlaysVisible();
+    const bt = snap.backtester || {};
+    const span = bt.time_span || (bt.summary && bt.summary.time_span) || {};
+    if (span.start && span.end) {
+      await zoomChartToIsoRange(span.start, span.end, span.start);
+    }
+    setStatus(bt.message || "BT-D12 latest_result geladen");
+    return snap;
+  }
+
   function ezmLayerMode() {
     const el = $("researchEzmLayerMode");
     return el ? el.value : "both";
@@ -5529,6 +6682,9 @@
   async function handleDrawingEvent(paneId, blob) {
     let data = {};
     try { data = typeof blob === "string" ? JSON.parse(blob) : blob || {}; } catch (e) { return; }
+    if (data.type === "cancel_preview") {
+      return;
+    }
     const pane = state.panes[paneId];
     data.pane_id = paneId;
     data.timeframe = pane.tf;
@@ -5586,6 +6742,7 @@
   }
 
   function handleClick(paneId, unix) {
+    mountDrawToolbar(paneId);
     state.selectedUnix = Number(unix);
     state.selectedPane = paneId;
     visibleIds().forEach(function (pid) {
@@ -5790,6 +6947,7 @@
       pane.pendingData = payload;
       pane.candleFp = nextFp;
       pane.closedFp = closedCandleFingerprint(packed.candles || [], pane.tf);
+      updatePaneLoadStatusFromBundle(pane, packed, skipCandles);
     }
     pane.pendingEma = packed.ema || { series: [] };
     pane.pendingLower = packed.stochastic || { id: "stochastic", visible: false };
@@ -5809,9 +6967,9 @@
         exactOriginDensityEnabled()
       )
       : packed.overlays || [];
-    pane.el.querySelector(".trp-pane-symbol").textContent = packed.symbol || state.symbol;
-    pane.el.querySelector(".trp-pane-status").textContent =
-      (packed.candles || []).length + " · " + (packed.cache || "load");
+    const symEl = pane.el.querySelector(".trp-pane-symbol");
+    if (symEl) symEl.textContent = packed.symbol || state.symbol;
+    if (skipCandles) updatePaneLoadStatusFromBundle(pane, packed, skipCandles);
     const chart = api(pane);
     if (chart) {
       if (!skipCandles) {
@@ -5833,6 +6991,7 @@
       pane.phase = "INTERACTION_READY";
     }
     syncOverlays(pane, pane.pendingOverlays);
+    repaintExactOriginDensityFromCache(pane);
     if (packed.clusters || (packed.liquidity && packed.liquidity.clusters)) {
       renderLegend((state.workspace || {}).liquidity, packed.clusters || packed.liquidity.clusters);
     }
@@ -5845,6 +7004,7 @@
     const gen = (opts && opts.gen != null) ? opts.gen : state.loadGen;
     const reqReplayGen = (opts && opts.replayGen != null) ? opts.replayGen : null;
     const paneGen = ++pane.paneGen;
+    const owner = registerPaneLoadOwner(pane, paneId, paneGen, gen);
     const ws = state.workspace || {};
     const range = resolvePaneLoadRange(opts || {});
     const reqBody = {
@@ -5867,7 +7027,8 @@
     ) {
       reqBody.liquidity_location_as_of = state.liquidityLocationAsOf;
     }
-    pane.el.querySelector(".trp-pane-status").textContent = "loading…";
+    const statusEl = paneStatusEl(pane);
+    if (statusEl) statusEl.textContent = "loading…";
     let packed;
     try {
       packed = await sendJson("/api/research/pane", "POST", reqBody, {
@@ -5877,23 +7038,37 @@
       signal: (opts && opts.signal) || (state.loadAbort && state.loadAbort.signal),
     });
     } catch (err) {
-      if (err && err.name === "AbortError") return;
+      if (err && err.name === "AbortError") {
+        discardPaneLoadResult(pane, paneId, owner);
+        return;
+      }
+      setPaneLoadHttpError(pane, paneGen, gen, owner, err);
       throw err;
     }
-    if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
-    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
-    if (packed.timeframe && packed.timeframe !== pane.tf) return;
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
+    if (packed.timeframe && packed.timeframe !== pane.tf) {
+      discardPaneLoadResult(pane, paneId, owner);
+      return;
+    }
     await whenReady(pane, 8000);
-    if (gen !== state.loadGen || paneGen !== pane.paneGen) return;
-    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
-    applyPaneBundle(pane, packed, {
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
+    const bundleOpts = {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
       // GO TO: never restore the previous live logical range onto a much longer
       // series (looks like the chart was "squeezed"). Jump sets the camera after.
       preserveView: !!(opts && opts.preserveView) || (isHistoricalReplay() && !(opts && opts.jumpToUnix != null)),
       skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
       skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
-    });
+    };
+    try {
+      applyPaneBundle(pane, packed, bundleOpts);
+    } catch (applyErr) {
+      if (paneLoadOwnerIsCurrent(pane, owner) && !paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen)) {
+        logPaneLoadFailure(paneId, pane, owner, applyErr, "applyPaneBundle");
+        setPaneLoadApplyError(pane, paneGen, gen, owner, applyErr);
+      }
+      return;
+    }
     if (!(opts && opts.indicatorsOnly)) {
       void ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false }).catch(function (err) {
         if (!(err && err.name === "AbortError")) {
@@ -5953,7 +7128,7 @@
         }
       });
     }
-    if (reqReplayGen != null && isHistoricalReplay() && reqReplayGen !== state.replayGen) return;
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
     // Soft follow-lock only — do not yank visible range here (GO TO jump owns the camera).
     if (!(opts && opts.jumpToUnix != null)) {
       enforceReplayViewOnAllPanes();
@@ -6003,6 +7178,10 @@
     scheduleOrderbookProfile(pane);
     scheduleOrderbookLevels(pane);
     scheduleTradeBubbles(pane);
+    scheduleBtD23SetupScanner(pane);
+    scheduleBtD26DynamicSelector(pane);
+    scheduleBtD46Chronological(pane);
+    releasePaneLoadOwner(pane, owner);
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -6095,18 +7274,25 @@
       window.PD1ExactOriginResearch &&
       PD1ExactOriginResearch.paneSupports(pane)
     ) {
-      const hasEod =
-        SC_HELPERS && SC_HELPERS.isExactOriginDensityOverlay
-          ? (pane.pendingOverlays || []).some(function (p) {
-            return SC_HELPERS.isExactOriginDensityOverlay(p);
-          })
-          : false;
-      if (!hasEod) {
-        void PD1ExactOriginResearch.refreshPane(pane, { force: true }).catch(function (err) {
-          if (!(err && err.name === "AbortError")) {
-            try { console.warn("[research] exact-origin after overlays load", err); } catch (e) { /* ignore */ }
-          }
-        });
+      const canvasOn =
+        PD1ExactOriginResearch.isCanvasPathEnabled &&
+        PD1ExactOriginResearch.isCanvasPathEnabled();
+      if (canvasOn && repaintExactOriginDensityFromCache(pane)) {
+        /* canvas density kept in iframe — do not force CH reload on drawing overlay sync */
+      } else {
+        const hasEod =
+          SC_HELPERS && SC_HELPERS.isExactOriginDensityOverlay
+            ? (pane.pendingOverlays || []).some(function (p) {
+              return SC_HELPERS.isExactOriginDensityOverlay(p);
+            })
+            : false;
+        if (!hasEod) {
+          void PD1ExactOriginResearch.refreshPane(pane, { force: true }).catch(function (err) {
+            if (!(err && err.name === "AbortError")) {
+              try { console.warn("[research] exact-origin after overlays load", err); } catch (e) { /* ignore */ }
+            }
+          });
+        }
       }
     }
     const chart = api(pane);
@@ -7033,6 +8219,7 @@
 
     function syncBtStrategyUi() {
       const sid = btStrategy();
+      syncBtD7Ui(state.workspace);
       const isExitPool = isExitPoolStrategy(sid);
       const isCsw = sid === "cluster_sweep_ema_9_20_59";
       const isEdc = sid === "ema_dual_cross_multisource_v1";
@@ -7715,10 +8902,30 @@
       }));
     }
 
+    const btD26DisplaySel = $("researchBtD26DisplayMode");
+    if (btD26DisplaySel) {
+      syncBtD26DisplayModeUi();
+      btD26DisplaySel.addEventListener("change", async function () {
+        try {
+          localStorage.setItem(BT_D26_DISPLAY_MODE_KEY, btD26DisplaySel.value);
+        } catch (e) { /* ignore */ }
+        if (!isBtD26DynamicSelectorStrategy(btStrategy())) return;
+        visibleIds().forEach(function (pid) {
+          const pane = state.panes[pid];
+          if (pane) scheduleBtD26DynamicSelector(pane);
+        });
+      });
+    }
+
     if ($("researchBtStrategy")) {
       $("researchBtStrategy").addEventListener("change", async function () {
         syncBtStrategyUi();
         const sid = btStrategy();
+        if (isBtD7PoolLandscapeStrategy(sid)) {
+          await refreshOverlaysVisible();
+          setStatus("Strategie: Pool Landscape SHORT · Backtester lädt latest_result.json");
+          return;
+        }
         try {
           applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
             strategy_id: "cluster_sweep_ema_9_20_59",
@@ -7741,6 +8948,10 @@
             display_mode: "off",
             layer_only: true,
           }, { sourceAction: "strategy-switch" }));
+        } catch (e) { /* ignore */ }
+        try {
+          await syncResearchBacktesterLayersOnStrategyChange(sid);
+          repaintExactOriginDensityAllVisiblePanes();
         } catch (e) { /* ignore */ }
         await refreshOverlaysVisible();
         setStatus("Strategie: " + sid);
@@ -7890,6 +9101,42 @@
 
     $("researchBacktesterBtn").addEventListener("click", async function () {
       if (!state.symbol) return;
+      if (isBtD23SetupScannerStrategy(btStrategy())) {
+        setStatus("Setup Scanner: lade PLANNED setups …");
+        try {
+          await applyBtD23SetupScannerBacktester(true);
+        } catch (err) {
+          setStatus("BT-D23 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD26DynamicSelectorStrategy(btStrategy())) {
+        setStatus("Dynamic Selector: lade PLANNED setups …");
+        try {
+          await applyBtD26DynamicSelectorBacktester(true);
+        } catch (err) {
+          setStatus("BT-D26 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD46ChronologicalBacktesterStrategy(btStrategy())) {
+        setStatus("Chronological Backtester: lade BT-D47 overlay …");
+        try {
+          await applyBtD46ChronologicalBacktester(true);
+        } catch (err) {
+          setStatus("BT-D46 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD7PoolLandscapeStrategy(btStrategy())) {
+        setStatus("Lade latest_result.json (BT-D12 Pool Landscape) …");
+        try {
+          await applyBtD12PoolLandscapeBacktester(true);
+        } catch (err) {
+          setStatus("BT-D12 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
       if (isExitPoolStrategy(btStrategy())) {
         const exitSid = btStrategy();
         setStatus("Exit-Pool Backtester: lade nur Longs Entry/SL/TP für " + state.symbol + " …");
@@ -8098,6 +9345,15 @@
           );
         } catch (err) {
           setStatus("Backtester fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD7PoolLandscapeStrategy(btStrategy())) {
+        setStatus("Lade latest_result.json (BT-D12 Pool Landscape) …");
+        try {
+          await applyBtD12PoolLandscapeBacktester(true);
+        } catch (err) {
+          setStatus("BT-D12 Laden fehlgeschlagen: " + (err.message || err), "error");
         }
         return;
       }
@@ -8330,6 +9586,7 @@
         updateHistoricalLmv2Hint: updateHistoricalLmv2Hint,
         VP_DEBOUNCE_MS: VP_DEBOUNCE_MS,
         setStatus: setStatus,
+        mountDrawToolbar: mountDrawToolbar,
       });
     }
     function onLiveMicroV2FilterChange() {
@@ -8626,6 +9883,29 @@
   }
 
   window.__researchDebug = state;
+  window.__researchEnablePaneSendJsonDiag = function () {
+    try { window.__researchPaneSendJsonDiag = true; } catch (e) { /* ignore */ }
+    try { localStorage.setItem("research.paneSendJsonDiag", "1"); } catch (e) { /* ignore */ }
+    return true;
+  };
+  window.__researchDisablePaneSendJsonDiag = function () {
+    try { window.__researchPaneSendJsonDiag = false; } catch (e) { /* ignore */ }
+    try { localStorage.removeItem("research.paneSendJsonDiag"); } catch (e) { /* ignore */ }
+    return false;
+  };
+  window.__researchPaneSendJsonDiagSummary = function (reqId) {
+    const rows = (state.paneSendJsonDiagLog || []).filter(function (r) {
+      return !reqId || r.reqId === reqId;
+    });
+    const phases = rows.map(function (r) { return r.phase; });
+    return {
+      enabled: paneSendJsonDiagEnabled(),
+      count: rows.length,
+      lastPhase: phases.length ? phases[phases.length - 1] : null,
+      phases: phases,
+      rows: rows,
+    };
+  };
 
   document.addEventListener("DOMContentLoaded", function () {
     boot().catch(function (err) {
