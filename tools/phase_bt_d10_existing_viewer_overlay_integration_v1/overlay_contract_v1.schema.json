@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bt_d10_overlay_contract_v1.schema.json",
+  "title": "BT-D10 Research Short Overlay Contract V1",
+  "description": "Read-only overlay payload for Trading Research Platform position drawings. Values must originate from BT-D7 integration_result ledgers only (export adapter); no frontend recomputation.",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "run_id",
+    "strategy_config_hash",
+    "symbol",
+    "timeframe",
+    "pool_detail",
+    "density_method",
+    "strategy_id",
+    "strategy_freeze_status",
+    "records"
+  ],
+  "properties": {
+    "contract_version": { "const": "bt_d10_overlay_contract_v1" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "strategy_config_hash": { "type": "string", "minLength": 8 },
+    "symbol": { "type": "string", "pattern": "^[A-Z0-9]+$" },
+    "timeframe": { "const": "5m" },
+    "pool_detail": { "const": 1 },
+    "density_method": { "const": "exact_unique_origin" },
+    "min_unique_origins": { "const": 2 },
+    "strategy_id": { "type": "string" },
+    "strategy_freeze_status": { "type": "string" },
+    "tp_selection_mode": { "type": "string" },
+    "density_provenance": {
+      "type": "object",
+      "required": ["density_path", "density_source"],
+      "properties": {
+        "density_path": { "type": "string" },
+        "density_source": { "type": "string" },
+        "validated_cache_bundle_path": { "type": ["string", "null"] },
+        "pipeline_line_id": { "type": ["string", "null"] },
+        "config_hash": { "type": ["string", "null"] }
+      }
+    },
+    "source_paths": {
+      "type": "object",
+      "properties": {
+        "integration_result": { "type": "string" },
+        "manifest": { "type": "string" }
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/overlay_record" }
+    }
+  },
+  "$defs": {
+    "overlay_record": {
+      "type": "object",
+      "required": [
+        "signal_id",
+        "run_id",
+        "strategy_config_hash",
+        "symbol",
+        "signal_time_utc",
+        "side",
+        "lifecycle_state",
+        "entry_price",
+        "pending_order_status"
+      ],
+      "properties": {
+        "signal_id": { "type": "string" },
+        "run_id": { "type": "string" },
+        "strategy_config_hash": { "type": "string" },
+        "symbol": { "type": "string" },
+        "signal_time_utc": { "type": "string" },
+        "order_active_from_utc": { "type": ["string", "null"] },
+        "side": { "enum": ["SHORT", "LONG"] },
+        "lifecycle_state": {
+          "enum": ["SIGNAL", "PENDING", "FILLED", "CLOSED", "CANCELLED", "EXPIRED"]
+        },
+        "pending_order_status": { "type": "string" },
+        "entry_price": { "type": ["number", "null"] },
+        "sl_price": { "type": ["number", "null"] },
+        "tp_price": { "type": ["number", "null"] },
+        "fill_time_utc": { "type": ["string", "null"] },
+        "fill_price": { "type": ["number", "null"] },
+        "exit_time_utc": { "type": ["string", "null"] },
+        "exit_reason": { "type": ["string", "null"] },
+        "realized_net_pnl_usdt": { "type": ["number", "null"] },
+        "realized_pnl_pct": { "type": ["number", "null"] },
+        "unrealized_pnl_usdt": { "type": ["number", "null"] },
+        "display_end_utc": { "type": ["string", "null"] },
+        "density_provenance": { "type": "object" },
+        "pool_lower": { "type": ["number", "null"] },
+        "pool_upper": { "type": ["number", "null"] },
+        "trade_id": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

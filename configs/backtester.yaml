@@ -1,0 +1,162 @@
+# =============================================================================
+# Zentrale Backtester-Konfiguration (BT-D16)
+# =============================================================================
+# Eine Datei für alle Parameter des Pool-Landscape-Short-Backtesters (BT-D6…D12).
+# Ablauf: YAML → sicherer Parser → BT-D6-JSON → Validator → bestehender Engine-Lauf.
+#
+# Klassifikation:
+#   FROZEN       = nicht änderbar ohne neue Strategiefreigabe / Validator-Lock
+#   CONFIGURABLE = im YAML änderbar, wirkt auf Signale/Orders/PnL
+#   EXPERIMENTAL = dokumentiert, aber nicht freigegeben oder nicht implementiert
+#   UNRESOLVED   = fachlich offen, darf nicht stillschweigend aktiviert werden
+#
+# Baseline: identisch zu BT-D9 24h (bt_d9_24h_v1.json) — keine stillen Abweichungen.
+# =============================================================================
+
+yaml_schema_version: bt_d16_yaml_v1
+config_version: bt_d6_strategy_backtest_config_v1
+
+# --- Strategieidentität und Version (FROZEN / CONFIGURABLE Metadaten) ---
+strategy_identity:
+  # FROZEN: Strategie-Schlüssel im Freeze-Baum pool_landscape_v1_candidate
+  strategy_id: pool_landscape_v1_candidate
+  # CONFIGURABLE: Lauf-Label (z. B. bt_d9_first_24h_v1) — nur Reporting, keine Regeländerung
+  strategy_version: bt_d9_first_24h_v1
+  # FROZEN: Referenz auf SOURCE_PROVENANCE im Freeze-Verzeichnis
+  frozen_source_reference: strategy_freeze/pool_landscape_v1_candidate/SOURCE_PROVENANCE.json
+  # FROZEN: depth2_density_research_v1 | config_experiment_v1 (nur erlaubte Enum-Werte)
+  research_mode: depth2_density_research_v1
+
+# --- Historischer Testzeitraum & Symbol (CONFIGURABLE, UTC, 5m-ausgerichtet) ---
+backtest:
+  # CONFIGURABLE: Handelsymbol (aktuell nur DOGEUSDT im Validator)
+  symbol: DOGEUSDT
+  symbols:
+    - DOGEUSDT
+  # CONFIGURABLE: Fensterstart UTC, Format YYYY-MM-DDTHH:MM:SSZ, Minute % 5 == 0
+  start_utc: "2026-09-11T12:00:00Z"
+  # CONFIGURABLE: Fensterende UTC (bei end_utc_exclusive=true: letzter enthaltene Close < end_utc)
+  end_utc: "2026-09-12T12:00:00Z"
+  # CONFIGURABLE: true = halb-offenes Intervall [start, end) wie BT-D9
+  end_utc_exclusive: true
+  # FROZEN: Ausführungs-Timeframe der Engine — nur 5m
+  execution_timeframe: 5m
+  # FROZEN: Signale outcome-blind (kein Peek auf spätere Exits bei Signalgenerierung)
+  outcome_blind_signals: true
+  # CONFIGURABLE: Determinismus-Seed (Integer) für reproduzierbare Läufe
+  deterministic_seed: 20261025
+
+# --- Timeframe / PD / Depth (FROZEN Density-Contract) ---
+density:
+  # FROZEN: Nur 5m
+  timeframe: 5m
+  # FROZEN: Pool-Detail 1 (PD1) — keine PD2-Umschaltung im Validator v1
+  pool_detail: 1
+  # FROZEN: exact_unique_origin — SSOT-konforme Unique-Origin-Density
+  method: exact_unique_origin
+  # FROZEN: Mindest-Origins 2 (= Depth 2 / zwei unabhängige Ursprünge pro Band)
+  min_unique_origins: 2
+  # CONFIGURABLE: canonical_provider | validated_cache
+  density_source: validated_cache
+  validated_cache:
+    # CONFIGURABLE: Pfad zum BT-D8/BT-D9 Cache-Bundle (relativ zum Repo-Root)
+    bundle_path: results/phase_bt_d9_first_24h_short_pnl_v1/cache_bundle
+    # Optional: required_config_hash: "<sha256>" — weglassen = Hash nicht prüfen (BT-D9-Baseline)
+
+# --- Short-Entry (CONFIGURABLE innerhalb erlaubter Modi) ---
+short_entry:
+  # CONFIGURABLE: Pool-Auswahl unter den Upper-Bändern (BT-D7 nearest_upper_proximity_v1)
+  entry_pool_selection_mode: nearest_upper_proximity_v1
+  # CONFIGURABLE (BT-D17): Short-Limit-Preis am gewählten Upper-Pool
+  #   pool_lower_edge        → Unterkante (BT-D9-Baseline)
+  #   pool_upper_edge        → Oberkante
+  #   pool_lower_edge_offset → Unterkante * (1 - entry_offset_pct/100); Offset nur in diesem Modus
+  # Alias: entry_mode (veraltet) — wenn beides gesetzt, müssen Werte identisch sein
+  entry_price_mode: pool_lower_edge
+  # Nichtnegative Prozentzahl; bei pool_lower_edge / pool_upper_edge muss 0 oder null sein
+  # Beispiel 0.1 bei pool_lower_edge_offset: 0.086810 → 0.08672319
+  entry_offset_pct: null
+  # CONFIGURABLE: Mindestalter des Pools in 5m-Bars (0 = kein Mindestalter)
+  pool_min_age_bars: 0
+  # CONFIGURABLE: Mindest-Gap zwischen benachbarten Upper-Union-Intervallen in Prozent (z. B. 0.5 = 0,5 %)
+  gap_min_pct: 0.5
+  # FROZEN: einzig dokumentierte Gap-Messung in v1
+  upper_gap_measurement_mode: adjacent_union_interval_gap_pct_v1
+  # CONFIGURABLE: Proximity-Schwelle in Prozent für „nächster“ Upper-Pool
+  pool_proximity_pct: 0.05
+  # CONFIGURABLE: Pending Sell-Limit aktiv (true) oder sofortiger Marktentry (false) — Short: Limit an Pool-Kante
+  pending_limit: true
+  # CONFIGURABLE: Ablauf in 5m-Bars; null = kein Zeit-TTL (nur Pool-Deaktivierung / Fill / Testende)
+  pending_limit_expiry_bars: null
+  # CONFIGURABLE (BT-D18): Pending Sell-Limit Fill-Modell
+  #   legacy_v1 — low<=limit<=high (BT-D9/BT-D17 reproduzierbar)
+  #   causal_sell_limit_v2 — marketable bei Open>=Limit, Touch intrabar, Fill vor Pool-Cancel
+  pending_limit_fill_model: causal_sell_limit_v2
+
+# --- Long-Entry (vorbereitet, DEAKTIVIERT — UNRESOLVED bis separate Long-Strategie) ---
+long_entry:
+  # Muss false bleiben. true → FAIL-CLOSED LONG_ENTRY_NOT_IMPLEMENTED
+  enabled: false
+  # Dokumentation (wirkt nicht auf Engine):
+  #   pool_upper_edge | pool_lower_edge | pool_upper_edge_offset
+  # Long mit Offset +0,1 %: pool_oberkante * (1 + 0.1/100) — nicht implementiert
+  entry_mode: pool_upper_edge
+  entry_offset_pct: null
+
+# --- Stop-Loss (CONFIGURABLE Prozent, SHORT: SL oberhalb Pool-Oberkante) ---
+risk:
+  # CONFIGURABLE: SL-Abstand über der Oberkante des Entry-Upper-Pools in Prozent (0.2 = 0,2 %)
+  sl_above_upper_top_pct: 0.2
+  # FROZEN: Validator erlaubt nur 1 gleichzeitige Position
+  max_concurrent_positions: 1
+
+# --- Take-Profit (CONFIGURABLE Modus, EXPERIMENTAL next_eligible_band in Freeze-Status) ---
+take_profit:
+  # CONFIGURABLE: next_eligible_band (BT-D9) | dense_cluster nur mit dense_cluster_semantics_approved=true
+  selection_mode: next_eligible_band
+  # CONFIGURABLE: Mindestabstand Fill→TP-Zielband in Prozent
+  min_distance_pct: 0.5
+  # FROZEN: Abstand gemessen ab tatsächlichem Fill zur Unterkante des Ziel-Lower-Bands
+  distance_reference: actual_fill_to_lower_upper_edge
+  # FROZEN/UNRESOLVED: dense_cluster User-Regel O-01 — muss false bleiben ohne Freigabe
+  dense_cluster_semantics_approved: false
+  # CONFIGURABLE: Zusatz-Gate (false = aus)
+  tp_pool_quality_gate_enabled: false
+
+# --- Kapital, Gebühren, Intrabar (CONFIGURABLE innerhalb Validator-Enums) ---
+pnl:
+  # CONFIGURABLE: Startkapital in USDT (> 0)
+  initial_equity_usdt: 10000.0
+  # CONFIGURABLE: fixed_notional_usdt | risk_fraction_of_equity
+  sizing_mode: fixed_notional_usdt
+  # CONFIGURABLE bei fixed_notional: Positionsgröße in USDT pro Trade
+  position_notional_usdt: 1000.0
+  # Bei sizing_mode=risk_fraction_of_equity: Pflichtfeld in Prozent; sonst null
+  risk_fraction_pct: null
+  # CONFIGURABLE: Hebel (1.0 = kein Leverage in PnL-Modell)
+  leverage: 1.0
+  trading_fee_model:
+    # FROZEN: roundtrip_pct_of_notional
+    model: roundtrip_pct_of_notional
+    # CONFIGURABLE: Roundtrip-Gebühr in Prozent der Notional (0.11 = 0,11 %)
+    roundtrip_pct: 0.11
+  slippage_model:
+    # CONFIGURABLE: none | pct_of_notional_per_side
+    model: none
+    entry_slippage_pct: 0.0
+    exit_slippage_pct: 0.0
+  funding_model:
+    # CONFIGURABLE: none | constant_bps_per_8h_short
+    model: none
+    funding_rate_bps_per_8h: 0.0
+  # FROZEN: no_trade_ambiguous bei SL+TP in derselben 5m-Kerze
+  intrabar_ambiguity_policy: no_trade_ambiguous
+  # FROZEN: offene Positionen am Testende nicht in realisiertes PnL zählen
+  end_of_test_open_position_policy: exclude_from_realized_pnl
+
+# --- Ergebnis-Export (Meta; wird nicht an BT-D6-Validator übergeben) ---
+result_export:
+  # Zielverzeichnis für run_simple_backtest.py (unverändert BT-D12)
+  runs_root: results/backtester_runs
+  # Atomisches latest_result.json nach erfolgreichem Lauf
+  publish_latest: true

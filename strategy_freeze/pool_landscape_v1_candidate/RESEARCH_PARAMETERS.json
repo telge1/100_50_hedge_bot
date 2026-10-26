@@ -1,0 +1,57 @@
+{
+  "min_depth": 2,
+  "parameters": {
+    "cooldown_candles": {
+      "class": "IMPLEMENTATION_DEFAULT",
+      "value": 6
+    },
+    "entry_proximity_pct": {
+      "class": "IMPLEMENTATION_DEFAULT",
+      "source": "phase2a timeline_scanner.js",
+      "value": 0.05
+    },
+    "max_open_positions": {
+      "class": "USER_CONFIRMED",
+      "value": 1
+    },
+    "min_pool_age_bars": {
+      "class": "USER_RESEARCH_START",
+      "hard_entry_gate_confirmed": false,
+      "note": "Signal_definierung.md \u00a7D supersedes earlier 10-bar draft; C003 must not be retro-labeled",
+      "value": 5
+    },
+    "min_pool_gap_pct": {
+      "class": "USER_RESEARCH_START",
+      "hard_entry_gate_confirmed": false,
+      "note": "Pool-to-pool gap; distinct from min_tp_distance_pct",
+      "value": 0.5
+    },
+    "min_tp_distance_pct": {
+      "applies_long": "entry to upper TP cluster BOTTOM",
+      "applies_short": "entry to lower TP cluster TOP",
+      "class": "USER_CONFIRMED",
+      "value": 0.5
+    },
+    "rejection_mode": {
+      "class": "IMPLEMENTATION_DEFAULT",
+      "value": "rejection_v1"
+    },
+    "roundtrip_fees_pct": {
+      "class": "USER_CONFIRMED",
+      "slippage_funding": "UNRESOLVED",
+      "value": 0.11
+    },
+    "sl_above_upper_pool_pct": {
+      "class": "USER_CONFIRMED",
+      "value": 0.2
+    },
+    "sl_below_lower_pool_pct": {
+      "class": "USER_CONFIRMED",
+      "value": 0.2
+    }
+  },
+  "pool_pd_entry": "PD1",
+  "strategy_family": "pool_landscape_pd1_depth2",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m"
+}

@@ -1,0 +1,23 @@
+{
+  "pd1": {
+    "config_hash": "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9",
+    "count": 17568,
+    "first": "2026-04-01T00:00:00Z",
+    "last": "2026-09-30T23:45:00Z",
+    "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd1_v1"
+  },
+  "pd10": {
+    "config_hash": "bd9ac4f30e177321b688f5adb0fe2681ebb4966d51701e3b323498bfcd0d06c2",
+    "count": 17568,
+    "first": "2026-04-01T00:00:00Z",
+    "last": "2026-09-30T23:45:00Z",
+    "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd10_v1"
+  },
+  "pd5": {
+    "config_hash": "533e04c7cd0e1c93540ed9466a2a5a2eb626f82b828b9a45d1da234703ebd03c",
+    "count": 17568,
+    "first": "2026-04-01T00:00:00Z",
+    "last": "2026-09-30T23:45:00Z",
+    "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd5_v1"
+  }
+}

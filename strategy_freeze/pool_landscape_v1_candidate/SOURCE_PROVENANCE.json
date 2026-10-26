@@ -1,0 +1,53 @@
+{
+  "freeze_candidate_id": "pool_landscape_v1_candidate",
+  "generated_utc": "2026-10-22T00:00:00Z",
+  "lmv2_separation": "Original LMV2 lives under backtester/short/dashboard/research_charts/historical_lmv2/ and frozen_strategies/ \u2014 excluded from this strategy lineage.",
+  "sources": [
+    {
+      "path": "Signal_definierung.md",
+      "role": "reference",
+      "sha256": "fd95461e29689d234722d33a8d120eab67cd2dd3d73b778c34b30f452a711b5a"
+    },
+    {
+      "path": "tools/phase4a_single_position_backtest_pilot_v1/research_config_v1.json",
+      "role": "reference",
+      "sha256": "0351c6be2aa466ed2fda8b9d3767292af587f1a1ab22e8c2e5060c835ee2d8ca"
+    },
+    {
+      "path": "tools/phase2a_5m_pd1_depth2_short_candidates_v1/timeline_scanner.js",
+      "role": "reference",
+      "sha256": "0c9214ad6d1a508dd8ec23639dba3e8a2a68c791812001b04f20a4412c26322b"
+    },
+    {
+      "path": "tools/phase4a_single_position_backtest_pilot_v1/backtest_pilot.py",
+      "role": "reference",
+      "sha256": "8b805d15ce8813d2282d68e83f1a9b394cc4ccd43d56924e89c9e26d370b0b17"
+    },
+    {
+      "path": "backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/phase6xt_reuse_research_poc/pd1_exact_density_trp_adapter.js",
+      "role": "reference",
+      "sha256": "365188ccb7985e0d18647362e65e16b8e6e131e1c2cac3e1bc6f3fce0d780a47"
+    },
+    {
+      "path": "reports/DOGEUSDT_PHASE2A_5M_PD1_DEPTH2_SHORT_CANDIDATE_SCANNER_V1.md",
+      "role": "reference",
+      "sha256": "d99fb03c500ebc780bd908a5af912514a26c73a8e6cd0a1e20e0ca76b3a89244"
+    },
+    {
+      "path": "reports/DOGEUSDT_PHASE3B_TWO_POOL_MARKET_STRUCTURE_DETECTOR_V1.md",
+      "role": "reference",
+      "sha256": "f019b9ff168f8c0409adfdb7f0b10ea8c6e849cdeadcda8b4e1c096f3bedb959"
+    },
+    {
+      "path": "reports/DOGEUSDT_PHASE4B_BACKTEST_TRADE_FORENSICS_V1.md",
+      "role": "reference",
+      "sha256": "48b218722d56969a370fed46222e697c0fab943e380fcd866409afde6b062ba8"
+    },
+    {
+      "path": "results/phase2g_upper_opportunity_dedup_v1/raw_candidates_with_opportunity_id.csv",
+      "role": "reference",
+      "sha256": "2d414a38703694a29ccfc4674f5fec2de50a4a7e3d471bc7d85aa98bdf8db247"
+    }
+  ],
+  "status": "NOT_FINAL_APPROVED"
+}

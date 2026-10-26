@@ -1,0 +1,14 @@
+{
+  "version": "phase3b_two_pool_market_structure_detector_v1",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "pool_pd": "PD1",
+  "min_depth": 2,
+  "min_pool_gap_pct": 0.5,
+  "min_pool_gap_highlight_pct": 1.0,
+  "min_pool_age_bars": 5,
+  "min_pool_age_bars_note": "Documented research parameter only — not enforced as hard gate in v1 unless pool first_seen is provable from POOL_NEW.",
+  "recovery_requires_close_above_first_lower_top": true,
+  "tp_upper_requires_above_close": true,
+  "phase3a_results_dir": "results/phase3a_dynamic_pool_landscape_timeline_v1"
+}

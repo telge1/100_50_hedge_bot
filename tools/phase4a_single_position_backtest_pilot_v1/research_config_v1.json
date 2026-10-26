@@ -1,0 +1,17 @@
+{
+  "version": "phase4a_single_position_backtest_pilot_v1",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "pool_pd": "PD1",
+  "min_depth": 2,
+  "min_pool_age_bars": 5,
+  "min_pool_gap_pct": 0.5,
+  "entry_proximity_pct": 0.05,
+  "sl_above_upper_pool_pct": 0.2,
+  "sl_below_lower_pool_pct": 0.2,
+  "min_tp_distance_pct": 0.5,
+  "roundtrip_fees_pct": 0.11,
+  "max_open_positions": 1,
+  "pilot_from_utc": "2026-09-11T12:00:00Z",
+  "pilot_to_utc": "2026-09-12T16:00:00Z"
+}

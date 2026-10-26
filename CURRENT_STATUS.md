@@ -1,6 +1,6 @@
 # CURRENT STATUS — pools+ob+delta_bot / DOGEUSDT LMV2
 
-**Stand:** 2026-10-11 (Phase 4J abgeschlossen, Phase 4K/4L Multi-Batch-Vorbereitung). **Aktualisieren:** nach Phasenabschluss oder auf Anforderung.
+**Stand:** 2026-10-11 (Phase 4X abgeschlossen — Mai 2026 vollständig). **Aktualisieren:** nach Phasenabschluss oder auf Anforderung.
 
 ---
 
@@ -10,65 +10,55 @@
 |------|------|
 | Branch | `pools-ob-delta-bot` |
 | **Letzter Remote-Checkpoint** | `a81d8c0f` |
-| **Lokal (nach 4L-Commit)** | Controlled-Orchestrator-Checkpoint (siehe `git log -1`) |
-| Remote Ahead/Behind | nach Commit: `git status` prüfen — **Push nicht freigegeben** |
+| **Lokal** | 4O–4X-Artefakte im Working Tree (kein Push freigegeben) |
 
 ---
 
-## 2. ClickHouse (nach Phase 4J)
+## 2. ClickHouse (nach Phase 4X)
 
 | Metrik | Stand |
 |--------|--------|
-| Historische Original-V2-Snapshots | **190** |
-| April `4h_PD10` Produktionslinie | **180 / 180** |
-| Letzter Batch | `phase4i_final_30_apr2026_4hpd10_v1` (30/30) |
-| `test_run_id` 4J | `903090d6-d0e2-49d2-a1b9-c65d327115bf` |
-| Backup-Referenz (vor 500er) | `e134b0fa-9cba-4c0f-b8d9-60125001de50` — **neues Backup vor 500er: ausstehend** |
+| April 2026 (alle 4 Kombinationen) | **vollständig** (unverändert) |
+| Mai 2026 `15m_PD1` / `15m_PD5` / `15m_PD10` | **je 2.976** auf Produktionslinie |
+| Mai 2026 `4h_PD10` | **186** |
+| Aug-Pilot | **10** |
+| Globale Tabellenzeilen | meta **19.995** · member **4.362.090** · catalog **4.358.783** · publish **20.080** · sidecar **17.935** |
 | Orphans | **0** |
+| Letzter Lauf | Phase **4X** · nohup `may2026_monthly_runner` · **184** Batches `readback_ok` |
 
----
-
-## 3. Multi-Batch-Vorbereitung (April `15m_PD1`, 500)
+### Phase 4X — Kurzprotokoll
 
 | Feld | Wert |
 |------|------|
-| Manifest | `manifests/phase4k_april_15mpd1_500_v1.json` |
-| Scope | `stems[0:500]` · `20260401T000000Z` … `20260406T044500Z` |
-| Batches | **10 × 50** |
-| Pipeline | `historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd1_v1` |
-| Dry-Run | OK · **0** Publish auf Ziel-Linie |
-| Erwartete Writes (bei Freigabe) | 500 meta · **108.250** member/catalog · 500 sidecar/publish |
+| Monatsplan | `phase4w_may2026_monthly_run_plan_v1.json` |
+| Backup (pre-Mai) | `ebfdfb7d-ba12-4c2a-af6b-ff9c5ca57b02` |
+| Scope-Writes Mai | **9.114** meta/sidecar/publish · **1.984.418** member/catalog |
+| Fortschritt | `doge_apr_sep_2026_v1_history/_controlled_import_progress_phase4x/` |
+| Logs | `logs/historical_import/may2026/phase4x_*` |
 
 ---
 
-## 4. Phase 4K/4L — Sicherheit
+## 3. Monatsstatus Apr–Sep 2026 (Katalog)
 
-- **Pre-Write-Gate:** `HISTORICAL_JSON_IMPORT_ALLOW_WRITE` + `HISTORICAL_JSON_IMPORT_ALLOW_SIDECAR_WRITE` vor erstem INSERT.
-- **Recovery-Bridge:** `recovery_orchestrator_bridge.py` — `meta_without_publish` + layer `SAFE_RESUME` (Catalog ohne Sidecar) zulässig.
-- **Ressourcen-Limits:** optional per Env (`resource_limit_proposal.proposed_500_batch_limit_environ()`); Batch/Readback-Wall-Clock in Orchestrator.
-
----
-
-## 5. Tests (Phase 4L)
-
-| Suite | Ergebnis |
-|-------|----------|
-| 4I + 4K + 4L + 4G + 4A + 4C + historical_json_import | **59 passed** |
+| Monat | 15m_PD1 | 15m_PD5 | 15m_PD10 | 4h_PD10 |
+|-------|---------|---------|----------|---------|
+| 2026-04 | ✓ | ✓ | ✓ | ✓ |
+| 2026-05 | ✓ | ✓ | ✓ | ✓ |
+| 2026-06 … 09 | offen | offen | offen | offen |
 
 ---
 
-## 6. Freigaben
+## 4. Freigaben
 
 | Schritt | Status |
 |---------|--------|
-| 500er `15m_PD1` CH-Import | **NEIN** |
-| Neues Fünf-Tabellen-Backup | **NEIN** (Preflight bereit) |
-| GitHub-Push | **NEIN** |
+| Juni 2026 Monatsimport-Vorbereitung | **offen** (empfohlen: post-4X Backup) |
+| Git commit/push | **NEIN** |
 
 ---
 
-## 7. Verweise
+## 5. Verweise
 
 - `MASTER_PROJECT_CONTEXT.md`
-- `historical_json_import/controlled_monthly_orchestrator.py`
-- `historical_json_import/productive_prewrite_gate.py`
+- `manifests/phase4w_may2026_backup_binding.json`
+- `historical_json_import/phase4x/phase4x_start_may.sh`

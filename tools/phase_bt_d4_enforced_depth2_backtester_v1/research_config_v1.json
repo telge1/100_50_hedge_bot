@@ -1,0 +1,34 @@
+{
+  "mode": "depth2_density_research_v1",
+  "mode_version": "bt_d4_research_v1",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "pool_detail": 1,
+  "pool_pd": "PD1",
+  "density_method": "exact_unique_origin",
+  "min_unique_origins": 2,
+  "warmup_hours": 168,
+  "density_provider_module": "phase_bt_d3_canonical_depth2_provider_v1.density_provider_v1",
+  "adapter_bridge": "phase1b_depth2_landscape_pilot_v1/analyzer_depth2_landscape.js",
+  "expected_pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "golden_reference_path": "results/phase_bt_d3_canonical_depth2_provider_v1/golden_20260925_1100_chart_path.json",
+  "parity_fixture_decision_closes": [
+    "2026-09-25T11:00:00Z"
+  ],
+  "additional_parity_closes": [
+    "2026-05-15T12:00:00Z",
+    "2026-06-20T08:00:00Z",
+    "2026-07-10T16:00:00Z",
+    "2026-08-05T10:00:00Z",
+    "2026-09-10T14:00:00Z"
+  ],
+  "causal_sequence_closes": [
+    "2026-09-25T10:40:00Z",
+    "2026-09-25T10:45:00Z",
+    "2026-09-25T10:50:00Z",
+    "2026-09-25T10:55:00Z",
+    "2026-09-25T11:00:00Z"
+  ],
+  "fail_closed": true,
+  "notes": "Research-only density integration. Does not run trades or mutate Phase 4D."
+}

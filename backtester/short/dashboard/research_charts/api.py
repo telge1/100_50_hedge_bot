@@ -96,6 +96,38 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     )
 
 
+POOL_LANDSCAPE_BT_D7_STRATEGY_ID = "pool_landscape_v1_candidate_bt_d7"
+SETUP_SCANNER_BT_D23_STRATEGY_ID = "pool_first_setup_scanner_bt_d23"
+
+
+def _bt_d12_latest_workspace_response(
+    symbol: str, *, visible: bool
+) -> dict[str, Any] | JSONResponse:
+    """Import BT-D12 latest_result.json overlays (no stoch/collector)."""
+    from .bt_d12_latest_backtester import STRATEGY_ID as BT_D12_SID, load_latest_result
+
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        return _error(400, "symbol_required", "symbol required")
+    ws = get_workspace()
+    if visible is False:
+        return ws.clear_bt_d7_short_research(sym)
+    _doc, bundle, summary, errs = load_latest_result(symbol=sym)
+    if errs:
+        return _error(400, "latest_result_invalid", ",".join(errs))
+    if bundle is None or summary is None:
+        return _error(404, "latest_result_missing", "latest_result.json not found")
+    snap = ws.import_bt_d7_short_research(sym, bundle, summary, visible=bool(visible))
+    snap["backtester"]["strategy_id"] = BT_D12_SID
+    snap["backtester"]["source"] = "bt_d12_latest_result_v1"
+    snap["backtester"]["message"] = (
+        f"BT-D12 latest {summary.get('run_id')} — "
+        f"{summary.get('signal_count', 0)} Signale, "
+        f"{summary.get('filled_trade_count', 0)} Trades"
+    )
+    return snap
+
+
 def build_router(*, require_auth: Callable, render_template: Callable) -> APIRouter:
     router = APIRouter()
 
@@ -1143,12 +1175,137 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             bool(body.get("enabled")), str(body.get("symbol") or "").upper()
         )
 
+    @router.get("/api/research/backtester/bt-d7/runs")
+    async def api_research_backtester_bt_d7_runs(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .bt_d7_short_research_backtester import discover_runs
+
+        sym = str(symbol or "").strip().upper()
+        runs = [r for r in discover_runs() if r.get("symbol") == sym]
+        return {"success": True, "symbol": sym, "runs": runs}
+
+    @router.post("/api/research/backtester/bt-d12/load-latest")
+    async def api_research_backtester_bt_d12_load_latest(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        symbol = str(body.get("symbol") or "").strip().upper()
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        return _bt_d12_latest_workspace_response(symbol, visible=bool(visible))
+
+    @router.get("/api/research/backtester/bt-d23-setup-scanner/runs")
+    async def api_research_backtester_bt_d23_setup_scanner_runs(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .bt_d23_setup_scanner_backtester import discover_setup_scanner_runs
+
+        sym = str(symbol or "").strip().upper()
+        runs = [r for r in discover_setup_scanner_runs() if r.get("symbol") == sym]
+        return {"success": True, "symbol": sym, "runs": runs, "payload_kind": "bt_d23_setup_scanner_chart_integration_v1"}
+
+    @router.post("/api/research/backtester/bt-d23-setup-scanner/load")
+    async def api_research_backtester_bt_d23_setup_scanner_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .bt_d23_setup_scanner_backtester import (
+            STRATEGY_ID as BT_D23_SID,
+            build_summary,
+            load_setups_document,
+        )
+
+        symbol = str(body.get("symbol") or "").strip().upper()
+        run_id = str(body.get("run_id") or "bt_d23_pilot_sep11_24h_v1").strip()
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        ws = get_workspace()
+        if visible is False:
+            return ws.clear_bt_d23_setup_scanner(symbol)
+        doc, errs = load_setups_document(run_id)
+        if errs:
+            return _error(400, "setup_scanner_invalid", ",".join(errs))
+        if doc is None:
+            return _error(404, "setup_scanner_not_found", "setups.json not found")
+        summary = build_summary(doc, run_id)
+        snap = ws.load_bt_d23_setup_scanner_catalog(
+            symbol, doc, summary, run_id=run_id, visible=True
+        )
+        snap["backtester"]["strategy_id"] = BT_D23_SID
+        return snap
+
+    @router.post("/api/research/backtester/bt-d23-setup-scanner/sync-viewport")
+    async def api_research_backtester_bt_d23_setup_scanner_sync_viewport(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        symbol = str(body.get("symbol") or "").strip().upper()
+        try:
+            v0 = int(body.get("view_start_unix"))
+            v1 = int(body.get("view_end_unix"))
+        except (TypeError, ValueError):
+            return _error(400, "viewport_required", "view_start_unix and view_end_unix required")
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        if v1 <= v0:
+            return _error(400, "viewport_invalid", "invalid viewport range")
+        ws = get_workspace()
+        return ws.sync_bt_d23_setup_scanner_viewport(
+            symbol, view_start_unix=v0, view_end_unix=v1
+        )
+
+    @router.post("/api/research/backtester/bt-d7/load")
+    async def api_research_backtester_bt_d7_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .bt_d7_short_research_backtester import (
+            STRATEGY_ID as BT_D7_SID,
+            load_validated_run,
+        )
+
+        symbol = str(body.get("symbol") or "").strip().upper()
+        run_id = str(body.get("run_id") or "").strip()
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        if not run_id:
+            return _error(400, "run_id_required", "run_id required")
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        ws = get_workspace()
+        if visible is False:
+            return ws.clear_bt_d7_short_research(symbol)
+        _raw, bundle, summary, errs = load_validated_run(run_id, symbol=symbol)
+        if errs:
+            return _error(400, "run_validation_failed", ",".join(errs))
+        if bundle is None or summary is None:
+            return _error(404, "run_not_found", "run not found or invalid")
+        snap = ws.import_bt_d7_short_research(symbol, bundle, summary, visible=bool(visible))
+        snap["backtester"]["strategy_id"] = BT_D7_SID
+        return snap
+
     @router.post("/api/research/backtester/load")
     async def api_research_backtester_load(
         user: dict = Depends(require_auth),
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         strategy_id = str(body.get("strategy_id") or "").strip()
+        if strategy_id in (POOL_LANDSCAPE_BT_D7_STRATEGY_ID,):
+            symbol = str(body.get("symbol") or "").strip().upper()
+            visible = body.get("visible")
+            if visible is None:
+                visible = True
+            return _bt_d12_latest_workspace_response(symbol, visible=bool(visible))
+        if strategy_id in (SETUP_SCANNER_BT_D23_STRATEGY_ID,):
+            return await api_research_backtester_bt_d23_setup_scanner_load(user=user, body=body)
         if strategy_id in (
             "ob_exit_pool_liquidity_v1",
             "ob_exit_pool_liquidity_v1_phase1h",

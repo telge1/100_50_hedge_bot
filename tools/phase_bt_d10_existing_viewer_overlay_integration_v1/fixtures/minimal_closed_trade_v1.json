@@ -1,0 +1,56 @@
+{
+  "manifest": {
+    "manifest_version": "bt_d6_run_manifest_v1",
+    "run_kind": "bt_d7_short_research",
+    "config_hash": "test_config_hash_abc",
+    "strategy_id": "pool_landscape_v1_candidate",
+    "strategy_freeze_status": "FREEZE_CANDIDATE_NOT_FINAL_APPROVED",
+    "density_contract": {
+      "timeframe": "5m",
+      "pool_detail": 1,
+      "method": "exact_unique_origin",
+      "min_unique_origins": 2
+    },
+    "tp_selection_mode": "next_eligible_band",
+    "density_path": "ResearchDensityRunV1.collect_at_close",
+    "manifest_id": "fixture_run_001"
+  },
+  "config_hash": "test_config_hash_abc",
+  "signals": [
+    {
+      "decision_close_utc": "2026-09-11T19:45:00Z",
+      "order_active_from_utc": "2026-09-11T19:50:00Z",
+      "pool_lower": 0.0845,
+      "pool_upper": 0.084518,
+      "entry_level": 0.0845
+    }
+  ],
+  "orders": [
+    { "status": "PENDING_PLACED", "signal_close": "2026-09-11T19:45:00Z" }
+  ],
+  "trades": [
+    {
+      "trade_id": "BT7_0001",
+      "signal_close_utc": "2026-09-11T19:45:00Z",
+      "fill_utc": "2026-09-11T19:50:00Z",
+      "exit_utc": "2026-09-11T20:10:00Z",
+      "entry_price": 0.0845,
+      "exit_price": 0.08374,
+      "exit_reason": "TP",
+      "direction": "SHORT",
+      "bars_held": 4,
+      "ambiguous_intrabar": false,
+      "sl_price": 0.084687036,
+      "tp_price": 0.08374
+    }
+  ],
+  "pnl": {
+    "trade_ledger": [
+      {
+        "trade_id": "BT7_0001",
+        "net_pnl_usdt": 9.88,
+        "return_pct": 0.988
+      }
+    ]
+  }
+}

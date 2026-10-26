@@ -511,18 +511,76 @@ def main() -> None:
     _set_job_status(verdict, execution_status)
     _write_progress("finished", verdict=verdict)
     if os.environ.get("PHASE6XT_EXPORT_HANDOFF") == "1" and mem_a is not None:
-        export_dir = _REPO / "logs/historical_import/overnight_2026/phase6xt_market_memory_checkpoint_handoff_v1"
+        export_allowed = verdict == "INTEGRATED_90D_MEMORY_VALIDATED"
+        export_dir = Path(
+            os.environ.get(
+                "PHASE6XT_EXPORT_DIR",
+                str(_REPO / "logs/historical_import/overnight_2026/phase6xt_market_memory_checkpoint_handoff_v1"),
+            )
+        )
         export_dir.mkdir(parents=True, exist_ok=True)
-        export_cp = mem_a.checkpoint()
-        export_cp["handoff_provenance"] = {
-            "source": "integrated_path_a_continuous",
+        export_meta = {
+            "export_allowed": export_allowed,
+            "verdict_at_export": verdict,
             "run_id": _RUN_ID or None,
+            "path": "A_continuous",
             "boot_end": _iso(BOOT_END),
         }
-        (export_dir / "validated_path_a_boot_end.checkpoint.json").write_text(
-            json.dumps(export_cp),
-            encoding="utf-8",
-        )
+        _wjson(export_dir / "path_a_export_manifest.json", export_meta)
+        if export_allowed:
+            in_mem_hash = mem_a.semantic_state_hash()
+            export_cp = mem_a.checkpoint()
+            export_cp["handoff_provenance"] = {
+                "source": "integrated_path_a_continuous",
+                "run_id": _RUN_ID or None,
+                "boot_end": _iso(BOOT_END),
+                "semantic_state_hash_at_export": in_mem_hash,
+            }
+            cp_path = export_dir / "validated_path_a_boot_end.checkpoint.json"
+            cp_path.write_text(json.dumps(export_cp), encoding="utf-8")
+            loaded = MarketMemoryState.from_checkpoint(json.loads(cp_path.read_text(encoding="utf-8")))
+            reload_hash = loaded.semantic_state_hash()
+            diff_reload = semantic_diff(mem_a, loaded)
+            verification = {
+                "semantic_hash_match": in_mem_hash == reload_hash,
+                "semantic_diff_count": diff_reload.get("diff_count", -1),
+                "in_memory_path_a_hash": in_mem_hash,
+                "reloaded_from_export_hash": reload_hash,
+                "stored_checkpoint_hash_field": export_cp.get("semantic_state_hash"),
+                "path_a_export_status": "PATH_A_EXPORT_VERIFIED"
+                if in_mem_hash == reload_hash and diff_reload.get("diff_count") == 0
+                else "PATH_A_EXPORT_VERIFICATION_FAILED",
+            }
+            export_meta["path_a_export_status"] = verification["path_a_export_status"]
+            export_meta["semantic_hash_match"] = verification["semantic_hash_match"]
+            _wjson(export_dir / "path_a_export_manifest.json", export_meta)
+            _wjson(export_dir / "checkpoint_load_verification.json", verification)
+            legacy = None
+            _legacy_summary = (
+                _REPO
+                / "logs/historical_import/overnight_2026/phase6xt_90d_integrated_price_pool_memory_v1/rerun_20261016T182520Z/full_replay_state_summary.json"
+            )
+            if _legacy_summary.is_file():
+                legacy = json.loads(_legacy_summary.read_text(encoding="utf-8")).get("semantic_state_hash")
+            hash_cmp = {
+                "current_export_hash": in_mem_hash,
+                "legacy_rerun_20261016_hash": legacy,
+                "legacy_match": legacy == in_mem_hash if legacy else None,
+                "note": "Legacy hash predates seen_origins fix; inequality expected.",
+            }
+            _wjson(export_dir / "semantic_hash_comparison.json", hash_cmp)
+            _wjson(_OUT / "path_a_export_manifest.json", export_meta)
+            _wjson(_OUT / "checkpoint_load_verification.json", verification)
+            _wjson(_OUT / "semantic_hash_comparison.json", hash_cmp)
+            if cp_path != _OUT / "validated_path_a_boot_end.checkpoint.json":
+                (_OUT / "validated_path_a_boot_end.checkpoint.json").write_text(
+                    cp_path.read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+        else:
+            limitations.append(
+                "PHASE6XT_EXPORT_HANDOFF=1 set but export skipped: verdict not INTEGRATED_90D_MEMORY_VALIDATED."
+            )
     print(verdict, execution_status)
 
 

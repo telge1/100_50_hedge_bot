@@ -325,9 +325,13 @@ def test_collector_strings_regression():
     assert "researchIndOi" in dock
     assert "researchIndLld" in dock
     assert "researchBacktesterBtn" in html
+    assert "pool_landscape_v1_candidate_bt_d7" in html
+    assert "pool_first_setup_scanner_bt_d23" in html
+    assert "researchBtD7Run" in html
     assert "researchFullscreenBtn" in html
     assert "researchBacktesterBtn" in host
     assert "/api/research/backtester/load" in host
+    assert "/api/research/backtester/bt-d7/runs" in (DASHBOARD_ROOT / "research_charts" / "api.py").read_text()
     assert "strategy_version" in host
     assert "/api/research/live-status" in host
     assert "/api/research/candles" in host

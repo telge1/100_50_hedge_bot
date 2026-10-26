@@ -1,0 +1,15 @@
+{
+  "contract_version": "bt_density_contract_v1",
+  "density_method": "exact_unique_origin",
+  "timeframe": "5m",
+  "pool_detail": 1,
+  "pool_pd": "PD1",
+  "min_unique_origins": 2,
+  "warmup_hours": 168,
+  "max_export_hours": 72,
+  "visible_context_hours": 48,
+  "symbol_default": "DOGEUSDT",
+  "adapter_module": "pd1_exact_density_trp_adapter.js",
+  "node_bridge": "phase1b_depth2_landscape_pilot_v1/analyzer_depth2_landscape.js",
+  "fail_closed": true
+}

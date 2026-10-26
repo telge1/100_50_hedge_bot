@@ -1,0 +1,58 @@
+{
+  "config_version": "bt_d6_strategy_backtest_config_v1",
+  "strategy_identity": {
+    "strategy_id": "pool_landscape_v1_candidate",
+    "strategy_version": "bt_d7_historical_pilot_24h_v1",
+    "frozen_source_reference": "strategy_freeze/pool_landscape_v1_candidate/SOURCE_PROVENANCE.json",
+    "research_mode": "depth2_density_research_v1"
+  },
+  "density": {
+    "timeframe": "5m",
+    "pool_detail": 1,
+    "method": "exact_unique_origin",
+    "min_unique_origins": 2
+  },
+  "short_entry": {
+    "entry_pool_selection_mode": "nearest_upper_proximity_v1",
+    "entry_price_reference": "upper_pool_lower_edge",
+    "pool_min_age_bars": 0,
+    "upper_gap_min_pct": 0.5,
+    "upper_gap_measurement_mode": "adjacent_union_interval_gap_pct_v1",
+    "upper_pool_proximity_pct": 0.05,
+    "pending_limit_enabled": true,
+    "pending_limit_expiry_bars": null
+  },
+  "risk": {
+    "sl_above_upper_top_pct": 0.2,
+    "max_concurrent_positions": 1
+  },
+  "take_profit": {
+    "selection_mode": "next_eligible_band",
+    "min_distance_pct": 0.5,
+    "distance_reference": "actual_fill_to_lower_upper_edge",
+    "dense_cluster_semantics_approved": false,
+    "tp_pool_quality_gate_enabled": false
+  },
+  "pnl": {
+    "initial_equity_usdt": 10000.0,
+    "sizing_mode": "fixed_notional_usdt",
+    "position_notional_usdt": 1000.0,
+    "risk_fraction_pct": null,
+    "leverage": 1.0,
+    "trading_fee_model": {"model": "roundtrip_pct_of_notional", "roundtrip_pct": 0.11},
+    "slippage_model": {"model": "none", "entry_slippage_pct": 0.0, "exit_slippage_pct": 0.0},
+    "funding_model": {"model": "none", "funding_rate_bps_per_8h": 0.0},
+    "intrabar_ambiguity_policy": "no_trade_ambiguous",
+    "end_of_test_open_position_policy": "exclude_from_realized_pnl"
+  },
+  "backtest": {
+    "symbol": "DOGEUSDT",
+    "symbols": ["DOGEUSDT"],
+    "end_utc_exclusive": false,
+    "start_utc": "2026-09-11T12:00:00Z",
+    "end_utc": "2026-09-12T12:00:00Z",
+    "execution_timeframe": "5m",
+    "outcome_blind_signals": true,
+    "deterministic_seed": 20261025
+  }
+}

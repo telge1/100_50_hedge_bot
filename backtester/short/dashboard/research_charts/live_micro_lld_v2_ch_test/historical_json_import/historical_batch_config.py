@@ -55,6 +55,13 @@ STRATEGY_COMBOS: tuple[StrategyCombo, ...] = (
     StrategyCombo("4h", 10),
 )
 
+# Isolated import combos (excluded from bulk STRATEGY_COMBOS dry-runs).
+ISOLATED_IMPORT_COMBOS: tuple[StrategyCombo, ...] = (
+    StrategyCombo("5m", 1),
+    StrategyCombo("5m", 5),
+    StrategyCombo("5m", 10),
+)
+
 # Derived from pilot write (~3s for 10 closes) and catalog size; conservative for CH + readback.
 DEFAULT_BATCH_SIZE_CLOSES = 50
 MAX_BATCH_SIZE_CLOSES = 200
@@ -70,7 +77,7 @@ MONTHS_APR_SEP: tuple[str, ...] = (
 
 
 def combo_for_folder(folder: str) -> StrategyCombo | None:
-    for c in STRATEGY_COMBOS:
+    for c in (*STRATEGY_COMBOS, *ISOLATED_IMPORT_COMBOS):
         if c.folder == folder:
             return c
     return None

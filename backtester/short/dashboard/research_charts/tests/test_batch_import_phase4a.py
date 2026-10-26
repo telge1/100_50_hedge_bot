@@ -37,6 +37,8 @@ from research_charts.live_micro_lld_v2_ch_test.historical_json_import.catalog_in
 )
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.historical_batch_config import (
     STRATEGY_COMBOS,
+    StrategyCombo,
+    combo_for_folder,
 )
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.pilot_config import CATALOG_ROOT
 from research_charts.live_micro_lld_v2_ch_test.historical_json_import.provenance_sidecar_design import (
@@ -154,13 +156,31 @@ def test_progress_report_roundtrip(tmp_path):
     assert loaded.status == "validated"
 
 
+def test_isolated_combo_for_folder_5m_pd5():
+    assert combo_for_folder("5m_PD5") == StrategyCombo("5m", 5)
+    assert combo_for_folder("5m_PD1") == StrategyCombo("5m", 1)
+
+
+def test_isolated_combo_for_folder_5m_pd10():
+    assert combo_for_folder("5m_PD10") == StrategyCombo("5m", 10)
+
+
 def test_catalog_inventory_matches_manifest():
     inv = inventory_from_coverage(CATALOG_ROOT)
-    assert inv["manifest_snapshot_count"] == 53802
-    assert inv["coverage_total_found"] == 53802
-    assert inv["disk_total_json"] == 53802
+    # Bulk Apr–Sep manifest + coverage_matrix (15m/4h only; unchanged by 5m file import).
+    bulk_snapshot_count = 53802
+    sep_5m_pd1_on_disk = 2592
+    sep_5m_pd5_on_disk = 2592
+    sep_5m_pd10_on_disk = 2592
+    assert inv["manifest_snapshot_count"] == bulk_snapshot_count
+    assert inv["coverage_total_found"] == bulk_snapshot_count
+    isolated_5m_sep = sep_5m_pd1_on_disk + sep_5m_pd5_on_disk + sep_5m_pd10_on_disk
+    assert inv["disk_total_json"] == bulk_snapshot_count + isolated_5m_sep
+    assert inv["by_combo_disk"].get("5m_PD1") == sep_5m_pd1_on_disk
+    assert inv["by_combo_disk"].get("5m_PD5") == sep_5m_pd5_on_disk
+    assert inv["by_combo_disk"].get("5m_PD10") == sep_5m_pd10_on_disk
     assert inv["all_slices_pass"] is True
-    assert sum(inv["by_combo_coverage"].values()) == 53802
+    assert sum(inv["by_combo_coverage"].values()) == bulk_snapshot_count
 
 
 def test_multi_combination_dry_run_ok():

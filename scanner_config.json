@@ -1,0 +1,10 @@
+{
+  "config_hash": "44e97f1f91a94b369ac266fbf261e1ae600ea414555aa5001ff632b3c361cb96",
+  "hh_lookback_bars": 32,
+  "lower_min_below_pct": 2.0,
+  "pd_primary": 10,
+  "require_ema_stack": true,
+  "sl_buffer": 1.002,
+  "upper_near_above_pct": 2.5,
+  "version": "full_context_short_finder_v1"
+}

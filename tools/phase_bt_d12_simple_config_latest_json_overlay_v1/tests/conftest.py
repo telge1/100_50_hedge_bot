@@ -1,0 +1,6 @@
+import sys
+from pathlib import Path
+
+BT_D12 = Path(__file__).resolve().parents[1]
+if str(BT_D12) not in sys.path:
+    sys.path.insert(0, str(BT_D12))

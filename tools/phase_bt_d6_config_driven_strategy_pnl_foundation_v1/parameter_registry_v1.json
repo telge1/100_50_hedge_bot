@@ -1,0 +1,43 @@
+{
+  "registry_version": "bt_d6_parameter_registry_v1",
+  "note": "Classification only — does not approve unresolved user rules.",
+  "parameters": {
+    "density.timeframe": { "classification": "FROZEN", "reference": "Signal_definierung.md § Scanner Min-Depth 2" },
+    "density.pool_detail": { "classification": "FROZEN", "reference": "PD1 entry landscape" },
+    "density.method": { "classification": "FROZEN", "reference": "Exact Unique-Origin Density" },
+    "density.min_unique_origins": { "classification": "FROZEN", "value": 2 },
+    "short_entry.entry_price_reference": {
+      "classification": "CONFIGURABLE_APPROVED",
+      "reference": "BT-D17: upper_pool_lower_edge | upper_pool_upper_edge",
+      "yaml_alias": "short_entry.entry_price_mode"
+    },
+    "short_entry.entry_offset_pct": {
+      "classification": "CONFIGURABLE_APPROVED",
+      "reference": "BT-D17: only with pool_lower_edge_offset; nonnegative percent below lower edge"
+    },
+    "short_entry.upper_gap_min_pct": { "classification": "CONFIGURABLE_APPROVED", "reference": "Signal_definierung L365 large gap 0.5%" },
+    "short_entry.upper_gap_measurement_mode": {
+      "classification": "CONFIGURABLE_APPROVED",
+      "reference": "phase1b analyzer computeGaps + Signal_definierung adjacent depth-2 gaps",
+      "executable_modes": ["adjacent_union_interval_gap_pct_v1"]
+    },
+    "short_entry.upper_pool_proximity_pct": { "classification": "EXPERIMENTAL", "reference": "Phase 2A default 0.05 — not user-frozen" },
+    "short_entry.entry_pool_selection_mode": { "classification": "EXPERIMENTAL", "reference": "IMPLEMENTATION_DEVIATIONS #1 nearest vs relevant" },
+    "short_entry.pool_min_age_bars": { "classification": "UNRESOLVED", "reference": "OPEN O-04 — hard gate not confirmed" },
+    "short_entry.pending_limit_enabled": { "classification": "FROZEN", "reference": "PENDING LIMIT V1 USER_CONFIRMED" },
+    "short_entry.pending_limit_expiry_bars": { "classification": "FROZEN", "reference": "null = no TTL per Signal_definierung L593" },
+    "short_entry.pending_limit_fill_model": {
+      "classification": "CONFIGURABLE_APPROVED",
+      "reference": "BT-D18 legacy_v1 | causal_sell_limit_v2",
+      "default": "legacy_v1"
+    },
+    "risk.sl_above_upper_top_pct": { "classification": "FROZEN", "value": 0.2 },
+    "risk.max_concurrent_positions": { "classification": "FROZEN", "value": 1 },
+    "take_profit.min_distance_pct": { "classification": "FROZEN", "value": 0.5 },
+    "take_profit.distance_reference": { "classification": "FROZEN", "reference": "fill to lower band top" },
+    "take_profit.selection_mode.next_eligible_band": { "classification": "CONFIGURABLE_APPROVED", "reference": "STRATEGY_SPEC_CANDIDATE_4D SHORT-TP-01" },
+    "take_profit.selection_mode.dense_cluster": { "classification": "UNRESOLVED", "reference": "USER_CONFIRMED SHORT-05 — no approved algorithm (O-01)" },
+    "pnl.initial_equity_usdt": { "classification": "CONFIGURABLE_APPROVED", "note": "Must be explicit in JSON — no code default" },
+    "pnl.trading_fee_model.roundtrip_pct": { "classification": "FROZEN", "reference": "0.11% Signal_definierung" }
+  }
+}

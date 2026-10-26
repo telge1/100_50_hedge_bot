@@ -1,0 +1,8 @@
+{
+  "pilot_version": "bt_d8_pilot_2h_v1",
+  "symbol": "DOGEUSDT",
+  "start_utc": "2026-09-11T12:00:00Z",
+  "end_utc": "2026-09-11T14:00:00Z",
+  "bundle_name": "dogeusdt_5m_pd1_depth2_pilot_2h_20260911T1200_1400Z",
+  "notes": "Predeclared 2h window — same as BT-D7 historical smoke. No 24h or multi-month auto-build."
+}

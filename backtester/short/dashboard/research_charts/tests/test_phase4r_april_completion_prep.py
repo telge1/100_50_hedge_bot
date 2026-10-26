@@ -97,8 +97,28 @@ def test_scope_ch_counts_uses_chunked_queries():
     assert fake_client.query.call_count >= 5 * 3  # 3 chunks × 5 table queries
 
 
-def test_verify_manifest_scope_ch_counts_integration_smoke():
+@pytest.mark.integration
+def test_verify_manifest_scope_ch_counts_pre_import_empty_smoke():
+    """Pre-import guard: expects zero CH rows for April PD5 manifest scope (Phase 4R prep)."""
     man = load_controlled_run_manifest(MANIFEST_PD5)
     counts = verify_manifest_scope_ch_counts(CATALOG_ROOT, man, chunk_size=150)
+    if counts["publish_distinct"] > 0:
+        pytest.skip(
+            "post-import environment: publish_distinct="
+            f"{counts['publish_distinct']} (see test_verify_manifest_scope_ch_counts_post_import)"
+        )
     assert counts["publish_distinct"] == 0
     assert counts["members"] == 0
+
+
+@pytest.mark.integration
+def test_verify_manifest_scope_ch_counts_post_import():
+    """Post-import: April PD5 scope must have full publish coverage (2880 stems)."""
+    man = load_controlled_run_manifest(MANIFEST_PD5)
+    counts = verify_manifest_scope_ch_counts(CATALOG_ROOT, man, chunk_size=150)
+    if counts["publish_distinct"] == 0:
+        pytest.skip("pre-import environment: no published rows for PD5 manifest")
+    assert counts["publish_distinct"] == 2880
+    assert counts["meta_distinct"] == 2880
+    assert counts["sidecar_distinct"] == 2880
+    assert counts["members"] > 0

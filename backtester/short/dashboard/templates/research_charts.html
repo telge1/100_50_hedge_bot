@@ -45,7 +45,21 @@
                     <select id="researchBtStrategy" class="trp-select" title="Research-Strategie">
                         <option value="ob_exit_pool_liquidity_v1_phase1h" selected>Exit Pool phase1h (mass+fee, +6.71%)</option>
                         <option value="ob_exit_pool_liquidity_v1_phase1e">Exit Pool phase1e (5m meaningful, +7.98%)</option>
+                        <option value="pool_landscape_v1_candidate_bt_d7">Pool Landscape SHORT · Depth 2 (Research)</option>
+                        <option value="pool_first_setup_scanner_bt_d23">Pool-First Setup Scanner · PLANNED only (BT-D23)</option>
                     </select>
+                    <span id="researchBtD7Wrap" class="research-ezm-layer-wrap" hidden>
+                        <span class="trp-field-label">BT-D7 Run</span>
+                        <select id="researchBtD7Run" class="trp-select" title="Abgeschlossener Research-Backtest (nur validierte Artefakte)">
+                            <option value="">— Run wählen —</option>
+                        </select>
+                    </span>
+                    <span id="researchBtD23Wrap" class="research-ezm-layer-wrap" hidden>
+                        <span class="trp-field-label">Setup Scanner Run</span>
+                        <select id="researchBtD23Run" class="trp-select" title="BT-D23 setups.json (keine Fills/PnL)">
+                            <option value="bt_d23_pilot_sep11_24h_v1">bt_d23_pilot_sep11_24h_v1</option>
+                        </select>
+                    </span>
                     <span id="researchPoolSignalsWrap" class="research-ezm-layer-wrap" hidden>
                         <span class="trp-field-label">A+ Pool Signals</span>
                         <select id="researchPoolSignalsMode" class="trp-select" title="A+ Pool Signal Anzeige (kein neuer Scanner-Job)">
@@ -117,6 +131,7 @@
                 </div>
             </div>
 
+            <div class="research-bt-d7-summary trp-muted" id="researchBtD7Summary" hidden aria-live="polite"></div>
             <div class="research-status" id="researchStatus"></div>
             <div class="research-selected" id="researchSelected">hover —  ·  sel —</div>
             <div class="trp-chart-dock" id="researchChartDock">

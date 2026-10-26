@@ -1,0 +1,16 @@
+{
+  "binding_version": "4xaq_september_immutable_binding_v1",
+  "applies_to_month": "2026-09",
+  "activation_env": "JUN_SEP_SEPTEMBER_IMMUTABLE_BINDING_V1",
+  "activation_env_value": "1",
+  "snapshot_id": "6c2e01d76a1559a94ec373abdb4b96bc73f3ddaba89bd1ee1058b001d04d6d61",
+  "ohlcv_content_hash": "62a2a808b05cf98e2c16f10b1aad2712be0e6e4c984242396f4a6a47d54e65fb",
+  "revision_metadata_hash": "984e80fd1ff4b2dcb0e9532ce8c8f7ca369ffd3817737b2a5e81d38ede47ae82",
+  "inputs_directory": "backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/doge_multi_month_2026_history/staging/phase4xap_sep_immutable_extension_v1/inputs",
+  "range_start": "2025-12-11T00:00:00.000Z",
+  "range_end_exclusive": "2026-10-01T00:00:00.000Z",
+  "expected_row_count": 423360,
+  "base_snapshot_id": "cfae2571806c823407767e4d81da82fe984a928ce29843c9f061fc66d79c115b",
+  "base_ohlcv_content_hash": "a0e6bd603bb705671deb9ad776672f807f469a56de1b90fb9a365337a01f240b",
+  "phase4xap_provenance": "results/phase4xap_september_immutable_extension_v1/provenance.json"
+}

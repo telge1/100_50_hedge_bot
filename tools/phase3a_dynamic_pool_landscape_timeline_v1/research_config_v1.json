@@ -1,0 +1,15 @@
+{
+  "version": "phase3a_dynamic_pool_landscape_timeline_v1",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "pool_pd": "PD1",
+  "pool_detail": 1,
+  "min_depth": 2,
+  "min_pool_age_bars": 5,
+  "min_pool_gap_pct": 0.5,
+  "large_gap_highlight_pct": 1.0,
+  "visible_from_utc": "2026-09-11T12:00:00Z",
+  "visible_to_utc": "2026-09-12T16:00:00Z",
+  "warmup_hours": 168,
+  "notes": "Research params only — not wired to production scanner or trade filters."
+}

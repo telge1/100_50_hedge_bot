@@ -1153,6 +1153,7 @@
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
+        scheduleBtD23SetupScanner(pane, from, to);
         scheduleLiveMicroLldV2ViewportSync(pane);
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
@@ -5160,6 +5161,188 @@
     );
   }
 
+  function isBtD7PoolLandscapeStrategy(sid) {
+    return String(sid || "") === "pool_landscape_v1_candidate_bt_d7";
+  }
+
+  function isBtD23SetupScannerStrategy(sid) {
+    return String(sid || "") === "pool_first_setup_scanner_bt_d23";
+  }
+
+  const BT_D23_DEFAULT_RUN = "bt_d23_pilot_sep11_24h_v1";
+  const BT_D23_VIEWPORT_DEBOUNCE_MS = 180;
+
+  async function loadBtD23Runs() {
+    if (!state.symbol) return;
+    const sel = $("researchBtD23Run");
+    if (!sel) return;
+    try {
+      const url = "/api/research/backtester/bt-d23-setup-scanner/runs?symbol="
+        + encodeURIComponent(state.symbol);
+      const res = await fetch(url, { method: "GET", credentials: "same-origin" }).then(function (r) {
+        return r.json();
+      });
+      const runs = (res && res.runs) || [];
+      sel.innerHTML = "";
+      if (!runs.length) {
+        const opt = document.createElement("option");
+        opt.value = BT_D23_DEFAULT_RUN;
+        opt.textContent = BT_D23_DEFAULT_RUN + " (default)";
+        sel.appendChild(opt);
+        return;
+      }
+      runs.forEach(function (r) {
+        const opt = document.createElement("option");
+        opt.value = r.run_id;
+        opt.textContent = r.run_id + " · " + (r.setup_count || 0) + " PLANNED setups";
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      sel.innerHTML = "<option value=\"" + BT_D23_DEFAULT_RUN + "\">" + BT_D23_DEFAULT_RUN + "</option>";
+    }
+  }
+
+  function renderBtD23Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d23_setup_scanner) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (!isBtD23SetupScannerStrategy(btStrategy()) || !bt.visible) {
+      if (!isBtD7PoolLandscapeStrategy(btStrategy())) {
+        el.hidden = true;
+        el.textContent = "";
+      }
+      return;
+    }
+    const parts = [
+      "Pool-First Setup Scanner · PLANNED SHORT — NOT EXECUTED",
+      sum.run_id ? ("run " + sum.run_id) : "",
+      sum.config_hash ? ("hash " + String(sum.config_hash).slice(0, 12) + "…") : "",
+      "depth 2 · 5m PD1",
+      sum.time_span && sum.time_span.start
+        ? (String(sum.time_span.start).slice(0, 16) + " … " + String(sum.time_span.end || "").slice(0, 16))
+        : "",
+      (bt.setup_count_total != null ? (bt.setup_count_total + " setups (catalog)") : ""),
+      (bt.setup_count_rendered != null ? (bt.setup_count_rendered + " gezeichnet (viewport)") : ""),
+      "kein PnL · keine Fills",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+  }
+
+  async function syncBtD23ViewportRange(pane, startUnix, endUnix) {
+    if (!pane || pane.tf !== "5m") return;
+    if (!isBtD23SetupScannerStrategy(btStrategy())) return;
+    const cat = (state.workspace && state.workspace.bt_d23_setup_scanner) || {};
+    if (!cat.visible) return;
+    if (!(endUnix > startUnix)) return;
+    const gen = ++pane.btD23Gen;
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d23-setup-scanner/sync-viewport", "POST", {
+        symbol: state.symbol,
+        view_start_unix: Math.floor(startUnix),
+        view_end_unix: Math.floor(endUnix),
+      }, { sourceAction: "bt-d23-viewport" });
+      if (gen !== pane.btD23Gen) return;
+      applyWorkspace(snap);
+      renderBtD23Summary(snap);
+      await refreshOverlaysVisible();
+    } catch (e) {
+      /* ignore viewport sync errors */
+    }
+  }
+
+  function scheduleBtD23SetupScanner(pane, from, to) {
+    if (!pane) return;
+    if (pane.btD23Timer) clearTimeout(pane.btD23Timer);
+    pane.btD23Timer = setTimeout(function () {
+      pane.btD23Timer = null;
+      let start = from;
+      let end = to;
+      if (start == null || end == null) {
+        const chart = api(pane);
+        if (!chart || !chart.getVisibleTimeRange) return;
+        const range = chart.getVisibleTimeRange();
+        if (!range || range.firstCandle == null || range.lastCandle == null) return;
+        const step = TF_SEC[pane.tf] || 300;
+        start = Number(range.firstCandle);
+        end = Number(range.lastCandle) + step;
+      }
+      syncBtD23ViewportRange(pane, start, end);
+    }, BT_D23_VIEWPORT_DEBOUNCE_MS);
+  }
+
+  async function loadBtD7Runs() {
+    if (!state.symbol) return;
+    const sel = $("researchBtD7Run");
+    if (!sel) return;
+    try {
+      const url = "/api/research/backtester/bt-d7/runs?symbol=" + encodeURIComponent(state.symbol);
+      const res = await fetch(url, { method: "GET", credentials: "same-origin" }).then(function (r) {
+        return r.json();
+      });
+      const runs = (res && res.runs) || [];
+      sel.innerHTML = "<option value=\"\">— Run wählen —</option>";
+      runs.forEach(function (r) {
+        const opt = document.createElement("option");
+        opt.value = r.run_id;
+        const pnl = (r.net_pnl_usdt != null) ? (" · PnL " + Number(r.net_pnl_usdt).toFixed(2) + " USDT") : "";
+        opt.textContent = r.run_id + " · " + (r.signal_count || 0) + " sig · "
+          + (r.trade_count || 0) + " trades" + pnl;
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      sel.innerHTML = "<option value=\"\">(Runs nicht geladen)</option>";
+    }
+  }
+
+  function renderBtD7Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d7_short_research) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (isBtD23SetupScannerStrategy(btStrategy())) {
+      renderBtD23Summary(snap);
+      return;
+    }
+    if (!isBtD7PoolLandscapeStrategy(btStrategy()) || !bt.visible) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    const parts = [
+      "Pool Landscape SHORT (Research) · NOT_FINAL_APPROVED",
+      sum.strategy_version ? ("v " + sum.strategy_version) : "",
+      sum.config_hash ? ("hash " + String(sum.config_hash).slice(0, 12) + "…") : "",
+      sum.upper_gap_min_pct != null ? ("gap≥" + sum.upper_gap_min_pct + "%") : "",
+      "depth 2 · 5m PD1",
+      sum.time_span && sum.time_span.start
+        ? (String(sum.time_span.start).slice(0, 16) + " … " + String(sum.time_span.end || "").slice(0, 16))
+        : "",
+      (sum.signal_count != null ? (sum.signal_count + " Signale") : ""),
+      (sum.filled_trade_count != null ? (sum.filled_trade_count + " gefüllt") : ""),
+      sum.net_pnl_usdt != null ? ("Netto " + Number(sum.net_pnl_usdt).toFixed(2) + " USDT") : "",
+      sum.return_pct != null ? ("Return " + Number(sum.return_pct).toFixed(2) + "%") : "",
+      sum.win_rate != null ? ("WR " + (Number(sum.win_rate) * 100).toFixed(1) + "%") : "",
+      sum.max_drawdown_pct != null ? ("MDD " + Number(sum.max_drawdown_pct).toFixed(2) + "%") : "",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+  }
+
+  function syncBtD7Ui(snap) {
+    const wrap = $("researchBtD7Wrap");
+    const wrapD23 = $("researchBtD23Wrap");
+    const on = isBtD7PoolLandscapeStrategy(btStrategy());
+    const onD23 = isBtD23SetupScannerStrategy(btStrategy());
+    if (wrap) wrap.hidden = !on;
+    if (wrapD23) wrapD23.hidden = !onD23;
+    if (on) loadBtD7Runs();
+    if (onD23) loadBtD23Runs();
+    renderBtD7Summary(snap || state.workspace);
+    renderBtD23Summary(snap || state.workspace);
+  }
+
   function ezmLayerMode() {
     const el = $("researchEzmLayerMode");
     return el ? el.value : "both";
@@ -5733,6 +5916,7 @@
     scheduleOrderbookProfile(pane);
     scheduleOrderbookLevels(pane);
     scheduleTradeBubbles(pane);
+    scheduleBtD23SetupScanner(pane);
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -7404,6 +7588,7 @@
     if ($("researchBtStrategy")) {
       $("researchBtStrategy").addEventListener("change", async function () {
         syncBtStrategyUi();
+        syncBtD7Ui();
         const sid = btStrategy();
         try {
           applyWorkspace(await sendJson("/api/research/backtester/load", "POST", {
@@ -7576,6 +7761,53 @@
 
     $("researchBacktesterBtn").addEventListener("click", async function () {
       if (!state.symbol) return;
+      if (isBtD23SetupScannerStrategy(btStrategy())) {
+        const runSel = $("researchBtD23Run");
+        const runId = (runSel && runSel.value) ? runSel.value : BT_D23_DEFAULT_RUN;
+        setStatus("Setup Scanner: lade PLANNED setups (" + runId + ") …");
+        try {
+          const snap = await sendJson("/api/research/backtester/bt-d23-setup-scanner/load", "POST", {
+            symbol: state.symbol,
+            run_id: runId,
+            visible: true,
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          syncBtD7Ui(snap);
+          const span = (snap.backtester && snap.backtester.summary && snap.backtester.summary.time_span) || {};
+          if (span.start && span.end) {
+            await zoomChartToIsoRange(span.start, span.end, span.start);
+          }
+          visibleIds().forEach(function (pid) {
+            const pane = state.panes[pid];
+            if (pane) scheduleBtD23SetupScanner(pane);
+          });
+          setStatus((snap.backtester && snap.backtester.message) || "BT-D23 Setup Scanner geladen");
+        } catch (err) {
+          setStatus("BT-D23 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD7PoolLandscapeStrategy(btStrategy())) {
+        setStatus("Lade latest_result.json (BT-D12 Pool Landscape) …");
+        try {
+          const snap = await sendJson("/api/research/backtester/bt-d12/load-latest", "POST", {
+            symbol: state.symbol,
+            visible: true,
+          }, { sourceAction: "backtester" });
+          applyWorkspace(snap);
+          syncBtD7Ui(snap);
+          await refreshOverlaysVisible();
+          const bt = snap.backtester || {};
+          const span = bt.time_span || {};
+          if (span.start && span.end) {
+            await zoomChartToIsoRange(span.start, span.end, span.start);
+          }
+          setStatus(bt.message || "BT-D12 latest_result geladen");
+        } catch (err) {
+          setStatus("BT-D12 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
       if (isExitPoolStrategy(btStrategy())) {
         const exitSid = btStrategy();
         setStatus("Exit-Pool Backtester: lade nur Longs Entry/SL/TP für " + state.symbol + " …");
