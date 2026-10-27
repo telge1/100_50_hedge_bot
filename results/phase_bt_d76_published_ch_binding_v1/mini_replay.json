@@ -1,0 +1,8 @@
+{
+  "bars": 5,
+  "start_utc": "2026-09-09T20:50:00Z",
+  "end_utc": "2026-09-09T21:10:00Z",
+  "chronology_match": true,
+  "canonical_digest": "{\"authorized\": 0, \"blocked\": 2, \"fills\": 0, \"pending\": null, \"po",
+  "published_digest": "{\"authorized\": 0, \"blocked\": 2, \"fills\": 0, \"pending\": null, \"po"
+}

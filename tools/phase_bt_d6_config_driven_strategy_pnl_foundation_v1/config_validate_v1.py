@@ -95,6 +95,7 @@ def validate_config_dict(raw: dict[str, Any]) -> dict[str, Any]:
                 "min_unique_origins",
                 "density_source",
                 "validated_cache",
+                "published_clickhouse",
             }
         ),
         "density",
@@ -109,12 +110,24 @@ def validate_config_dict(raw: dict[str, Any]) -> dict[str, Any]:
         raise ConfigValidationError("DENSITY_MIN_ORIGINS_LOCKED", "only min_unique_origins=2")
 
     density_source = dens.get("density_source", "canonical_provider")
-    if density_source not in ("canonical_provider", "validated_cache"):
+    if density_source not in ("canonical_provider", "validated_cache", "published_clickhouse"):
         raise ConfigValidationError(
             "INVALID_DENSITY_SOURCE",
-            "density_source must be canonical_provider or validated_cache",
+            "density_source must be canonical_provider, validated_cache, or published_clickhouse",
             {"got": density_source},
         )
+    if density_source == "published_clickhouse":
+        si = raw.get("strategy_identity") or {}
+        if si.get("research_mode") != "depth2_density_research_v1":
+            raise ConfigValidationError(
+                "PUBLISHED_CH_RESEARCH_ONLY",
+                "published_clickhouse requires strategy_identity.research_mode=depth2_density_research_v1",
+            )
+        pc = dens.get("published_clickhouse")
+        if pc is not None and not isinstance(pc, dict):
+            raise ConfigValidationError("PUBLISHED_CH_INVALID", "published_clickhouse must be object or omitted")
+        if isinstance(pc, dict):
+            _reject_unknown_keys(pc, frozenset({"require_pipeline_line_id"}), "density.published_clickhouse")
     if density_source == "validated_cache":
         vc = dens.get("validated_cache")
         if not isinstance(vc, dict):

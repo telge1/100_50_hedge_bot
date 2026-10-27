@@ -1,0 +1,106 @@
+{
+  "ok": true,
+  "closes": [
+    {
+      "decision_close_utc": "2026-05-15T12:00:00Z",
+      "parity_ok": true,
+      "canonical_s": 9.9067,
+      "published_ch_s": 9.4649,
+      "speedup_x": 1.05,
+      "band_compare": {
+        "ok": true,
+        "expected_count": 361,
+        "actual_count": 361,
+        "only_expected": [],
+        "only_actual": [],
+        "only_expected_total": 0,
+        "only_actual_total": 0,
+        "field_mismatches": [],
+        "field_mismatch_total": 0
+      },
+      "fingerprint_canon": "9d754338b6280be8",
+      "fingerprint_pub": "6305ffd568966bfd"
+    },
+    {
+      "decision_close_utc": "2026-08-01T19:00:00Z",
+      "parity_ok": true,
+      "canonical_s": 8.3365,
+      "published_ch_s": 8.3348,
+      "speedup_x": 1.0,
+      "band_compare": {
+        "ok": true,
+        "expected_count": 322,
+        "actual_count": 322,
+        "only_expected": [],
+        "only_actual": [],
+        "only_expected_total": 0,
+        "only_actual_total": 0,
+        "field_mismatches": [],
+        "field_mismatch_total": 0
+      },
+      "fingerprint_canon": "959127d38662d7fd",
+      "fingerprint_pub": "fb1f3c213f97fff0"
+    },
+    {
+      "decision_close_utc": "2026-09-09T20:55:00Z",
+      "parity_ok": true,
+      "canonical_s": 5.8927,
+      "published_ch_s": 5.799,
+      "speedup_x": 1.02,
+      "band_compare": {
+        "ok": true,
+        "expected_count": 202,
+        "actual_count": 202,
+        "only_expected": [],
+        "only_actual": [],
+        "only_expected_total": 0,
+        "only_actual_total": 0,
+        "field_mismatches": [],
+        "field_mismatch_total": 0
+      },
+      "fingerprint_canon": "71d02bbb341f8488",
+      "fingerprint_pub": "8236dac6cbafcdca"
+    },
+    {
+      "decision_close_utc": "2026-09-23T12:00:00Z",
+      "parity_ok": true,
+      "canonical_s": 5.8639,
+      "published_ch_s": 5.6967,
+      "speedup_x": 1.03,
+      "band_compare": {
+        "ok": true,
+        "expected_count": 212,
+        "actual_count": 212,
+        "only_expected": [],
+        "only_actual": [],
+        "only_expected_total": 0,
+        "only_actual_total": 0,
+        "field_mismatches": [],
+        "field_mismatch_total": 0
+      },
+      "fingerprint_canon": "db719fad9401f35e",
+      "fingerprint_pub": "2b9c52c3ad7671ba"
+    },
+    {
+      "decision_close_utc": "2026-09-25T11:00:00Z",
+      "parity_ok": true,
+      "canonical_s": 5.8859,
+      "published_ch_s": 5.784,
+      "speedup_x": 1.02,
+      "band_compare": {
+        "ok": true,
+        "expected_count": 215,
+        "actual_count": 215,
+        "only_expected": [],
+        "only_actual": [],
+        "only_expected_total": 0,
+        "only_actual_total": 0,
+        "field_mismatches": [],
+        "field_mismatch_total": 0
+      },
+      "fingerprint_canon": "5946bc15fa412f6f",
+      "fingerprint_pub": "679d254c955120a3"
+    }
+  ],
+  "member_cache_keys": 10936
+}

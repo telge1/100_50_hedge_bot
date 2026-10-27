@@ -9,13 +9,15 @@ from typing import Any, Protocol
 BT_D4 = Path(__file__).resolve().parents[1] / "phase_bt_d4_enforced_depth2_backtester_v1"
 BT_D6 = Path(__file__).resolve().parents[1] / "phase_bt_d6_config_driven_strategy_pnl_foundation_v1"
 BT_D8 = Path(__file__).resolve().parents[1] / "phase_bt_d8_canonical_density_cache_v1"
-for p in (str(BT_D4), str(BT_D6), str(BT_D8)):
+BT_D76 = Path(__file__).resolve().parents[1] / "phase_bt_d76_published_ch_binding_v1"
+for p in (str(BT_D4), str(BT_D6), str(BT_D8), str(BT_D76)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
 from config_validate_v1 import ConfigValidationError, validate_config_dict  # noqa: E402
 from research_backtester_v1 import ResearchDensityRunV1  # noqa: E402
 from cache_session_v1 import ValidatedDensityCacheSessionV1  # noqa: E402
+from published_ch_density_session_v1 import PublishedClickhouseDensitySessionV1  # noqa: E402
 
 
 class DensitySession(Protocol):
@@ -65,4 +67,6 @@ def create_density_session(config: dict[str, Any]) -> DensitySession:
                 f"cache bundle not found: {bundle}",
             )
         return ValidatedDensityCacheSessionV1(bundle, strategy_config=config)
+    if source == "published_clickhouse":
+        return PublishedClickhouseDensitySessionV1(config)
     raise ConfigValidationError("INVALID_DENSITY_SOURCE", str(source))

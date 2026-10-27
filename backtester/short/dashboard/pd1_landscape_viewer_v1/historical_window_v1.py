@@ -404,6 +404,8 @@ def build_landscape_window(
     pool_detail: int = PD1_POOL_DETAIL,
     client: Any | None = None,
     database: str | None = None,
+    member_cache: dict[str, list[dict]] | None = None,
+    density_only: bool = False,
 ) -> dict[str, Any]:
     global _LAST_PROFILE, _profile_ctx
     try:
@@ -464,12 +466,14 @@ def build_landscape_window(
     db = database or cfg.database
 
     t_ch = time.perf_counter()
-    src = ClickHouseResearchCandleSource()
-    bars_list = src.get_candles(SYMBOL, TIMEFRAME_5M, start=context_from, end=vis_to + timedelta(minutes=5))
-    bars = _resample_5m_from_candles(bars_list)
+    bars: dict[datetime, dict] = {}
+    if not density_only:
+        src = ClickHouseResearchCandleSource()
+        bars_list = src.get_candles(SYMBOL, TIMEFRAME_5M, start=context_from, end=vis_to + timedelta(minutes=5))
+        bars = _resample_5m_from_candles(bars_list)
     t_ch_done = time.perf_counter()
 
-    cache: dict[str, list[dict]] = {}
+    cache: dict[str, list[dict]] = member_cache if member_cache is not None else {}
     phase5s_prefill: dict[str, Any] | None = None
     t_prefill = time.perf_counter()
     if historical_lmv2_batch_reader_enabled():
@@ -498,24 +502,31 @@ def build_landscape_window(
     pools = _clip_segments_to_window(pools_full, vis_from, vis_to)
 
     vis_grid = [t for t in grid if vis_from <= t <= vis_to]
-    price_rows = [
-        {
-            "t": _iso(t),
-            "o": float(bars[t]["open"]),
-            "h": float(bars[t]["high"]),
-            "l": float(bars[t]["low"]),
-            "c": float(bars[t]["close"]),
-        }
-        for t in vis_grid
-        if t in bars
-    ]
+    price_rows = (
+        []
+        if density_only
+        else [
+            {
+                "t": _iso(t),
+                "o": float(bars[t]["open"]),
+                "h": float(bars[t]["high"]),
+                "l": float(bars[t]["low"]),
+                "c": float(bars[t]["close"]),
+            }
+            for t in vis_grid
+            if t in bars
+        ]
+    )
     t_cl = time.perf_counter()
-    clusters_by_dc = _build_clusters_by_dc(grid, cache, client, db, bars, hcfg, slot_minutes)
-    t_cl_done = time.perf_counter()
-    # Keep only DC keys overlapping visible window
-    clusters_by_dc = {
-        k: v for k, v in clusters_by_dc.items() if vis_from <= parse_decision_iso(k) <= vis_to
-    }
+    if density_only:
+        clusters_by_dc = {}
+        t_cl_done = t_cl
+    else:
+        clusters_by_dc = _build_clusters_by_dc(grid, cache, client, db, bars, hcfg, slot_minutes)
+        t_cl_done = time.perf_counter()
+        clusters_by_dc = {
+            k: v for k, v in clusters_by_dc.items() if vis_from <= parse_decision_iso(k) <= vis_to
+        }
 
     fill, borders = _load_style()
     payload = {
@@ -544,6 +555,7 @@ def build_landscape_window(
                 else "load_historical_pool_state_at_close"
             ),
             "remaining": False,
+            "density_only": density_only,
             "phase5s_batch_reader_active": phase5s_prefill is not None,
             **(
                 {"phase5s_batch_stats": phase5s_prefill}
