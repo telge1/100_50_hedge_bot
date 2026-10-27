@@ -66,6 +66,12 @@ class IsolatedChronoStateV1:
     blocked_candidates: list[dict[str, Any]] = field(default_factory=list)
     authorized_candidates: list[dict[str, Any]] = field(default_factory=list)
     pending_cancel_audit: list[dict[str, Any]] = field(default_factory=list)
+    baseline_pool_candidates: list[dict[str, Any]] = field(default_factory=list)
+    ema_shadow_at_candidates: list[dict[str, Any]] = field(default_factory=list)
+    pending_lifecycle: list[dict[str, Any]] = field(default_factory=list)
+    modeled_positions: list[dict[str, Any]] = field(default_factory=list)
+    coverage_incomplete: list[dict[str, Any]] = field(default_factory=list)
+    timing_notes: list[dict[str, Any]] = field(default_factory=list)
     pending_orders_created: int = 0
     pending_cancels_ema: int = 0
     modeled_fills: int = 0
@@ -108,6 +114,27 @@ def _try_fill(
     )
     st.pending = None
     st.modeled_fills += 1
+    st.modeled_positions.append(
+        {
+            "event": "SIMULATED_FILL",
+            "decision_close_utc": bar,
+            "position_id": pid,
+            "order_id": pend.order_id,
+            "entry_price": px,
+            "sl_price": pend.planned_sl,
+            "tp_price": float(pend.planned_tp),
+            "signal_close_utc": pend.decision_close_utc,
+            "pool_key": pend.pool_key,
+        }
+    )
+    st.pending_lifecycle.append(
+        {
+            "event": "FILLED",
+            "decision_close_utc": bar,
+            "order_id": pend.order_id,
+            "detail": "model_1_touch_fill_before_close_ema_review",
+        }
+    )
     return True
 
 
@@ -126,6 +153,16 @@ def _try_exit_sl(
         return
     if float(ohlc["h"]) >= pos.sl_price:
         pause.on_modeled_stop_loss(exit_bar_utc=bar, position_id=pos.position_id)
+        st.modeled_positions.append(
+            {
+                "event": "SIMULATED_SL",
+                "decision_close_utc": bar,
+                "position_id": pos.position_id,
+                "order_id": pos.order_id,
+                "exit_price": pos.sl_price,
+                "signal_close_utc": pos.signal_close_utc,
+            }
+        )
         st.position = None
 
 
@@ -149,7 +186,23 @@ def run_isolated_chronological_replay(
             continue
         try:
             snap = density_session.collect_at_close(bar)
-        except KeyError:
+        except KeyError as exc:
+            st.coverage_incomplete.append(
+                {
+                    "decision_close_utc": bar,
+                    "reason": "DENSITY_KEY_ERROR",
+                    "detail": str(exc)[:200],
+                }
+            )
+            continue
+        except Exception as exc:  # noqa: BLE001
+            st.coverage_incomplete.append(
+                {
+                    "decision_close_utc": bar,
+                    "reason": "DENSITY_COLLECT_FAILED",
+                    "detail": str(exc)[:200],
+                }
+            )
             continue
         candle = prices[bar]
         for b in snap.get("upper_bands") or []:
@@ -159,12 +212,21 @@ def run_isolated_chronological_replay(
         if st.position is not None:
             _try_exit_sl(st, bar=bar, prices=prices, pause=pause_ctl)
 
+        filled_this_bar = False
         if st.pending is not None and st.position is None:
-            _try_fill(st, bar=bar, prices=prices)
+            filled_this_bar = _try_fill(st, bar=bar, prices=prices)
 
         ema_at_bar = None
         if ema_gate is not None:
             ema_at_bar = ema_gate.at_close(bar)
+            if filled_this_bar and ema_at_bar and not ema_at_bar.authorizes_new_pending:
+                st.timing_notes.append(
+                    {
+                        "decision_close_utc": bar,
+                        "note": "FILL_ON_BAR_BEFORE_CLOSE_EMA_WOULD_VETO",
+                        "ema_decision": ema_at_bar.decision,
+                    }
+                )
             if st.pending is not None and st.position is None and not ema_at_bar.authorizes_new_pending:
                 st.pending_cancel_audit.append(
                     {
@@ -178,6 +240,14 @@ def run_isolated_chronological_replay(
                 )
                 st.pending = None
                 st.pending_cancels_ema += 1
+                st.pending_lifecycle.append(
+                    {
+                        "event": "CANCEL",
+                        "decision_close_utc": bar,
+                        "cancel_reason": "EMA_PERMISSION_LOST",
+                        "order_id": st.pending_cancel_audit[-1]["order_id"],
+                    }
+                )
 
         if st.pending is not None and st.position is None:
             review = review_pending_at_close(
@@ -212,6 +282,26 @@ def run_isolated_chronological_replay(
         )
         if baseline_sig is not None:
             st.pool_candidates_seen += 1
+            st.baseline_pool_candidates.append(
+                {
+                    "decision_close_utc": bar,
+                    "pool_key": baseline_sig.pool_key,
+                    "pool_lower": float(baseline_sig.pool_lower),
+                    "pool_upper": float(baseline_sig.pool_upper),
+                }
+            )
+            if ema_gate is not None:
+                ema_shadow = ema_gate.at_close(bar)
+                st.ema_shadow_at_candidates.append(
+                    {
+                        "decision_close_utc": bar,
+                        "pool_key": baseline_sig.pool_key,
+                        "ema_decision": ema_shadow.decision,
+                        "ema_reason_code": ema_shadow.reason_code,
+                        "ema_authorizes": ema_shadow.authorizes_new_pending,
+                        "pause_state": pause_ctl.pause_state,
+                    }
+                )
 
         ctx = RegimeContextV1(decision_close_utc=bar, ohlc_to_close=candle, ema_features=None)
         decision = evaluate_entry_gate(
@@ -276,6 +366,17 @@ def run_isolated_chronological_replay(
             if pending is not None:
                 st.pending = pending
                 st.pending_orders_created += 1
+                st.pending_lifecycle.append(
+                    {
+                        "event": "CREATE",
+                        "decision_close_utc": bar,
+                        "order_id": oid,
+                        "planned_entry": pending.planned_entry,
+                        "planned_sl": pending.planned_sl,
+                        "planned_tp": pending.planned_tp,
+                        "pool_key": pending.pool_key,
+                    }
+                )
 
     return {
         "contract": CHRONO_CONTRACT,
@@ -294,4 +395,10 @@ def run_isolated_chronological_replay(
         "pause_events": [e.__dict__ for e in pause_ctl.events],
         "position_open_at_end": st.position is not None,
         "pending_open_at_end": st.pending is not None,
+        "baseline_pool_candidates": st.baseline_pool_candidates,
+        "ema_shadow_at_candidates": st.ema_shadow_at_candidates,
+        "pending_lifecycle": st.pending_lifecycle,
+        "modeled_positions": st.modeled_positions,
+        "coverage_incomplete": st.coverage_incomplete,
+        "timing_notes": st.timing_notes,
     }

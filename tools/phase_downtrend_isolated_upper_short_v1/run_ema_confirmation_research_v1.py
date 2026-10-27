@@ -111,9 +111,9 @@ def main() -> int:
     authorized: list[dict] = []
     cancel_audit: list[dict] = []
     try:
-        from density_session_factory_v1 import build_validated_density_session_for_config
+        from density_bridge_v1 import create_density_session
 
-        density = build_validated_density_session_for_config(cfg)
+        density = create_density_session(cfg)
         start_s, end_s = _iso(start), _iso(end)
         bars = [b for b in bar_keys if start_s <= b <= end_s]
         from short_pause_state_v1 import ShortPauseControllerV1
