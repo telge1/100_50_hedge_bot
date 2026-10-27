@@ -1,0 +1,15 @@
+{
+  "replay_total_s": 10.0299,
+  "verdict": "MULTICHUNK_CACHE_PASS",
+  "pool_candidates": 77,
+  "v3_authorized": 6,
+  "v3_blocked": 64,
+  "v3_pending_created": 6,
+  "v3_pending_cancels_ema": 1,
+  "v3_fills": 1,
+  "default_paused_pending": 0,
+  "coverage_gaps": 0,
+  "replay_research_ready_s": 4.6593,
+  "replay_default_paused_s": 4.7592,
+  "d8_sample_read_s": 0.000643
+}

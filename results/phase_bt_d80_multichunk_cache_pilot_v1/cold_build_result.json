@@ -1,0 +1,17 @@
+{
+  "note": "First cold build on empty D80 bundle (run 1); warm resume run overwrote cache_build_result.json",
+  "complete": true,
+  "entry_count": 864,
+  "reused_donor": 386,
+  "chunk_written": 478,
+  "skipped": 0,
+  "chunk_compute_s": 32.85,
+  "multichunk_session_build_s": 18.142,
+  "cache_build_wall_s": 35.9211,
+  "multichunk_timing": {
+    "chunk_count": 3,
+    "chunk_build_s": [5.9836, 6.0257, 6.1327],
+    "total_build_s": 18.142
+  },
+  "amortized_chunk_collect_ms_per_new_close": 68.7
+}

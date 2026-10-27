@@ -1,0 +1,26 @@
+[
+  {
+    "chunk_index": 0,
+    "closes": 288,
+    "first": "2026-09-23T00:00:00Z",
+    "last": "2026-09-23T23:55:00Z",
+    "visible_span_hours": 71.9167,
+    "export_safe": true
+  },
+  {
+    "chunk_index": 1,
+    "closes": 288,
+    "first": "2026-09-24T00:00:00Z",
+    "last": "2026-09-24T23:55:00Z",
+    "visible_span_hours": 71.9167,
+    "export_safe": true
+  },
+  {
+    "chunk_index": 2,
+    "closes": 288,
+    "first": "2026-09-25T00:00:00Z",
+    "last": "2026-09-25T23:55:00Z",
+    "visible_span_hours": 71.9167,
+    "export_safe": true
+  }
+]
