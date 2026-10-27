@@ -1,0 +1,62 @@
+{
+  "phase": "BT-D60",
+  "verdict": "EMA_HISTORY_VALIDATED",
+  "regime_gate": "READY_FOR_REGIME_GEGENPROBE",
+  "recorded_at_utc": "2026-10-27",
+  "repository_head_before_commit": "c61610b8ea2c35b31442811a1bcb1472deb7c5a4",
+  "data_source": {
+    "ohlc": "ClickHouse signal_generator.candles_1m → TRP aggregate 5m (ClickHouseResearchCandleSource)",
+    "resample": "pd1_landscape_viewer_v1._resample_5m_from_candles",
+    "symbol": "DOGEUSDT",
+    "load_window_utc": {
+      "start": "2026-08-04T12:00:00Z",
+      "end": "2026-09-11T17:00:00Z"
+    },
+    "import_bounds_observed": {
+      "lo": "2026-05-01T00:00:00Z",
+      "hi": "2026-09-30T23:45:00Z"
+    },
+    "bars_loaded": 11005,
+    "pool_context_hours_documented": 168,
+    "reference_warmup_hours": 720,
+    "warmup_candidates_hours": [72, 168, 336, 720]
+  },
+  "ema_definition_primary": "trp_research_charts",
+  "ema_definition_doc": "TRP indicators.ema: SMA seed of first period closes, then recursive EMA k=2/(period+1)",
+  "convergence_tolerance": {
+    "ema59": {"abs": 1e-8, "rel": 1e-5},
+    "ema200": {"abs": 1e-8, "rel": 1e-5}
+  },
+  "entrypoints": {
+    "validation": "tools/phase_bt_d60_ema_history_validation_v1/run_ema_history_validation.py",
+    "gegenprobe": "tools/phase_bt_d60_ema_history_validation_v1/run_regime_gegenprobe.py"
+  },
+  "probe_decision_closes": [
+    "2026-09-04T12:00:00Z",
+    "2026-09-05T12:00:00Z",
+    "2026-09-09T16:30:00Z",
+    "2026-09-09T17:25:00Z",
+    "2026-09-09T20:55:00Z",
+    "2026-09-09T21:25:00Z",
+    "2026-09-11T12:00:00Z",
+    "2026-09-11T12:25:00Z",
+    "2026-09-11T12:35:00Z",
+    "2026-09-11T15:30:00Z",
+    "2026-09-11T17:00:00Z"
+  ],
+  "local_result_artifacts_not_in_git": {
+    "dir": "results/phase_bt_d60_ema_history_v1/",
+    "note": "Regenerate via entrypoints; requires ClickHouse + ssot_bootstrap paths",
+    "sha256": {
+      "ema_history_manifest.json": "cf27397031051e306338a50988109f006f46fa3b566423854d230ef61b49c719",
+      "convergence_by_probe.csv": "1c888b971173c353e8cc86073a26a612fdc1434252125fd29f9c259c3468bb2c",
+      "regime_gegenprobe_asof.csv": "0feec442cafeee4c30954d440bbf89cdecd04e8765a006441b1e083918e9fd32"
+    },
+    "regime_gegenprobe_row_count": 340
+  },
+  "reports_in_git": [
+    "reports/PHASE_BT_D60_EMA_HISTORY_REQUIREMENT_V1.md",
+    "reports/PHASE_BT_D60_REGIME_GEGENPROBE_V1.md"
+  ],
+  "bt_d59_ema_status": "SUPERSEDED_BY_D60_TRP_PATH"
+}
