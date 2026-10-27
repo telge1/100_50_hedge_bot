@@ -21,6 +21,8 @@ isolated_strategy_v1:
     upper_stack_density_filter: UNSET
   pure_ema_confirmation:
     enabled: false
+    classifier_version: v1
+    classifier_v3_module: phase_bt_d69_pure_ema_false_allow_audit_v1.variant_classifiers_v1
     rules_module: phase_bt_d65_pure_ema_timestamp_review_v1
     ema_path: trp_research_charts
     reference_warmup_hours: 720

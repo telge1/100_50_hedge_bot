@@ -16,21 +16,31 @@ for p in (
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from classification_v1 import classify_row  # noqa: E402
 from ema_features_pure_v1 import compute_pure_ema_row  # noqa: E402
 from enrich_v1 import build_trp_ema_maps  # noqa: E402
+from pure_ema_classifier_v1 import (  # noqa: E402
+    EmaClassifierVersion,
+    classify_feature_row,
+    normalize_classifier_version,
+)
 
 EMA_PATH = "trp_research_charts"
-BT_D65_RULES_MODULE = "phase_bt_d65_pure_ema_timestamp_review_v1.classification_v1"
 
 
 class PureEmaSeriesProviderV1:
     """Precomputed TRP EMA maps; causal evaluation at each decision close."""
 
-    def __init__(self, *, bar_keys: list[str], prices: dict[str, dict[str, float]]) -> None:
+    def __init__(
+        self,
+        *,
+        bar_keys: list[str],
+        prices: dict[str, dict[str, float]],
+        classifier_version: str = "v1",
+    ) -> None:
         self.bar_keys = bar_keys
         self.prices = prices
         self.emas = build_trp_ema_maps(bar_keys, prices)
+        self.classifier_version: EmaClassifierVersion = normalize_classifier_version(classifier_version)
 
     def feature_row_at_close(self, decision_close_utc: str) -> dict[str, Any]:
         if decision_close_utc not in self.bar_keys or decision_close_utc not in self.prices:
@@ -44,7 +54,7 @@ class PureEmaSeriesProviderV1:
 
     def confirm_at_close(self, decision_close_utc: str) -> dict[str, Any]:
         row = self.feature_row_at_close(decision_close_utc)
-        out = classify_row(row)
+        out = classify_feature_row(row, self.classifier_version)
         out["ema_path"] = EMA_PATH
-        out["bt_d65_rules_module"] = BT_D65_RULES_MODULE
+        out["bt_d65_rules_module"] = out.get("ema_classifier_module")
         return out

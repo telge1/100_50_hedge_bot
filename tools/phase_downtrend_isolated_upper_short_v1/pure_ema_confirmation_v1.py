@@ -20,6 +20,7 @@ def confirmation_from_classified_row(row: dict[str, Any]) -> PureEmaConfirmation
     provenance = {
         "ema_path": row.get("ema_path"),
         "bt_d65_rules_module": row.get("bt_d65_rules_module"),
+        "ema_classifier_version": row.get("ema_classifier_version"),
         "decision_close_utc": row.get("decision_close_utc"),
         "ema9": row.get("ema9"),
         "ema20": row.get("ema20"),
@@ -41,6 +42,24 @@ def confirmation_from_classified_row(row: dict[str, Any]) -> PureEmaConfirmation
         provenance=provenance,
         authorizes_new_pending=decision == "SHORT_OK",
     )
+
+
+def build_pure_ema_gate(
+    *,
+    bar_keys: list[str],
+    prices: dict[str, dict[str, float]],
+    isolated_strategy_config: dict[str, Any],
+) -> PureEmaConfirmationGateV1:
+    from pure_ema_series_provider_v1 import PureEmaSeriesProviderV1
+
+    ema_cfg = isolated_strategy_config.get("pure_ema_confirmation") or {}
+    version = ema_cfg.get("classifier_version", "v1")
+    provider = PureEmaSeriesProviderV1(
+        bar_keys=bar_keys,
+        prices=prices,
+        classifier_version=version,
+    )
+    return PureEmaConfirmationGateV1(provider=provider)
 
 
 class PureEmaConfirmationGateV1:

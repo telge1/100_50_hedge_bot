@@ -1,0 +1,20 @@
+{
+  "phase": "BT-D70",
+  "git_head": "d1bc4eafe8d409eb1080e8f0caf4dbd94e85db21",
+  "v1_module": "tools/phase_bt_d65_pure_ema_timestamp_review_v1/classification_v1.py",
+  "v3_module": "tools/phase_bt_d69_pure_ema_false_allow_audit_v1/variant_classifiers_v1.py",
+  "v3_variant_id": "v3_bear_stack_falling_59_200",
+  "proposed_rule_sha256": "1009ac5bf02f09470e7827ff4097b5fc1804ba16f856a8ec47297c639ae70f69",
+  "d60_manifest_sha256": "cf27397031051e306338a50988109f006f46fa3b566423854d230ef61b49c719",
+  "ohlc_meta": {
+    "symbol": "DOGEUSDT",
+    "source": "ClickHouseResearchCandleSource.get_candles(5m strict_complete_buckets)",
+    "resample": "pd1_landscape_viewer_v1._resample_5m_from_candles",
+    "data_bounds_lo": "2026-05-01T00:00:00Z",
+    "data_bounds_hi": "2026-09-30T23:45:00Z",
+    "requested_start": "2026-07-04T00:00:00Z",
+    "requested_end": "2026-09-18T06:00:00Z",
+    "bars_loaded": 21961,
+    "grid_steps": 21961
+  }
+}
