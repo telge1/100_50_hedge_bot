@@ -1,0 +1,40 @@
+{
+  "phase": "BT-D73",
+  "git_head": "16eaebc72974409ae367517c744cfabb5de619e0",
+  "verdict": "SELECTED_WINDOW_REPLAY_PASS",
+  "window": {
+    "start": "2026-09-23T06:45:00Z",
+    "end": "2026-09-24T14:50:00Z",
+    "closes": 386
+  },
+  "cache": {
+    "complete": true,
+    "bundle_dir": "/home/telgenbuescher/projects/pools+ob+delta_bot/results/phase_bt_d73_selected_sep23_24_v1/cache_bundle",
+    "entry_count": 386,
+    "reused_entries": 0,
+    "cold_computed_entries": 386,
+    "skipped_existing": 0,
+    "cold_compute_total_s": 2268.1789,
+    "cold_compute_mean_s": 5.8761,
+    "wall_s": 2269.5913
+  },
+  "cache_hits_donor": 0,
+  "cache_cold_computed": 386,
+  "validated_snapshots": 386,
+  "pool_candidates": 33,
+  "v1_authorized": 2,
+  "v3_authorized": 6,
+  "v1_blocked_at_candidate": 21,
+  "v3_blocked_at_candidate": 23,
+  "v1_pending_created": 2,
+  "v3_pending_created": 6,
+  "v1_modeled_fills": 1,
+  "v3_modeled_fills": 1,
+  "first_sl_v1": null,
+  "first_sl_v3": null,
+  "default_paused_v1_pending_created": 0,
+  "pause_state_final_research_v1": "READY",
+  "pause_state_final_research_v3": "READY",
+  "coverage_gaps_v1": 0,
+  "coverage_gaps_v3": 0
+}

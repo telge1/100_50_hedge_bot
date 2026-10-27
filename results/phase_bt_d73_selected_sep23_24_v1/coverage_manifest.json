@@ -1,0 +1,53 @@
+{
+  "phase": "BT-D73",
+  "git_head": "16eaebc72974409ae367517c744cfabb5de619e0",
+  "preflight": {
+    "git_head": "16eaebc72974409ae367517c744cfabb5de619e0",
+    "window_start": "2026-09-23T06:45:00Z",
+    "window_end": "2026-09-24T14:50:00Z",
+    "close_count": 386,
+    "expected_close_count": 386,
+    "blockers": [],
+    "disk_free_gib": 190.44,
+    "density_warmup_hours": 168,
+    "d60_verdict": "EMA_HISTORY_VALIDATED",
+    "donor_bundle_count": 8,
+    "donor_hits_in_window": 0,
+    "donor_misses_in_window": 386,
+    "ohlc_load_s": 0.466,
+    "ohlc_meta": {
+      "symbol": "DOGEUSDT",
+      "source": "ClickHouseResearchCandleSource.get_candles(5m strict_complete_buckets)",
+      "resample": "pd1_landscape_viewer_v1._resample_5m_from_candles",
+      "data_bounds_lo": "2026-05-01T00:00:00Z",
+      "data_bounds_hi": "2026-09-30T23:45:00Z",
+      "requested_start": "2026-08-22T06:45:00Z",
+      "requested_end": "2026-09-24T14:50:00Z",
+      "bars_loaded": 9602,
+      "grid_steps": 9602
+    },
+    "ohlc_missing_for_window": 0,
+    "bounded_sample_density_s": 6.2669,
+    "preflight_density_sample": [
+      {
+        "decision_close_utc": "2026-09-23T06:45:00Z",
+        "coverage_status": "OK",
+        "density_transport": "canonical_provider",
+        "error": ""
+      },
+      {
+        "decision_close_utc": "2026-09-23T22:50:00Z",
+        "coverage_status": "OK",
+        "density_transport": "canonical_provider",
+        "error": ""
+      },
+      {
+        "decision_close_utc": "2026-09-24T14:50:00Z",
+        "coverage_status": "OK",
+        "density_transport": "canonical_provider",
+        "error": ""
+      }
+    ],
+    "verdict": "PREFLIGHT_PASS"
+  }
+}

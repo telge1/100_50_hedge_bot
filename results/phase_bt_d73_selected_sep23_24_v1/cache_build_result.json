@@ -1,0 +1,11 @@
+{
+  "complete": true,
+  "bundle_dir": "/home/telgenbuescher/projects/pools+ob+delta_bot/results/phase_bt_d73_selected_sep23_24_v1/cache_bundle",
+  "entry_count": 386,
+  "reused_entries": 0,
+  "cold_computed_entries": 386,
+  "skipped_existing": 0,
+  "cold_compute_total_s": 2268.1789,
+  "cold_compute_mean_s": 5.8761,
+  "wall_s": 2269.5913
+}
