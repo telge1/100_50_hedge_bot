@@ -406,6 +406,7 @@ def build_landscape_window(
     database: str | None = None,
     member_cache: dict[str, list[dict]] | None = None,
     density_only: bool = False,
+    expose_pools_full: bool = False,
 ) -> dict[str, Any]:
     global _LAST_PROFILE, _profile_ctx
     try:
@@ -588,6 +589,8 @@ def build_landscape_window(
         "total": round((t_done - t0) * 1000, 1),
     }
     payload["timing_ms"] = timing
+    if expose_pools_full:
+        payload["_research_pools_full"] = pools_full
     if _PROFILE:
         _profile_ctx["timing_ms"] = timing
         _profile_ctx["pools_out"] = len(pools)

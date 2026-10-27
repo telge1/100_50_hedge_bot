@@ -1,0 +1,27 @@
+{
+  "canonical_total_s": 133.7217,
+  "canonical_mean_s": 5.5717,
+  "d8_total_s": 0.0137,
+  "d8_mean_s": 0.000573,
+  "chunk_lifetime_build_s": 5.5976,
+  "chunk_node_clip": {
+    "per_close_node_clip_total_s": 1.5312,
+    "per_close_mean_ms": 63.799,
+    "per_close_max_ms": 81.388
+  },
+  "chunk_total_s": 7.1288,
+  "chunk_mean_s": 0.297,
+  "speedup_chunk_vs_canonical": 18.76,
+  "lifetime_timing_ms": {
+    "clickhouse_candles": 0.0,
+    "build_lifetimes": 345.2,
+    "build_clusters_by_dc": 0.0,
+    "json_serialize": 0.9,
+    "total": 5528.9
+  },
+  "canonical_per_close_s_sample": [
+    5.7232,
+    5.5331,
+    5.5606
+  ]
+}
