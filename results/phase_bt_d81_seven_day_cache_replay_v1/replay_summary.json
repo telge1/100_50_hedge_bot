@@ -1,0 +1,70 @@
+{
+  "verdict": "SEVEN_DAY_CACHE_REPLAY_PASS",
+  "replay_total_s": 23.5156,
+  "pool_candidates": 187,
+  "v3_authorized": 8,
+  "v3_blocked": 179,
+  "v3_pending_created": 8,
+  "v3_pending_cancels_ema": 1,
+  "v3_fills": 1,
+  "default_paused_pending": 0,
+  "coverage_gaps": 0,
+  "replay_research_ready_s": 11.1735,
+  "replay_default_paused_s": 11.5133,
+  "trade_ledger_v3": [
+    {
+      "event": "SIMULATED_FILL",
+      "signal_utc": "2026-09-20T13:55:00Z",
+      "fill_or_event_utc": "2026-09-20T14:00:00Z",
+      "entry": "0.085",
+      "exit": "",
+      "sl": "0.08518002000000001",
+      "tp": "0.08428",
+      "pool_key": "0.085000000000000006|0.085010000000000002",
+      "unresolved": "yes",
+      "fees_slippage": "none_modeled_isolated_touch_fill"
+    },
+    {
+      "event": "SIMULATED_SL",
+      "signal_utc": "2026-09-20T13:55:00Z",
+      "fill_or_event_utc": "2026-09-20T14:05:00Z",
+      "entry": "",
+      "exit": "0.08518002000000001",
+      "sl": "",
+      "tp": "",
+      "pool_key": "",
+      "unresolved": "no",
+      "fees_slippage": "none_modeled_isolated_touch_fill"
+    }
+  ],
+  "chart_events_sample": [
+    {
+      "decision_close_utc": "2026-09-20T14:00:00Z",
+      "chart_review_reason": "MODELED_SIMULATED_FILL_v1",
+      "pool_key": "0.085000000000000006|0.085010000000000002",
+      "ema_v1": "",
+      "ema_v3": ""
+    },
+    {
+      "decision_close_utc": "2026-09-20T14:05:00Z",
+      "chart_review_reason": "MODELED_SIMULATED_SL_v1",
+      "pool_key": "",
+      "ema_v1": "",
+      "ema_v3": ""
+    },
+    {
+      "decision_close_utc": "2026-09-20T14:00:00Z",
+      "chart_review_reason": "MODELED_SIMULATED_FILL_v3",
+      "pool_key": "0.085000000000000006|0.085010000000000002",
+      "ema_v1": "",
+      "ema_v3": ""
+    },
+    {
+      "decision_close_utc": "2026-09-20T14:05:00Z",
+      "chart_review_reason": "MODELED_SIMULATED_SL_v3",
+      "pool_key": "",
+      "ema_v1": "",
+      "ema_v3": ""
+    }
+  ]
+}

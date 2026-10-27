@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "discrepancy_resolution": "No Sep-24 12:30 fill in artifacts. pilot_id `selected_sep23_24` names the D73 window, not fill day. Sep-24 12:30 shows SHORT_OK in gate CSV but no pool signal/fill that bar. V1 classifier filled 2026-09-23T10:00:00Z (separate row in D73).",
+  "modeled": {
+    "fill_utc": "2026-09-23T12:30:00Z",
+    "signal_utc": "2026-09-23T12:25:00Z",
+    "entry": 0.09969,
+    "sl": 0.10009378800000002,
+    "tp": 0.09875,
+    "order_id": "517aad3af63cf9e6248b",
+    "fill_detail": "model_1_touch_fill_before_close_ema_review"
+  },
+  "ohlc_through_d80_window_end": {
+    "bars": 714,
+    "max_high": 0.09999,
+    "min_low": 0.09101,
+    "first_sl_trigger_bar": null,
+    "first_tp_touch_bar": "2026-09-23T13:05:00Z",
+    "isolated_runner_models_tp_exit": false,
+    "position_open_at_horizon_per_runner": true
+  },
+  "meta": {
+    "symbol": "DOGEUSDT",
+    "source": "ClickHouseResearchCandleSource.get_candles(5m strict_complete_buckets)",
+    "resample": "pd1_landscape_viewer_v1._resample_5m_from_candles",
+    "data_bounds_lo": "2026-05-01T00:00:00Z",
+    "data_bounds_hi": "2026-09-30T23:45:00Z",
+    "requested_start": "2026-09-23T12:30:00Z",
+    "requested_end": "2026-09-25T23:55:00Z",
+    "bars_loaded": 714,
+    "grid_steps": 714
+  }
+}

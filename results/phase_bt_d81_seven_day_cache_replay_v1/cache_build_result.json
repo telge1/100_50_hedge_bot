@@ -1,0 +1,23 @@
+{
+  "complete": true,
+  "entry_count": 2016,
+  "reused_donor": 864,
+  "chunk_written": 1152,
+  "skipped": 0,
+  "chunk_compute_s": 76.1131,
+  "multichunk_timing": {
+    "chunk_count": 7,
+    "chunk_build_s": [
+      6.288,
+      6.0145,
+      6.1229,
+      6.2241,
+      6.1946,
+      6.3452,
+      6.3957
+    ],
+    "total_build_s": 43.5852
+  },
+  "multichunk_session_build_s": 43.5852,
+  "cache_build_wall_s": 84.6403
+}
