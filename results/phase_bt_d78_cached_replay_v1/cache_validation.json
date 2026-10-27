@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "manifest_entry_count": 386,
+  "expected": 386,
+  "missing_closes": [],
+  "validation_failures": [],
+  "validation_failure_count": 0,
+  "unique_content_sha256": 386,
+  "validate_wall_s": 0.3723,
+  "required_pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "required_config_hash": "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9"
+}
