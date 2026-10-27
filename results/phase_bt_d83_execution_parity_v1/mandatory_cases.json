@@ -1,0 +1,69 @@
+[
+  {
+    "case": "sep20_fill_sl_timing",
+    "baseline_sl_utc": "2026-09-20T14:05:00Z",
+    "research_exit": {
+      "decision_close_utc": "2026-09-20T14:00:00Z",
+      "position_id": "f9d818a966fdf715",
+      "order_id": "b9e88ec7f1c6503c857d",
+      "signal_close_utc": "2026-09-20T13:55:00Z",
+      "entry_price": 0.085,
+      "exit_price": 0.08518002000000001,
+      "gross_return_pct_short": -0.211788,
+      "ambiguous_intrabar": false,
+      "event": "SIMULATED_SL"
+    },
+    "pass": true
+  },
+  {
+    "case": "sep23_three_day_tp_research",
+    "baseline_open_at_end": true,
+    "research_tp": {
+      "decision_close_utc": "2026-09-23T13:05:00Z",
+      "position_id": "4e12874066344424",
+      "order_id": "517aad3af63cf9e6248b",
+      "signal_close_utc": "2026-09-23T12:25:00Z",
+      "entry_price": 0.09969,
+      "exit_price": 0.09875,
+      "gross_return_pct_short": 0.942923,
+      "ambiguous_intrabar": false,
+      "event": "SIMULATED_TP"
+    },
+    "pass": true
+  },
+  {
+    "case": "both_hit_same_candle",
+    "policy": "no_trade_ambiguous",
+    "result": {
+      "reason": "AMBIGUOUS_INTRABAR",
+      "price": null,
+      "ambiguous": true
+    },
+    "pass": true
+  },
+  {
+    "case": "state_across_midnight",
+    "pause_state_first_bar_sep21": "SHORT_PAUSED",
+    "pass": true
+  },
+  {
+    "case": "seven_day_summary",
+    "baseline": {
+      "fills": 1,
+      "exit_events": {
+        "SIMULATED_SL": 1
+      },
+      "open_at_end": false,
+      "pause_final": "SHORT_PAUSED"
+    },
+    "research": {
+      "fills": 1,
+      "exit_events": {
+        "SIMULATED_SL": 1
+      },
+      "open_at_end": false,
+      "pause_final": "SHORT_PAUSED"
+    },
+    "pass": true
+  }
+]

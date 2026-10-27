@@ -1,0 +1,23 @@
+{
+  "bar_timestamp": "5m decision CLOSE UTC; OHLC is the completed bucket for that key.",
+  "fill_model": "D45 MODEL_1 / causal_sell_limit_v2 via model_entry_decision (D45 execution_contract_v1).",
+  "pending_active_from": "earliest_eligible_execution_utc on pending (typically next 5m open after signal close).",
+  "isolated_per_bar_order": [
+    "1) If open position: SL-only exit (high >= sl); no TP; no intrabar_ambiguity_policy.",
+    "2) If pending and flat: attempt fill (MODEL_1).",
+    "3) EMA cancel, D41 pending review, new pool signals / pending create."
+  ],
+  "d46_integrated_per_bar_order": [
+    "1) If open position: full TP+SL+ambiguity exit (_try_exit_on_bar).",
+    "2) If pending and flat: fill; then immediate full exit on same bar if still applicable.",
+    "3) D41 pending review, pool-first signal logic, ..."
+  ],
+  "simulate_short_exit_timing": "Scans bars t >= entry_utc inclusive; D46 TP/SL/ambiguous rules per bar.",
+  "sep20_sl_discrepancy": {
+    "isolated_baseline_sl": "2026-09-20T14:05:00Z",
+    "d46_simulate_short_exit_sl": "2026-09-20T14:00:00Z",
+    "cause": "Isolated checks SL before fill on the fill bar (14:00), so the new position cannot stop out until 14:05. simulate_short_exit includes the entry bar in the exit scan, so an SL touch on 14:00 counts even though the fill also occurs on 14:00. D46 integrated calls _try_exit_on_bar immediately after fill on the same bar \u2014 compatible with D46 simulate_short_exit, not with current isolated SL-only pre-fill ordering."
+  },
+  "research_adapter_resolution": "Opt-in research_execution_runner_v1 keeps isolated fill path unchanged and applies D46 per-bar exit (TP+SL+no_trade_ambiguous) after fill on the fill bar, matching integrated_backtester_v1 post-fill exit call. Baseline isolated runner is untouched.",
+  "conflict_status": "RESOLVED_BY_ADAPTER_TIMING \u2014 no change to production D46 or isolated files."
+}
