@@ -1,0 +1,20 @@
+{
+  "phase": "BT-D59",
+  "generated_at_utc": "2026-10-27T08:03:54Z",
+  "ema_provenance": "EMA(9/20/59/200): standard recursive \u03b1=2/(n+1); first observed close in loaded price series seeds each EMA (same as BT-D54). Not TradingView seed.",
+  "ohlc_provenance": "OHLC via price_feed_v1 \u2192 pd1_landscape_viewer historical_window (\u226472h export cap); bars before vis_from are unavailable \u2014 168h warmup may be partial.",
+  "density_canonical": "ResearchDensityRunV1.collect_at_close / historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "density_cache": "ValidatedDensityCacheSessionV1 / BT-D9 bundle (Sep-11\u201312 only)",
+  "row_counts": {
+    "asof_regime_features": 76,
+    "asof_upper_pool_evolution": 76,
+    "reference_window_comparison": 2,
+    "regime_variant_comparison": 76,
+    "sl_requalification_research": 5
+  },
+  "limitations": [
+    "OHLC export capped at ~72h before window end \u2014 full 168h EMA warmup not guaranteed",
+    "Sep-9 density via canonical_provider; Sep-11 via D9 cache bundle only",
+    "Sep-4/5 window may have partial OHLC depending on vis_from"
+  ]
+}
