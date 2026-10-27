@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 RegimeState = Literal["DOWNTREND", "SIDEWAYS", "UNCERTAIN"]
 PauseState = Literal["READY", "SHORT_PAUSED"]
+EmaStructureDecision = Literal["SHORT_OK", "SHORT_NO", "UNCERTAIN"]
 
 CONTRACT = "downtrend_isolated_upper_short_v1"
 RUNNER_CONTRACT = "isolated_research_runner_v1"
@@ -50,12 +51,23 @@ class IsolatedEligibilityResultV1:
 
 
 @dataclass(frozen=True)
+class PureEmaConfirmationV1:
+    decision: EmaStructureDecision
+    reason_code: str
+    chart_focus: str | None
+    provenance: dict[str, Any]
+    authorizes_new_pending: bool
+
+
+@dataclass(frozen=True)
 class EntryGateDecisionV1:
     allow_new_short_intent: bool
     reasons: list[str]
     regime: RegimeClassificationV1
     eligibility: IsolatedEligibilityResultV1
     pause_state: PauseState
+    ema_confirmation: PureEmaConfirmationV1 | None = None
+    pool_candidate_present: bool = False
 
 
 @dataclass(frozen=True)

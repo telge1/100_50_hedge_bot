@@ -48,14 +48,21 @@ def evaluate_isolated_upper_eligibility(
     baseline_signal: Any | None,
     snapshot: dict[str, Any],
     structural_context: dict[str, Any] | None = None,
+    research_pass_on_baseline_signal: bool = False,
 ) -> IsolatedEligibilityResultV1:
-    """Fail-closed until pool-growth / stack rules are validated."""
+    """Fail-closed until pool-growth / stack rules are validated (unless BT-D66 research flag)."""
     candidate = build_candidate_diagnostic(
         decision_close_utc=decision_close_utc,
         snapshot=snapshot,
         baseline_signal=baseline_signal,
     )
     _ = structural_context  # reserved for research hooks (D51/D50)
+    if research_pass_on_baseline_signal and baseline_signal is not None:
+        return IsolatedEligibilityResultV1(
+            eligible=True,
+            reason="BASELINE_POOL_CANDIDATE_PRESENT",
+            candidate=candidate,
+        )
     return IsolatedEligibilityResultV1(
         eligible=False,
         reason=NOT_YET_VALIDATED,

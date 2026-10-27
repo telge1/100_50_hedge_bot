@@ -5,7 +5,7 @@
 isolated_strategy_v1:
   contract: downtrend_isolated_upper_short_v1
   strategy_id: downtrend_isolated_upper_short_v1
-  status: RESEARCH_SKELETON_FAIL_CLOSED
+  status: RESEARCH_EMA_CONFIRMATION_V1
   minimum_warmup_hours: 168
   warmup_note: "Decision window must start >=168h after density history; older still-ACTIVE origins via canonical provider"
   regime_classifier:
@@ -16,14 +16,21 @@ isolated_strategy_v1:
     price_structure_rule: UNSET
   isolated_upper_eligibility:
     default_eligible: false
+    research_pass_on_baseline_signal: false
     pool_growth_filter: UNSET
     upper_stack_density_filter: UNSET
+  pure_ema_confirmation:
+    enabled: false
+    rules_module: phase_bt_d65_pure_ema_timestamp_review_v1
+    ema_path: trp_research_charts
+    reference_warmup_hours: 720
   short_pause:
     initial_pause_state: SHORT_PAUSED
     requalification_after_sl: UNSET
     cooldown_timer: forbidden
   entry_gate:
     require_regime: DOWNTREND
+    require_pure_ema_short_ok: false
     require_pause_ready: true
     require_isolated_eligible: true
     require_baseline_signal: true
