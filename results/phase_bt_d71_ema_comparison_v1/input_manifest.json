@@ -1,0 +1,34 @@
+{
+  "phase": "BT-D71",
+  "baseline_commit": "5c18c0cd",
+  "git_head": "5c18c0cddcb26331ce3eac819a8006bf85cd0f44",
+  "d60_manifest_sha256": "cf27397031051e306338a50988109f006f46fa3b566423854d230ef61b49c719",
+  "ohlc_load_start": "2026-07-04T00:00:00Z",
+  "ohlc_load_end": "2026-09-11T13:30:00Z",
+  "ohlc_meta": {
+    "symbol": "DOGEUSDT",
+    "source": "ClickHouseResearchCandleSource.get_candles(5m strict_complete_buckets)",
+    "resample": "pd1_landscape_viewer_v1._resample_5m_from_candles",
+    "data_bounds_lo": "2026-05-01T00:00:00Z",
+    "data_bounds_hi": "2026-09-30T23:45:00Z",
+    "requested_start": "2026-07-04T00:00:00Z",
+    "requested_end": "2026-09-11T13:30:00Z",
+    "bars_loaded": 20035,
+    "grid_steps": 20035
+  },
+  "windows": [
+    "aug05_06_investigation",
+    "aug12_morning_investigation",
+    "aug13_morning_investigation",
+    "sep9_evening_2026",
+    "sep11_midday_2026"
+  ],
+  "verdict": "EXTENDED_EMA_REPLAY_PASS",
+  "verified_evaluation_bars": 533,
+  "pool_eligible_closes": 58,
+  "ema_only_diff_bars": 30,
+  "pool_conditional_diff_bars": 9,
+  "pending_state_diff_bars": 37,
+  "any_pending_created_diff": true,
+  "any_modeled_fill_diff": true
+}
