@@ -1,0 +1,223 @@
+{
+  "fill_count_executable": 1,
+  "research_ledger_rows": [
+    {
+      "order_id": "b9e88ec7f1c6503c857d",
+      "signal_close_utc": "2026-09-20T13:55:00Z",
+      "executable_fill_utc": "2026-09-20T14:00:00Z",
+      "entry_price": 0.085,
+      "sl_price": 0.08518002000000001,
+      "tp_price": 0.08428,
+      "pool_key": "0.085000000000000006|0.085010000000000002",
+      "baseline_sl_exit_utc": "2026-09-20T14:05:00Z",
+      "baseline_records_tp_exit": false,
+      "d46_research_exit": {
+        "entry_bar_utc": "2026-09-20T14:00:00Z",
+        "entry_price": 0.085,
+        "sl_price": 0.08518002000000001,
+        "tp_price": 0.08428,
+        "exit_bar_utc": "2026-09-20T14:00:00Z",
+        "exit_price": 0.08518002000000001,
+        "exit_reason": "SL",
+        "ambiguous_intrabar": false,
+        "bars_held": 1,
+        "gross_return_pct_short": -0.211788,
+        "fees_slippage": "none_configured",
+        "contract": "phase_bt_d7_config_driven_short_pnl_integration_v1/execution_v1.py:simulate_short_exit"
+      }
+    }
+  ],
+  "open_at_horizon_executable": false,
+  "d46_unresolved_at_horizon": [],
+  "pause_state_final": "SHORT_PAUSED",
+  "pause_events": [
+    {
+      "exit_bar_utc": "2026-09-20T14:05:00Z",
+      "position_id": "f9d818a966fdf715",
+      "causal_note": "MODELED_SL_EXIT"
+    }
+  ],
+  "shadow_count": 15,
+  "shadow_sample": [
+    {
+      "decision_close_utc": "2026-09-23T10:40:00Z",
+      "pool_key": "0.099970000000000003|0.10006",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T10:45:00Z",
+      "pool_key": "0.099970000000000003|0.10005",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T11:00:00Z",
+      "pool_key": "0.10019|0.10019400000000001",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T11:10:00Z",
+      "pool_key": "0.10006|0.10007000000000001",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T12:10:00Z",
+      "pool_key": "0.099610000000000004|0.099690000000000001",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T12:25:00Z",
+      "pool_key": "0.099690000000000001|0.099894000000000011",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T15:15:00Z",
+      "pool_key": "0.095170000000000005|0.095259999999999997",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T17:50:00Z",
+      "pool_key": "0.092689999999999995|0.092719999999999997",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-23T21:15:00Z",
+      "pool_key": "0.092230000000000006|0.092273999999999995",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-24T10:15:00Z",
+      "pool_key": "0.092280000000000001|0.092305999999999999",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-25T06:55:00Z",
+      "pool_key": "0.094960000000000003|0.094991999999999993",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-25T07:00:00Z",
+      "pool_key": "0.094969999999999999|0.094991999999999993",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-25T07:05:00Z",
+      "pool_key": "0.095014000000000001|0.095039999999999999",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-26T09:50:00Z",
+      "pool_key": "0.097100000000000006|0.097129999999999994",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    },
+    {
+      "decision_close_utc": "2026-09-26T19:15:00Z",
+      "pool_key": "0.097309999999999994|0.097341999999999998",
+      "ema_decision": "SHORT_OK",
+      "ema_reason_code": "RESEARCH_BEAR_STACK_FALLING_59_200",
+      "pause_state": "SHORT_PAUSED",
+      "block_reasons": [
+        "PAUSE_SHORT_PAUSED"
+      ],
+      "shadow_class": "POOL_EMA_V3_OK_BLOCKED_BY_SHORT_PAUSED",
+      "executable": false
+    }
+  ]
+}

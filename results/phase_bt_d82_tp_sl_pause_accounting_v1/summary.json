@@ -1,0 +1,53 @@
+{
+  "verdict": "TRADE_ACCOUNTING_PASS",
+  "replay_wall_s": 10.48,
+  "pool_candidates": 187,
+  "authorized": 8,
+  "blocked": 179,
+  "executable_fills": 1,
+  "shadow_pause_pool_ema_ok": 15,
+  "pause_state_final": "SHORT_PAUSED",
+  "intrabar_policy": "no_trade_ambiguous",
+  "chart_review_events": [
+    {
+      "decision_close_utc": "2026-09-20T14:00:00Z",
+      "chart_review_reason": "EXECUTABLE_SIMULATED_FILL_v3",
+      "pool_key": "0.085000000000000006|0.085010000000000002"
+    },
+    {
+      "decision_close_utc": "2026-09-20T14:05:00Z",
+      "chart_review_reason": "EXECUTABLE_SIMULATED_SL_v3",
+      "pool_key": ""
+    },
+    {
+      "decision_close_utc": "2026-09-20T14:00:00Z",
+      "chart_review_reason": "D46_RESEARCH_SL",
+      "pool_key": "0.085000000000000006|0.085010000000000002"
+    },
+    {
+      "decision_close_utc": "2026-09-23T10:40:00Z",
+      "chart_review_reason": "SHADOW_NOT_EXECUTABLE",
+      "pool_key": "0.099970000000000003|0.10006"
+    },
+    {
+      "decision_close_utc": "2026-09-23T10:45:00Z",
+      "chart_review_reason": "SHADOW_NOT_EXECUTABLE",
+      "pool_key": "0.099970000000000003|0.10005"
+    },
+    {
+      "decision_close_utc": "2026-09-23T11:00:00Z",
+      "chart_review_reason": "SHADOW_NOT_EXECUTABLE",
+      "pool_key": "0.10019|0.10019400000000001"
+    },
+    {
+      "decision_close_utc": "2026-09-23T11:10:00Z",
+      "chart_review_reason": "SHADOW_NOT_EXECUTABLE",
+      "pool_key": "0.10006|0.10007000000000001"
+    },
+    {
+      "decision_close_utc": "2026-09-23T12:10:00Z",
+      "chart_review_reason": "SHADOW_NOT_EXECUTABLE",
+      "pool_key": "0.099610000000000004|0.099690000000000001"
+    }
+  ]
+}

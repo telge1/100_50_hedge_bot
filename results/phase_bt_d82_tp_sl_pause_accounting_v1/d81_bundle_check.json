@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "entry_count": 2016,
+  "expected": 2016,
+  "pipeline": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "config_hash": "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9",
+  "read_only": true
+}
