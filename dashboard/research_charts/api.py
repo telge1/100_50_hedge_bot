@@ -1523,6 +1523,12 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         strategy_id = str(body.get("strategy_id") or "").strip()
+        if strategy_id in (
+            "bt_d85_july_ema_v3_no_pause_research",
+            "bt_d85_july",
+            "bt-d85-july",
+        ):
+            return await api_research_backtester_bt_d85_july_load(user=user, body=body)
         if strategy_id in (POOL_LANDSCAPE_BT_D7_STRATEGY_ID,):
             symbol = str(body.get("symbol") or "").strip().upper()
             visible = body.get("visible")

@@ -9467,6 +9467,16 @@
         }
         return;
       }
+      // Safety net: never hit legacy stoch /load when BT-D85 is selected (stale-cache guard).
+      if (isBtD85JulyResearchStrategy(btStrategy())) {
+        setStatus("BT-D85: lade July 2026 research trades …");
+        try {
+          await applyBtD85JulyResearchBacktester(true);
+        } catch (err) {
+          setStatus("BT-D85 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
       const strategy = lastStochStrategy();
       const jobId = lastStochResearchJob();
       const evalId = lastStochEvaluation();
