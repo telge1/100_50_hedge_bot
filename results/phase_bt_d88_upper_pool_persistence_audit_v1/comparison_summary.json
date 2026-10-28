@@ -1,0 +1,161 @@
+{
+  "baseline": "BT-D87 031ea67e / BT-D85 434fbbd8",
+  "matching_methodology": {
+    "reference_band": "ledger pool_key at signal_close_utc",
+    "historical_track": "ACTIVE upper with exact pool_key OR >=50% price overlap with reference",
+    "identity": "pool_key may change on merge/split; price_tracked chain allows key changes",
+    "past_only": "only closes <= signal_close_utc; window max(168h, bundle_start)"
+  },
+  "metrics_selected": {
+    "persistence_bars_price_tracked": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "mean": 72.923077,
+      "median": 10.0
+    },
+    "persistence_bars_exact_pool_key": {
+      "n": 13,
+      "min": 1.0,
+      "max": 20.0,
+      "mean": 3.230769,
+      "median": 1.0
+    },
+    "hours_signal_minus_first_tracked": {
+      "n": 13,
+      "min": 0.0,
+      "max": 166.75,
+      "mean": 58.153846,
+      "median": 47.083333
+    },
+    "boundary_pool_key_changes_while_tracked": {
+      "n": 13,
+      "min": 0.0,
+      "max": 16.0,
+      "mean": 3.230769,
+      "median": 2.0
+    },
+    "origin_membership_change_bars": {
+      "n": 13,
+      "min": 0.0,
+      "max": 19.0,
+      "mean": 4.538462,
+      "median": 3.0
+    },
+    "mean_origin_age_hours_at_signal": {
+      "n": 13,
+      "min": 0.125,
+      "max": 0.6667,
+      "mean": 0.2094,
+      "median": 0.125
+    },
+    "min_origin_age_hours_at_signal": {
+      "n": 13,
+      "min": 0.08333333333333333,
+      "max": 0.25,
+      "mean": 0.096154,
+      "median": 0.083333
+    },
+    "qualifying_depth2_bars_in_track": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "mean": 72.923077,
+      "median": 10.0
+    },
+    "nearby_upper_50bp_mean_while_tracked": {
+      "n": 13,
+      "min": 0.4481,
+      "max": 6.9674,
+      "mean": 2.246854,
+      "median": 1.9535
+    },
+    "gap_unmatched_bars_immediately_before_signal": {
+      "n": 13,
+      "min": 0.0,
+      "max": 2016.0,
+      "mean": 812.923077,
+      "median": 693.0
+    }
+  },
+  "metrics_comparison": {
+    "persistence_bars_price_tracked": {
+      "n": 12,
+      "min": 1.0,
+      "max": 503.0,
+      "mean": 122.0,
+      "median": 28.0
+    },
+    "persistence_bars_exact_pool_key": {
+      "n": 12,
+      "min": 1.0,
+      "max": 5.0,
+      "mean": 1.666667,
+      "median": 1.0
+    },
+    "hours_signal_minus_first_tracked": {
+      "n": 12,
+      "min": 0.0,
+      "max": 168.0,
+      "mean": 82.840278,
+      "median": 103.5
+    },
+    "boundary_pool_key_changes_while_tracked": {
+      "n": 12,
+      "min": 0.0,
+      "max": 19.0,
+      "mean": 4.25,
+      "median": 2.5
+    },
+    "origin_membership_change_bars": {
+      "n": 12,
+      "min": 0.0,
+      "max": 24.0,
+      "mean": 5.833333,
+      "median": 3.5
+    },
+    "mean_origin_age_hours_at_signal": {
+      "n": 12,
+      "min": 0.125,
+      "max": 0.5833,
+      "mean": 0.243625,
+      "median": 0.22915
+    },
+    "min_origin_age_hours_at_signal": {
+      "n": 12,
+      "min": 0.08333333333333333,
+      "max": 0.25,
+      "mean": 0.118056,
+      "median": 0.083333
+    },
+    "qualifying_depth2_bars_in_track": {
+      "n": 12,
+      "min": 1.0,
+      "max": 503.0,
+      "mean": 122.0,
+      "median": 28.0
+    },
+    "nearby_upper_50bp_mean_while_tracked": {
+      "n": 12,
+      "min": 1.0,
+      "max": 4.7944,
+      "mean": 2.183108,
+      "median": 1.79165
+    },
+    "gap_unmatched_bars_immediately_before_signal": {
+      "n": 12,
+      "min": 0.0,
+      "max": 2016.0,
+      "mean": 546.25,
+      "median": 43.0
+    }
+  },
+  "sudden_appearance_selected": 4,
+  "sudden_appearance_comparison": 2,
+  "unavailable": [
+    "full_lifetime_builder_timeline_pre_bake",
+    "notional_at_origin",
+    "exact_merge_split_event_log_ssot",
+    "chart_render_persistence"
+  ]
+}

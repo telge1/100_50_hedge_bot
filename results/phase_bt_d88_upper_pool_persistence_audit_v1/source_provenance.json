@@ -1,0 +1,13 @@
+{
+  "bundle": "results/phase_bt_d85_july_2026_no_pause_research_v1/cache_bundle",
+  "entry_count": 8928,
+  "density_method": "exact_unique_origin",
+  "pool_detail": 1,
+  "min_unique_origins": 2,
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "decision_close_first": "2026-07-01T00:00:00Z",
+  "decision_close_last": "2026-07-31T23:55:00Z",
+  "clickhouse_used": false,
+  "clickhouse_note": "Origin segment start times parsed from lldv2 origin_ids epoch suffix; band persistence from July D8 cache snapshots only (read-only).",
+  "pre_july_1_blind_spot": "Bundle covers 2026-07-01..2026-07-31 only; persistence before July 1 is not observable in this audit."
+}
