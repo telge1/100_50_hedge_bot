@@ -3,7 +3,7 @@
 **VERDICT:** `MONTH_NO_PAUSE_RESEARCH_BLOCKED`
 
 **Baseline execution parity:** BT-D83 `EXECUTION_PARITY_PASS` @ `f5fe267f`  
-**Git HEAD:** `f5fe267f59af695e1a41cb1e384327ccf3509dc1`  
+**Git HEAD:** `28cbc5c9662b27f518eea80b3116b08b535bd4b1`  
 **Window:** `2026-09-01T00:00:00Z` … `2026-09-30T23:55:00Z` (**8640** closes)
 
 ## Research change (opt-in only)
@@ -27,7 +27,7 @@
 
 ## Parity evidence (bounded)
 
-- Day-boundary gates: **29** × 24 closes — **PASS**
+- Day-boundary gates: **29** × 24 closes — **NOT_RUN**
 - Interior noon samples: **30** — canonical vs multichunk
 - Boundary wall: **0** s; interior: **0** s
 - Detail: `results/phase_bt_d84_30day_no_pause_research_v1/parity_evidence.json`
@@ -99,7 +99,7 @@ Trades are **not merged** between replays. Detail: `month_performance_short_paus
 ```json
 {
   "baseline_commit": "f5fe267f",
-  "git_head": "f5fe267f59af695e1a41cb1e384327ccf3509dc1",
+  "git_head": "28cbc5c9662b27f518eea80b3116b08b535bd4b1",
   "closes": 8640,
   "chunk_plan_days": 30,
   "disk_free_gib": 190.79,
