@@ -1,0 +1,154 @@
+{
+  "baseline": "BT-D85 JULY_MONTH_RESEARCH_PASS 434fbbd8",
+  "bundle": "results/phase_bt_d85_july_2026_no_pause_research_v1/cache_bundle",
+  "comparison_exit_reasons": {
+    "SIMULATED_SL": 4,
+    "SIMULATED_TP": 8
+  },
+  "comparison_n": 12,
+  "density": "DOGEUSDT 5m PD1 depth2 exact_unique_origin",
+  "metrics_comparison": {
+    "band_width_abs": {
+      "max": 6.20000000000065e-05,
+      "mean": 2.167e-05,
+      "median": 1.7e-05,
+      "min": 2.000000000002e-06,
+      "n": 12
+    },
+    "band_width_pct_of_entry": {
+      "max": 0.085141,
+      "mean": 0.02984417,
+      "median": 0.0231785,
+      "min": 0.002711,
+      "n": 12
+    },
+    "gap_to_next_upper_lower_abs": {
+      "max": 0.00044800000000000395,
+      "mean": 0.0001405,
+      "median": 4.7e-05,
+      "min": 0.0,
+      "n": 12
+    },
+    "local_active_upper_count_within_20bp_of_entry": {
+      "max": 3,
+      "mean": 1.08333333,
+      "median": 1.0,
+      "min": 0,
+      "n": 12
+    },
+    "local_active_upper_count_within_50bp_of_entry": {
+      "max": 4,
+      "mean": 1.75,
+      "median": 1.0,
+      "min": 1,
+      "n": 12
+    },
+    "n_active_upper_bands_at_signal": {
+      "max": 343,
+      "mean": 318.25,
+      "median": 317.0,
+      "min": 291,
+      "n": 12
+    },
+    "shared_origin_count_with_next_upper": {
+      "max": 4,
+      "mean": 1.08333333,
+      "median": 0.0,
+      "min": 0,
+      "n": 12
+    },
+    "stacked_or_near_neighbor_count": {
+      "max": 3,
+      "mean": 0.83333333,
+      "median": 0.0,
+      "min": 0,
+      "n": 12
+    },
+    "unique_origin_count": {
+      "max": 4,
+      "mean": 2.25,
+      "median": 2.0,
+      "min": 2,
+      "n": 12
+    }
+  },
+  "metrics_selected": {
+    "band_width_abs": {
+      "max": 4.799999999999249e-05,
+      "mean": 2e-05,
+      "median": 2e-05,
+      "min": 4.000000000004e-06,
+      "n": 13
+    },
+    "band_width_pct_of_entry": {
+      "max": 0.069105,
+      "mean": 0.02815992,
+      "median": 0.027454,
+      "min": 0.005588,
+      "n": 13
+    },
+    "gap_to_next_upper_lower_abs": {
+      "max": 0.0016979999999999912,
+      "mean": 0.000388,
+      "median": 0.00027,
+      "min": 0.0,
+      "n": 13
+    },
+    "local_active_upper_count_within_20bp_of_entry": {
+      "max": 2,
+      "mean": 1,
+      "median": 1,
+      "min": 0,
+      "n": 13
+    },
+    "local_active_upper_count_within_50bp_of_entry": {
+      "max": 4,
+      "mean": 1.76923077,
+      "median": 1,
+      "min": 1,
+      "n": 13
+    },
+    "n_active_upper_bands_at_signal": {
+      "max": 342,
+      "mean": 316.61538462,
+      "median": 313,
+      "min": 285,
+      "n": 13
+    },
+    "shared_origin_count_with_next_upper": {
+      "max": 6,
+      "mean": 1,
+      "median": 0,
+      "min": 0,
+      "n": 13
+    },
+    "stacked_or_near_neighbor_count": {
+      "max": 4,
+      "mean": 0.92307692,
+      "median": 0,
+      "min": 0,
+      "n": 13
+    },
+    "unique_origin_count": {
+      "max": 3,
+      "mean": 2.15384615,
+      "median": 2,
+      "min": 2,
+      "n": 13
+    }
+  },
+  "signal_resolution_issues": {},
+  "unavailable_in_cache_snapshot": [
+    "pool_age_bars",
+    "pool_persistence_utc",
+    "origin_first_seen_utc",
+    "lifetime_notional",
+    "depth2_overlap_score_ssot",
+    "chart_pixel_width"
+  ],
+  "user_selected_exit_reasons": {
+    "SIMULATED_SL": 11,
+    "SIMULATED_TP": 2
+  },
+  "user_selected_n": 13
+}

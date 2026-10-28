@@ -1,0 +1,12 @@
+{
+  "fields_not_in_bt_d8_snapshot": [
+    "pool_age_bars",
+    "pool_persistence_utc",
+    "origin_first_seen_utc",
+    "lifetime_notional",
+    "depth2_overlap_score_ssot",
+    "chart_pixel_width"
+  ],
+  "note": "BT-D8 cache upper_bands carry lower/upper price, unique_origin_count, origin_ids, pool_status, density_method only. No age/persistence/lifetime fields at decision close.",
+  "per_trade_issues": {}
+}
