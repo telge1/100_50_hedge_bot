@@ -5895,6 +5895,25 @@
     return String(sid || "") === "chronological_short_backtester_bt_d46";
   }
 
+  const BT_FROZEN_MONTH_RESEARCH = {
+    bt_d94_june_ema_v3_no_pause_research: {
+      loadUrl: "/api/research/backtester/bt-d94-june/load",
+      label: "BT-D94R · Juni 2026 · EMA V3 · 34 Trades",
+    },
+    bt_d85_july_ema_v3_no_pause_research: {
+      loadUrl: "/api/research/backtester/bt-d85-july/load",
+      label: "BT-D85 · Juli 2026 · EMA V3 · 25 Trades",
+    },
+    bt_d91_august_ema_v3_no_pause_research: {
+      loadUrl: "/api/research/backtester/bt-d91-august/load",
+      label: "BT-D91 · August 2026 · EMA V3 · 25 Trades",
+    },
+  };
+
+  function isBtFrozenMonthResearchStrategy(sid) {
+    return Object.prototype.hasOwnProperty.call(BT_FROZEN_MONTH_RESEARCH, String(sid || ""));
+  }
+
   function isBtD85JulyResearchStrategy(sid) {
     return String(sid || "") === "bt_d85_july_ema_v3_no_pause_research";
   }
@@ -6268,24 +6287,35 @@
   }
 
   function renderBtD85Summary(snap) {
+    renderBtFrozenMonthSummary(snap);
+  }
+
+  function renderBtFrozenMonthSummary(snap) {
     const el = $("researchBtD7Summary");
     if (!el) return;
-    const bt = (snap && snap.bt_d85_july_research) || {};
-    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
-    if (!isBtD85JulyResearchStrategy(btStrategy()) || !bt.visible) {
+    const sid = btStrategy();
+    if (!isBtFrozenMonthResearchStrategy(sid)) {
       if (
-        !isBtD7PoolLandscapeStrategy(btStrategy()) &&
-        !isBtD23SetupScannerStrategy(btStrategy()) &&
-        !isBtD26DynamicSelectorStrategy(btStrategy()) &&
-        !isBtD46ChronologicalBacktesterStrategy(btStrategy())
+        !isBtD7PoolLandscapeStrategy(sid) &&
+        !isBtD23SetupScannerStrategy(sid) &&
+        !isBtD26DynamicSelectorStrategy(sid) &&
+        !isBtD46ChronologicalBacktesterStrategy(sid)
       ) {
         el.hidden = true;
         el.textContent = "";
       }
       return;
     }
+    const bt = snap && snap.backtester;
+    const sum = (bt && bt.summary) || {};
+    const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
+    if (!bt || bt.strategy_id !== sid || !bt.visible) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
     const parts = [
-      "BT-D85 · Juli 2026 · EMA V3 · No post-SL pause (research)",
+      cfg.label || sid,
       sum.trade_count != null ? (sum.trade_count + " fills") : "",
       sum.tp_count != null ? (sum.tp_count + " TP") : "",
       sum.sl_count != null ? (sum.sl_count + " SL") : "",
@@ -6305,7 +6335,7 @@
         !isBtD7PoolLandscapeStrategy(btStrategy()) &&
         !isBtD23SetupScannerStrategy(btStrategy()) &&
         !isBtD26DynamicSelectorStrategy(btStrategy()) &&
-        !isBtD85JulyResearchStrategy(btStrategy())
+        !isBtFrozenMonthResearchStrategy(btStrategy())
       ) {
         el.hidden = true;
         el.textContent = "";
@@ -6405,19 +6435,23 @@
     }
   }
 
-  async function clearBtD85JulyLayer() {
-    if (!state.symbol) return null;
-    try {
-      const snap = await sendJson("/api/research/backtester/bt-d85-july/load", "POST", {
-        symbol: state.symbol,
-        visible: false,
-      }, { sourceAction: "bt-d85-clear" });
-      applyWorkspace(snap);
-      await refreshOverlaysVisible();
-      return snap;
-    } catch (e) {
-      return null;
+  async function clearAllBtFrozenMonthResearchLayers() {
+    if (!state.symbol) return;
+    for (const sid of Object.keys(BT_FROZEN_MONTH_RESEARCH)) {
+      const cfg = BT_FROZEN_MONTH_RESEARCH[sid];
+      try {
+        const snap = await sendJson(cfg.loadUrl, "POST", {
+          symbol: state.symbol,
+          visible: false,
+        }, { sourceAction: "bt-frozen-month-clear" });
+        applyWorkspace(snap);
+      } catch (e) { /* ignore */ }
     }
+    await refreshOverlaysVisible();
+  }
+
+  async function clearBtD85JulyLayer() {
+    return clearAllBtFrozenMonthResearchLayers();
   }
 
   async function clearBtD46ChronologicalLayer() {
@@ -6452,7 +6486,8 @@
 
   async function syncResearchBacktesterLayersOnStrategyChange(sid) {
     if (!state.symbol) return;
-    if (isBtD85JulyResearchStrategy(sid)) {
+    if (isBtFrozenMonthResearchStrategy(sid)) {
+      await clearAllBtFrozenMonthResearchLayers();
       await clearBtD26DynamicSelectorLayer();
       await clearBtD23SetupScannerLayer();
       await clearBtD46ChronologicalLayer();
@@ -6518,12 +6553,13 @@
     return snap;
   }
 
-  async function applyBtD85JulyResearchBacktester(visible) {
-    if (!state.symbol) return null;
+  async function applyBtFrozenMonthResearchBacktester(sid, visible) {
+    if (!state.symbol || !isBtFrozenMonthResearchStrategy(sid)) return null;
+    const cfg = BT_FROZEN_MONTH_RESEARCH[sid];
     await clearBtD26DynamicSelectorLayer();
     await clearBtD23SetupScannerLayer();
     await clearBtD46ChronologicalLayer();
-    const snap = await sendJson("/api/research/backtester/bt-d85-july/load", "POST", {
+    const snap = await sendJson(cfg.loadUrl, "POST", {
       symbol: state.symbol,
       visible: visible !== false,
     }, { sourceAction: "backtester" });
@@ -6538,16 +6574,20 @@
         await zoomChartToIsoRange(span.start, span.end, span.start);
       } catch (zoomErr) {
         try {
-          console.warn("[research] bt-d85 zoom after load", zoomErr);
+          console.warn("[research] frozen-month zoom after load", zoomErr);
         } catch (ignore) { /* ignore */ }
       }
     }
     setStatus(
       (snap.backtester && snap.backtester.message) ||
-      "BT-D85 July research overlay geladen"
+      (cfg.label + " overlay geladen")
     );
     repaintExactOriginDensityAllVisiblePanes();
     return snap;
+  }
+
+  async function applyBtD85JulyResearchBacktester(visible) {
+    return applyBtFrozenMonthResearchBacktester("bt_d85_july_ema_v3_no_pause_research", visible);
   }
 
   async function applyBtD23SetupScannerBacktester(visible) {
@@ -6594,7 +6634,7 @@
       renderBtD46Summary(snap);
       return;
     }
-    if (isBtD85JulyResearchStrategy(btStrategy())) {
+    if (isBtFrozenMonthResearchStrategy(btStrategy())) {
       renderBtD85Summary(snap);
       return;
     }
@@ -9017,9 +9057,11 @@
       $("researchBtStrategy").addEventListener("change", async function () {
         syncBtStrategyUi();
         const sid = btStrategy();
-        if (isBtD85JulyResearchStrategy(sid)) {
+        if (isBtFrozenMonthResearchStrategy(sid)) {
+          await clearAllBtFrozenMonthResearchLayers();
           await refreshOverlaysVisible();
-          setStatus("Strategie: BT-D85 July 2026 · Backtester lädt gespeicherte Research-Trades");
+          const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
+          setStatus("Strategie: " + (cfg.label || sid) + " · Backtester lädt gespeicherte Research-Trades");
           return;
         }
         if (isBtD7PoolLandscapeStrategy(sid)) {
@@ -9220,12 +9262,14 @@
         }
         return;
       }
-      if (isBtD85JulyResearchStrategy(btStrategy())) {
-        setStatus("BT-D85: lade July 2026 research trades …");
+      if (isBtFrozenMonthResearchStrategy(btStrategy())) {
+        const sid = btStrategy();
+        const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
+        setStatus((cfg.label || sid) + ": lade gespeicherte Research-Trades …");
         try {
-          await applyBtD85JulyResearchBacktester(true);
+          await applyBtFrozenMonthResearchBacktester(sid, true);
         } catch (err) {
-          setStatus("BT-D85 Laden fehlgeschlagen: " + (err.message || err), "error");
+          setStatus("Frozen month Laden fehlgeschlagen: " + (err.message || err), "error");
         }
         return;
       }
@@ -9467,13 +9511,15 @@
         }
         return;
       }
-      // Safety net: never hit legacy stoch /load when BT-D85 is selected (stale-cache guard).
-      if (isBtD85JulyResearchStrategy(btStrategy())) {
-        setStatus("BT-D85: lade July 2026 research trades …");
+      // Safety net: never hit legacy stoch /load when frozen month research is selected.
+      if (isBtFrozenMonthResearchStrategy(btStrategy())) {
+        const sid = btStrategy();
+        const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
+        setStatus((cfg.label || sid) + ": lade gespeicherte Research-Trades …");
         try {
-          await applyBtD85JulyResearchBacktester(true);
+          await applyBtFrozenMonthResearchBacktester(sid, true);
         } catch (err) {
-          setStatus("BT-D85 Laden fehlgeschlagen: " + (err.message || err), "error");
+          setStatus("Frozen month Laden fehlgeschlagen: " + (err.message || err), "error");
         }
         return;
       }

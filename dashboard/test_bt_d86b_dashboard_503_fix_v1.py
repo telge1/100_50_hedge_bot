@@ -10,7 +10,7 @@ from pathlib import Path
 
 def test_html_cache_bust_bt_d86b() -> None:
     html = open("templates/research_charts.html", encoding="utf-8").read()
-    assert "phase6xt-bt-d86b-bt-d85-503-fix-v1" in html
+    assert "phase6xt-bt-d95-three-month-overlay-v1" in html
 
 
 def test_js_stoch_fallback_bt_d85_guard() -> None:
@@ -18,7 +18,7 @@ def test_js_stoch_fallback_bt_d85_guard() -> None:
     idx = js.find("const strategy = lastStochStrategy();")
     assert idx > 0
     before = js[:idx]
-    assert before.count("isBtD85JulyResearchStrategy(btStrategy())") >= 2
+    assert before.count("isBtFrozenMonthResearchStrategy(btStrategy())") >= 2
 
 
 def test_api_load_delegates_bt_d85_strategy_id() -> None:

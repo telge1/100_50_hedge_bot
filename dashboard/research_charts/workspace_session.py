@@ -53,6 +53,14 @@ from .bt_d46_chronological_backtester import (
     build_viewport_draw_specs as d46_build_viewport_draw_specs,
     position_detail_panel as d46_position_detail_panel,
 )
+from .frozen_month_research_overlay_v1 import (
+    all_profiles as frozen_month_all_profiles,
+    build_drawing_specs as frozen_month_build_drawing_specs,
+    build_summary as frozen_month_build_summary,
+    get_profile as frozen_month_get_profile,
+    load_trade_ledger as frozen_month_load_trade_ledger,
+    validate_ledger as frozen_month_validate_ledger,
+)
 from .bt_d85_july_research_backtester import (
     BACKTESTER_SOURCE as BT_D85_SOURCE,
     BOX_PREFIX as BT_D85_BOX_PREFIX,
@@ -1567,47 +1575,58 @@ class ResearchWorkspace:
         }
         return snap
 
-    def _clear_bt_d85_july_drawings(self, symbol: str) -> int:
+    def _clear_frozen_month_research_drawings(self, symbol: str) -> int:
         sym = str(symbol or "").strip().upper()
         removed = 0
+        prefixes: set[str] = set()
+        origins: set[str] = set()
+        for prof in frozen_month_all_profiles():
+            prefixes.add(prof.box_prefix)
+            prefixes.add(prof.link_prefix)
+            origins.add(prof.backtester_source)
         for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
             did = str(getattr(drawing, "drawing_id", "") or "")
             meta = drawing.metadata or {}
             origin = str(meta.get("origin") or "")
-            if (
-                did.startswith(BT_D85_BOX_PREFIX)
-                or did.startswith(BT_D85_LINK_PREFIX)
-                or origin == BT_D85_SOURCE
-            ):
+            if any(did.startswith(p) for p in prefixes) or origin in origins:
                 self.drawings.remove_drawing(drawing.drawing_id)
                 removed += 1
         return removed
 
-    def clear_bt_d85_july_backtester(self, symbol: str) -> dict[str, Any]:
+    def _clear_bt_d85_july_drawings(self, symbol: str) -> int:
+        return self._clear_frozen_month_research_drawings(symbol)
+
+    def clear_frozen_month_research_backtester(self, month_key: str, symbol: str) -> dict[str, Any]:
+        prof = frozen_month_get_profile(month_key)
         sym = str(symbol or "").strip().upper()
-        self._clear_bt_d85_july_drawings(sym)
+        self._clear_frozen_month_research_drawings(sym)
         self.persist_drawings()
         snap = self.snapshot()
         snap["backtester"] = {
-            "strategy_id": BT_D85_STRATEGY_ID,
+            "strategy_id": prof.strategy_id,
             "symbol": sym,
             "loaded": 0,
             "visible": False,
-            "source": BT_D85_SOURCE,
-            "payload_kind": "bt_d85_july_chart_integration_v1",
-            "message": "BT-D85 July research overlay hidden",
+            "source": prof.backtester_source,
+            "payload_kind": prof.payload_kind,
+            "message": f"{prof.display_name} overlay hidden",
         }
-        snap["bt_d85_july_research"] = {"visible": False}
+        snap[prof.workspace_snap_key] = {"visible": False}
         return snap
 
-    def load_bt_d85_july_backtester(
+    def clear_bt_d85_july_backtester(self, symbol: str) -> dict[str, Any]:
+        return self.clear_frozen_month_research_backtester("july", symbol)
+
+    def load_frozen_month_research_backtester(
         self,
+        month_key: str,
         symbol: str,
         rows: list[dict[str, Any]],
         summary: dict[str, Any],
         *,
         visible: bool = True,
     ) -> dict[str, Any]:
+        prof = frozen_month_get_profile(month_key)
         trp = self._trp
         dc_replace = trp["dc_replace"]
         sym = str(symbol or "").strip().upper()
@@ -1618,9 +1637,9 @@ class ResearchWorkspace:
         self._bt_d26_catalog = None
         self._clear_bt_d46_chronological_drawings(sym)
         self._bt_d46_catalog = None
-        self._clear_bt_d85_july_drawings(sym)
+        self._clear_frozen_month_research_drawings(sym)
 
-        positions, links = d85_build_drawing_specs(rows)
+        positions, links = frozen_month_build_drawing_specs(prof, rows)
         loaded = 0
         for spec in positions:
             drawing = trp["make_short_position"](
@@ -1670,31 +1689,43 @@ class ResearchWorkspace:
 
         self.persist_drawings()
         snap = self.snapshot()
-        snap["bt_d85_july_research"] = {
+        snap[prof.workspace_snap_key] = {
             "visible": visible,
             "summary": summary,
             "trade_count": summary.get("trade_count"),
             "tp_count": summary.get("tp_count"),
             "sl_count": summary.get("sl_count"),
-            "payload_kind": "bt_d85_july_chart_integration_v1",
+            "payload_kind": prof.payload_kind,
         }
         snap["backtester"] = {
-            "strategy_id": BT_D85_STRATEGY_ID,
+            "strategy_id": prof.strategy_id,
             "symbol": sym,
             "loaded": loaded,
             "visible": visible,
-            "source": BT_D85_SOURCE,
-            "payload_kind": "bt_d85_july_chart_integration_v1",
+            "source": prof.backtester_source,
+            "payload_kind": prof.payload_kind,
             "summary": summary,
             "simulated_only": True,
             "plan_only": False,
             "message": (
-                f"BT-D85 July 2026 · {summary.get('trade_count', 0)} modeled shorts · "
+                f"{prof.display_name} · {summary.get('trade_count', 0)} modeled shorts · "
                 f"TP {summary.get('tp_count')} / SL {summary.get('sl_count')} · research replay only"
             ),
             "time_span": summary.get("time_span"),
         }
         return snap
+
+    def load_bt_d85_july_backtester(
+        self,
+        symbol: str,
+        rows: list[dict[str, Any]],
+        summary: dict[str, Any],
+        *,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        return self.load_frozen_month_research_backtester(
+            "july", symbol, rows, summary, visible=visible
+        )
 
     def _clear_cluster_sweep_overlays(self, symbol: str | None = None) -> int:
         removed = 0

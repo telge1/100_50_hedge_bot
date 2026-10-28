@@ -1517,6 +1517,99 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         snap["backtester"]["strategy_id"] = BT_D85_SID
         return snap
 
+    def _frozen_month_api_load(month_key: str, user: dict, body: dict[str, Any]) -> dict[str, Any]:
+        from .frozen_month_research_overlay_v1 import (
+            build_summary,
+            get_profile,
+            load_trade_ledger,
+            validate_ledger,
+        )
+
+        prof = get_profile(month_key)
+        symbol = str(body.get("symbol") or "").strip().upper()
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        ws = get_workspace()
+        if visible is False:
+            return ws.clear_frozen_month_research_backtester(month_key, symbol)
+        rows, path, errs = load_trade_ledger(prof)
+        if errs:
+            return _error(400, "ledger_invalid", ",".join(errs))
+        val = validate_ledger(prof, rows)
+        if val:
+            return _error(400, "ledger_validation_failed", ",".join(val))
+        if symbol != "DOGEUSDT":
+            return _error(400, "symbol_mismatch", f"{prof.display_name} ledger is DOGEUSDT only")
+        summary = build_summary(prof, rows, ledger_path=path)
+        snap = ws.load_frozen_month_research_backtester(month_key, symbol, rows, summary, visible=True)
+        snap["backtester"]["strategy_id"] = prof.strategy_id
+        return snap
+
+    @router.get("/api/research/backtester/bt-d94-june/meta")
+    async def api_research_backtester_bt_d94_june_meta(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .frozen_month_research_overlay_v1 import build_summary, get_profile, load_trade_ledger, validate_ledger
+
+        prof = get_profile("june")
+        sym = str(symbol or "").strip().upper()
+        rows, path, errs = load_trade_ledger(prof)
+        if errs:
+            return _error(404, "ledger_missing", ",".join(errs))
+        val = validate_ledger(prof, rows)
+        summary = build_summary(prof, rows, ledger_path=path)
+        if sym != "DOGEUSDT":
+            val.append("symbol_mismatch")
+        return {
+            "success": not val,
+            "symbol": sym,
+            "validation_errors": val,
+            "summary": summary,
+            "payload_kind": prof.payload_kind,
+        }
+
+    @router.post("/api/research/backtester/bt-d94-june/load")
+    async def api_research_backtester_bt_d94_june_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return _frozen_month_api_load("june", user, body)
+
+    @router.get("/api/research/backtester/bt-d91-august/meta")
+    async def api_research_backtester_bt_d91_august_meta(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .frozen_month_research_overlay_v1 import build_summary, get_profile, load_trade_ledger, validate_ledger
+
+        prof = get_profile("august")
+        sym = str(symbol or "").strip().upper()
+        rows, path, errs = load_trade_ledger(prof)
+        if errs:
+            return _error(404, "ledger_missing", ",".join(errs))
+        val = validate_ledger(prof, rows)
+        summary = build_summary(prof, rows, ledger_path=path)
+        if sym != "DOGEUSDT":
+            val.append("symbol_mismatch")
+        return {
+            "success": not val,
+            "symbol": sym,
+            "validation_errors": val,
+            "summary": summary,
+            "payload_kind": prof.payload_kind,
+        }
+
+    @router.post("/api/research/backtester/bt-d91-august/load")
+    async def api_research_backtester_bt_d91_august_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return _frozen_month_api_load("august", user, body)
+
     @router.post("/api/research/backtester/load")
     async def api_research_backtester_load(
         user: dict = Depends(require_auth),
@@ -1529,6 +1622,18 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "bt-d85-july",
         ):
             return await api_research_backtester_bt_d85_july_load(user=user, body=body)
+        if strategy_id in (
+            "bt_d94_june_ema_v3_no_pause_research",
+            "bt_d94_june",
+            "bt-d94-june",
+        ):
+            return await api_research_backtester_bt_d94_june_load(user=user, body=body)
+        if strategy_id in (
+            "bt_d91_august_ema_v3_no_pause_research",
+            "bt_d91_august",
+            "bt-d91-august",
+        ):
+            return await api_research_backtester_bt_d91_august_load(user=user, body=body)
         if strategy_id in (POOL_LANDSCAPE_BT_D7_STRATEGY_ID,):
             symbol = str(body.get("symbol") or "").strip().upper()
             visible = body.get("visible")
