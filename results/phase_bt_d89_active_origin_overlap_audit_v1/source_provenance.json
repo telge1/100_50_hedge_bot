@@ -1,0 +1,21 @@
+{
+  "clickhouse_database_tables": {
+    "publish": "research_lmv2_active_snapshot_publish_v1",
+    "active_pool_catalog": "research_lmv2_snapshot_active_pool_v1"
+  },
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "config_hash": "4aeb36fe22ef3ab24fc65c8e7bc33b6ca499dd51759d07936c96fee781c641c9",
+  "timeframe": "5m",
+  "pool_detail": 1,
+  "publish_row_count": 44064,
+  "publish_first_close": "2026-05-01T00:00:00Z",
+  "publish_last_close": "2026-09-30T23:55:00Z",
+  "density_depth2_exact": "results/phase_bt_d85_july_2026_no_pause_research_v1/cache_bundle/",
+  "concepts_distinguished": {
+    "ch_known_at": "research_lmv2_snapshot_active_pool_v1.known_at at published snapshot",
+    "segment_epoch_in_origin_id": "5m candle-open epoch suffix in lldv2 pool_id string",
+    "d8_origin_ids": "exact unique-origin depth2 band membership at decision close",
+    "d8_vs_ch_pool_id": "D8 origin_id strings omit :micro: pool_type segment present in CH catalog pool_id",
+    "ch_pre_july_region": "ACTIVE upper catalog overlap with entry band prices (epoch-key proxy)"
+  }
+}

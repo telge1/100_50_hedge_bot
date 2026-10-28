@@ -1,0 +1,139 @@
+{
+  "baseline": "BT-D88 8b80eed3",
+  "selected_n": 13,
+  "comparison_n": 12,
+  "persistent_heuristic_selected": 0,
+  "persistent_heuristic_comparison": 0,
+  "fresh_heuristic_selected": 4,
+  "fresh_heuristic_comparison": 3,
+  "metrics_selected": {
+    "bars_with_depth2_ge2_in_region": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "mean": 72.923077,
+      "median": 10.0
+    },
+    "fraction_window_bars_depth2_ge2": {
+      "n": 13,
+      "min": 0.000496,
+      "max": 0.224591,
+      "mean": 0.036154,
+      "median": 0.004958
+    },
+    "bars_with_any_overlap_track": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "mean": 72.923077,
+      "median": 10.0
+    },
+    "ch_known_at_min_hours_before_signal": {
+      "n": 13,
+      "min": 0.0,
+      "max": 0.1667,
+      "mean": 0.012823,
+      "median": 0.0
+    },
+    "segment_epoch_min_hours_before_signal": {
+      "n": 13,
+      "min": 0.0833,
+      "max": 0.25,
+      "mean": 0.096123,
+      "median": 0.0833
+    },
+    "origin_jaccard_signal_vs_window_start": {
+      "n": 13,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "median": 0.0
+    },
+    "origin_membership_change_bars_d8": {
+      "n": 13,
+      "min": 0.0,
+      "max": 19.0,
+      "mean": 4.538462,
+      "median": 3.0
+    },
+    "window_bars_pre_july": {
+      "n": 13,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "median": 0.0
+    },
+    "adjacent_upper_neighbors_50bp_at_signal": {
+      "n": 13,
+      "min": 1.0,
+      "max": 6.0,
+      "mean": 2.307692,
+      "median": 2.0
+    }
+  },
+  "metrics_comparison": {
+    "bars_with_depth2_ge2_in_region": {
+      "n": 12,
+      "min": 1.0,
+      "max": 682.0,
+      "mean": 137.416667,
+      "median": 28.0
+    },
+    "fraction_window_bars_depth2_ge2": {
+      "n": 12,
+      "min": 0.000496,
+      "max": 0.338126,
+      "mean": 0.068129,
+      "median": 0.013882
+    },
+    "bars_with_any_overlap_track": {
+      "n": 12,
+      "min": 1.0,
+      "max": 682.0,
+      "mean": 145.5,
+      "median": 59.5
+    },
+    "ch_known_at_min_hours_before_signal": {
+      "n": 12,
+      "min": 0.0,
+      "max": 0.1667,
+      "mean": 0.034717,
+      "median": 0.0
+    },
+    "segment_epoch_min_hours_before_signal": {
+      "n": 12,
+      "min": 0.0833,
+      "max": 0.25,
+      "mean": 0.118042,
+      "median": 0.0833
+    },
+    "origin_jaccard_signal_vs_window_start": {
+      "n": 12,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "median": 0.0
+    },
+    "origin_membership_change_bars_d8": {
+      "n": 12,
+      "min": 0.0,
+      "max": 24.0,
+      "mean": 5.833333,
+      "median": 3.5
+    },
+    "window_bars_pre_july": {
+      "n": 12,
+      "min": 0.0,
+      "max": 1929.0,
+      "mean": 180.0,
+      "median": 0.0
+    },
+    "adjacent_upper_neighbors_50bp_at_signal": {
+      "n": 12,
+      "min": 1.0,
+      "max": 4.0,
+      "mean": 2.416667,
+      "median": 2.0
+    }
+  }
+}
