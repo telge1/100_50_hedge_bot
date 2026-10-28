@@ -1,0 +1,193 @@
+{
+  "baseline_commits": "BT-D87/B88/B89 through 5c9b59fd",
+  "n_selected": 13,
+  "n_comparison": 12,
+  "exit_reason_selected": {
+    "SIMULATED_TP": 2,
+    "SIMULATED_SL": 11
+  },
+  "exit_reason_comparison": {
+    "SIMULATED_TP": 8,
+    "SIMULATED_SL": 4
+  },
+  "metrics_selected": {
+    "band_width_pct_of_entry_d87": {
+      "n": 13,
+      "min": 0.005588,
+      "max": 0.069105,
+      "median": 0.027454,
+      "mean": 0.02816
+    },
+    "width_rank_pct_july25_d87": {
+      "n": 13,
+      "min": 12.0,
+      "max": 96.0,
+      "median": 56.0,
+      "mean": 52.615385
+    },
+    "unique_origin_count_d87_depth2": {
+      "n": 13,
+      "min": 2.0,
+      "max": 3.0,
+      "median": 2.0,
+      "mean": 2.153846
+    },
+    "gap_to_next_upper_abs_d87": {
+      "n": 13,
+      "min": 0.0,
+      "max": 0.0016979999999999912,
+      "median": 0.00026999999999999247,
+      "mean": 0.000388
+    },
+    "persistence_bars_price_tracked_d88": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "median": 10.0,
+      "mean": 72.923077
+    },
+    "overlap_bars_depth2_ge2_d88_july_window": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "median": 10.0,
+      "mean": 72.923077
+    },
+    "overlap_fraction_d89_168h_mixed": {
+      "n": 13,
+      "min": 0.000496,
+      "max": 0.224591,
+      "median": 0.004958,
+      "mean": 0.036154
+    },
+    "overlap_bars_ge2_d89_168h_mixed": {
+      "n": 13,
+      "min": 1.0,
+      "max": 453.0,
+      "median": 10.0,
+      "mean": 72.923077
+    },
+    "ch_known_at_min_hours_d89": {
+      "n": 13,
+      "min": 0.0,
+      "max": 0.1667,
+      "median": 0.0,
+      "mean": 0.012823
+    },
+    "segment_epoch_min_hours_d89": {
+      "n": 13,
+      "min": 0.0833,
+      "max": 0.25,
+      "median": 0.0833,
+      "mean": 0.096123
+    },
+    "hours_signal_minus_first_tracked_d88": {
+      "n": 13,
+      "min": 0.0,
+      "max": 166.75,
+      "median": 47.083333333333336,
+      "mean": 58.153846
+    },
+    "adjacent_upper_neighbors_50bp_d89": {
+      "n": 13,
+      "min": 1.0,
+      "max": 6.0,
+      "median": 2.0,
+      "mean": 2.307692
+    }
+  },
+  "metrics_comparison": {
+    "band_width_pct_of_entry_d87": {
+      "n": 12,
+      "min": 0.002711,
+      "max": 0.085141,
+      "median": 0.023178499999999998,
+      "mean": 0.029844
+    },
+    "width_rank_pct_july25_d87": {
+      "n": 12,
+      "min": 4.0,
+      "max": 100.0,
+      "median": 48.0,
+      "mean": 51.333333
+    },
+    "unique_origin_count_d87_depth2": {
+      "n": 12,
+      "min": 2.0,
+      "max": 4.0,
+      "median": 2.0,
+      "mean": 2.25
+    },
+    "gap_to_next_upper_abs_d87": {
+      "n": 12,
+      "min": 0.0,
+      "max": 0.00044800000000000395,
+      "median": 4.699999999999843e-05,
+      "mean": 0.000141
+    },
+    "persistence_bars_price_tracked_d88": {
+      "n": 12,
+      "min": 1.0,
+      "max": 503.0,
+      "median": 28.0,
+      "mean": 122.0
+    },
+    "overlap_bars_depth2_ge2_d88_july_window": {
+      "n": 12,
+      "min": 1.0,
+      "max": 503.0,
+      "median": 28.0,
+      "mean": 122.0
+    },
+    "overlap_fraction_d89_168h_mixed": {
+      "n": 12,
+      "min": 0.000496,
+      "max": 0.338126,
+      "median": 0.013882,
+      "mean": 0.068129
+    },
+    "overlap_bars_ge2_d89_168h_mixed": {
+      "n": 12,
+      "min": 1.0,
+      "max": 682.0,
+      "median": 28.0,
+      "mean": 137.416667
+    },
+    "ch_known_at_min_hours_d89": {
+      "n": 12,
+      "min": 0.0,
+      "max": 0.1667,
+      "median": 0.0,
+      "mean": 0.034717
+    },
+    "segment_epoch_min_hours_d89": {
+      "n": 12,
+      "min": 0.0833,
+      "max": 0.25,
+      "median": 0.0833,
+      "mean": 0.118042
+    },
+    "hours_signal_minus_first_tracked_d88": {
+      "n": 12,
+      "min": 0.0,
+      "max": 168.0,
+      "median": 103.5,
+      "mean": 82.840278
+    },
+    "adjacent_upper_neighbors_50bp_d89": {
+      "n": 12,
+      "min": 1.0,
+      "max": 4.0,
+      "median": 2.0,
+      "mean": 2.416667
+    }
+  },
+  "fresh_unstable_d89_selected": 4,
+  "fresh_unstable_d89_comparison": 3,
+  "sudden_appearance_d88_selected": 4,
+  "sudden_appearance_d88_comparison": 2,
+  "data_quality": {
+    "d88_vs_d89_overlap": "D88 tracks price-region overlap within window often capped at Jul-1; D89 uses 168h from May with D8 exact Jul bars + CH proxy pre-Jul. Prefer D89 fraction for cross-trade overlap density; D88 bars for July-centric persistence.",
+    "origin_age": "Use ch_known_at_min_hours_d89 (CH SSOT), not segment_epoch alone."
+  }
+}

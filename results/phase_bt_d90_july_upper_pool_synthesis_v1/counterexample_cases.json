@@ -1,0 +1,240 @@
+[
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-07T09:10:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.013339,
+      "width_rank": 24.0,
+      "overlap_bars_d89": 682,
+      "overlap_frac_d89": 0.338126,
+      "persistence_d88": 503
+    }
+  },
+  {
+    "case_id": "tp_short_overlap",
+    "reason": "TP with very short D89 overlap track",
+    "fill_time_utc": "2026-07-08T04:30:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.013765,
+      "width_rank": 28.0,
+      "overlap_bars_d89": 3,
+      "overlap_frac_d89": 0.001487,
+      "persistence_d88": 3
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-09T03:05:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.038792,
+      "width_rank": 80.0,
+      "overlap_bars_d89": 43,
+      "overlap_frac_d89": 0.021319,
+      "persistence_d88": 43
+    }
+  },
+  {
+    "case_id": "user_wide_band",
+    "reason": "User-flagged but wide band rank (>=80pct)",
+    "fill_time_utc": "2026-07-09T03:05:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.038792,
+      "width_rank": 80.0,
+      "overlap_bars_d89": 43,
+      "overlap_frac_d89": 0.021319,
+      "persistence_d88": 43
+    }
+  },
+  {
+    "case_id": "user_wide_band",
+    "reason": "User-flagged but wide band rank (>=80pct)",
+    "fill_time_utc": "2026-07-12T01:15:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.060448,
+      "width_rank": 88.0,
+      "overlap_bars_d89": 21,
+      "overlap_frac_d89": 0.010412,
+      "persistence_d88": 21
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-12T23:05:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.002751,
+      "width_rank": 8.0,
+      "overlap_bars_d89": 199,
+      "overlap_frac_d89": 0.098661,
+      "persistence_d88": 199
+    }
+  },
+  {
+    "case_id": "not_user_thin_band",
+    "reason": "Not user-flagged but thin band rank (<=12pct)",
+    "fill_time_utc": "2026-07-12T23:05:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.002751,
+      "width_rank": 8.0,
+      "overlap_bars_d89": 199,
+      "overlap_frac_d89": 0.098661,
+      "persistence_d88": 199
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-13T04:25:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.011086,
+      "width_rank": 20.0,
+      "overlap_bars_d89": 44,
+      "overlap_frac_d89": 0.021815,
+      "persistence_d88": 44
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-13T13:30:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.013857,
+      "width_rank": 32.0,
+      "overlap_bars_d89": 44,
+      "overlap_frac_d89": 0.021815,
+      "persistence_d88": 44
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-15T11:50:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.002711,
+      "width_rank": 4.0,
+      "overlap_bars_d89": 107,
+      "overlap_frac_d89": 0.053049,
+      "persistence_d88": 107
+    }
+  },
+  {
+    "case_id": "not_user_thin_band",
+    "reason": "Not user-flagged but thin band rank (<=12pct)",
+    "fill_time_utc": "2026-07-15T11:50:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.002711,
+      "width_rank": 4.0,
+      "overlap_bars_d89": 107,
+      "overlap_frac_d89": 0.053049,
+      "persistence_d88": 107
+    }
+  },
+  {
+    "case_id": "tp_short_overlap",
+    "reason": "TP with very short D89 overlap track",
+    "fill_time_utc": "2026-07-23T14:35:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.034009,
+      "width_rank": 72.0,
+      "overlap_bars_d89": 1,
+      "overlap_frac_d89": 0.000496,
+      "persistence_d88": 1
+    }
+  },
+  {
+    "case_id": "tp_short_overlap",
+    "reason": "TP with very short D89 overlap track",
+    "fill_time_utc": "2026-07-23T16:35:00Z",
+    "user_visually_flagged_weak": false,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.034428,
+      "width_rank": 76.0,
+      "overlap_bars_d89": 1,
+      "overlap_frac_d89": 0.000496,
+      "persistence_d88": 1
+    }
+  },
+  {
+    "case_id": "user_tp",
+    "reason": "User-flagged weak visual but TP outcome",
+    "fill_time_utc": "2026-07-24T12:05:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.069105,
+      "width_rank": 96.0,
+      "overlap_bars_d89": 20,
+      "overlap_frac_d89": 0.009916,
+      "persistence_d88": 20
+    }
+  },
+  {
+    "case_id": "user_wide_band",
+    "reason": "User-flagged but wide band rank (>=80pct)",
+    "fill_time_utc": "2026-07-24T12:05:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.069105,
+      "width_rank": 96.0,
+      "overlap_bars_d89": 20,
+      "overlap_frac_d89": 0.009916,
+      "persistence_d88": 20
+    }
+  },
+  {
+    "case_id": "sl_long_overlap",
+    "reason": "SL with long overlap (comparison-like)",
+    "fill_time_utc": "2026-07-28T05:00:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_SL",
+    "highlights": {
+      "width_pct": 0.022831,
+      "width_rank": 48.0,
+      "overlap_bars_d89": 337,
+      "overlap_frac_d89": 0.16708,
+      "persistence_d88": 337
+    }
+  },
+  {
+    "case_id": "user_tp",
+    "reason": "User-flagged weak visual but TP outcome",
+    "fill_time_utc": "2026-07-31T03:50:00Z",
+    "user_visually_flagged_weak": true,
+    "exit_reason": "SIMULATED_TP",
+    "highlights": {
+      "width_pct": 0.028514,
+      "width_rank": 60.0,
+      "overlap_bars_d89": 453,
+      "overlap_frac_d89": 0.224591,
+      "persistence_d88": 453
+    }
+  }
+]
