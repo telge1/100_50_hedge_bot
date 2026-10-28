@@ -5895,6 +5895,10 @@
     return String(sid || "") === "chronological_short_backtester_bt_d46";
   }
 
+  function isBtD85JulyResearchStrategy(sid) {
+    return String(sid || "") === "bt_d85_july_ema_v3_no_pause_research";
+  }
+
   const BT_D23_DEFAULT_RUN = "bt_d23_pilot_sep11_24h_v1";
   const BT_D26_DEFAULT_RUN = "bt_d26_dynamic_referenz_sep11_24h_v1";
   const BT_D23_VIEWPORT_DEBOUNCE_MS = 180;
@@ -6263,6 +6267,34 @@
     box.hidden = !lines.length;
   }
 
+  function renderBtD85Summary(snap) {
+    const el = $("researchBtD7Summary");
+    if (!el) return;
+    const bt = (snap && snap.bt_d85_july_research) || {};
+    const sum = bt.summary || (snap && snap.backtester && snap.backtester.summary) || {};
+    if (!isBtD85JulyResearchStrategy(btStrategy()) || !bt.visible) {
+      if (
+        !isBtD7PoolLandscapeStrategy(btStrategy()) &&
+        !isBtD23SetupScannerStrategy(btStrategy()) &&
+        !isBtD26DynamicSelectorStrategy(btStrategy()) &&
+        !isBtD46ChronologicalBacktesterStrategy(btStrategy())
+      ) {
+        el.hidden = true;
+        el.textContent = "";
+      }
+      return;
+    }
+    const parts = [
+      "BT-D85 · Juli 2026 · EMA V3 · No post-SL pause (research)",
+      sum.trade_count != null ? (sum.trade_count + " fills") : "",
+      sum.tp_count != null ? (sum.tp_count + " TP") : "",
+      sum.sl_count != null ? (sum.sl_count + " SL") : "",
+      sum.fill_disclaimer || "SIMULATED — NOT EXCHANGE CONFIRMED",
+    ].filter(Boolean);
+    el.textContent = parts.join(" · ");
+    el.hidden = !parts.length;
+  }
+
   function renderBtD46Summary(snap) {
     const el = $("researchBtD7Summary");
     if (!el) return;
@@ -6272,7 +6304,8 @@
       if (
         !isBtD7PoolLandscapeStrategy(btStrategy()) &&
         !isBtD23SetupScannerStrategy(btStrategy()) &&
-        !isBtD26DynamicSelectorStrategy(btStrategy())
+        !isBtD26DynamicSelectorStrategy(btStrategy()) &&
+        !isBtD85JulyResearchStrategy(btStrategy())
       ) {
         el.hidden = true;
         el.textContent = "";
@@ -6372,6 +6405,21 @@
     }
   }
 
+  async function clearBtD85JulyLayer() {
+    if (!state.symbol) return null;
+    try {
+      const snap = await sendJson("/api/research/backtester/bt-d85-july/load", "POST", {
+        symbol: state.symbol,
+        visible: false,
+      }, { sourceAction: "bt-d85-clear" });
+      applyWorkspace(snap);
+      await refreshOverlaysVisible();
+      return snap;
+    } catch (e) {
+      return null;
+    }
+  }
+
   async function clearBtD46ChronologicalLayer() {
     if (!state.symbol) return null;
     try {
@@ -6404,30 +6452,41 @@
 
   async function syncResearchBacktesterLayersOnStrategyChange(sid) {
     if (!state.symbol) return;
+    if (isBtD85JulyResearchStrategy(sid)) {
+      await clearBtD26DynamicSelectorLayer();
+      await clearBtD23SetupScannerLayer();
+      await clearBtD46ChronologicalLayer();
+      return;
+    }
     if (isBtD46ChronologicalBacktesterStrategy(sid)) {
       await clearBtD26DynamicSelectorLayer();
       await clearBtD23SetupScannerLayer();
+      await clearBtD85JulyLayer();
       return;
     }
     if (isBtD26DynamicSelectorStrategy(sid)) {
       await clearBtD46ChronologicalLayer();
       await clearBtD23SetupScannerLayer();
+      await clearBtD85JulyLayer();
       return;
     }
     if (isBtD23SetupScannerStrategy(sid)) {
       await clearBtD26DynamicSelectorLayer();
       await clearBtD46ChronologicalLayer();
+      await clearBtD85JulyLayer();
       return;
     }
     await clearBtD26DynamicSelectorLayer();
     await clearBtD46ChronologicalLayer();
     await clearBtD23SetupScannerLayer();
+    await clearBtD85JulyLayer();
   }
 
   async function applyBtD46ChronologicalBacktester(visible) {
     if (!state.symbol) return null;
     await clearBtD26DynamicSelectorLayer();
     await clearBtD23SetupScannerLayer();
+    await clearBtD85JulyLayer();
     const snap = await sendJson("/api/research/backtester/bt-d46-chronological/load", "POST", {
       symbol: state.symbol,
       visible: visible !== false,
@@ -6455,6 +6514,38 @@
         } catch (ignore) { /* ignore */ }
       }
     }
+    repaintExactOriginDensityAllVisiblePanes();
+    return snap;
+  }
+
+  async function applyBtD85JulyResearchBacktester(visible) {
+    if (!state.symbol) return null;
+    await clearBtD26DynamicSelectorLayer();
+    await clearBtD23SetupScannerLayer();
+    await clearBtD46ChronologicalLayer();
+    const snap = await sendJson("/api/research/backtester/bt-d85-july/load", "POST", {
+      symbol: state.symbol,
+      visible: visible !== false,
+    }, { sourceAction: "backtester" });
+    applyWorkspace(snap);
+    syncBtD7Ui(snap);
+    await refreshOverlaysVisible();
+    repaintExactOriginDensityAllVisiblePanes();
+    const span = (snap.backtester && snap.backtester.time_span) ||
+      (snap.backtester && snap.backtester.summary && snap.backtester.summary.time_span) || {};
+    if (span.start && span.end) {
+      try {
+        await zoomChartToIsoRange(span.start, span.end, span.start);
+      } catch (zoomErr) {
+        try {
+          console.warn("[research] bt-d85 zoom after load", zoomErr);
+        } catch (ignore) { /* ignore */ }
+      }
+    }
+    setStatus(
+      (snap.backtester && snap.backtester.message) ||
+      "BT-D85 July research overlay geladen"
+    );
     repaintExactOriginDensityAllVisiblePanes();
     return snap;
   }
@@ -6503,6 +6594,10 @@
       renderBtD46Summary(snap);
       return;
     }
+    if (isBtD85JulyResearchStrategy(btStrategy())) {
+      renderBtD85Summary(snap);
+      return;
+    }
     if (!isBtD7PoolLandscapeStrategy(btStrategy()) || !bt.visible) {
       el.hidden = true;
       el.textContent = "";
@@ -6536,6 +6631,7 @@
     renderBtD23Summary(snap || state.workspace);
     renderBtD26Summary(snap || state.workspace);
     renderBtD46Summary(snap || state.workspace);
+    renderBtD85Summary(snap || state.workspace);
   }
 
   async function applyBtD12PoolLandscapeBacktester(visible) {
@@ -8921,6 +9017,11 @@
       $("researchBtStrategy").addEventListener("change", async function () {
         syncBtStrategyUi();
         const sid = btStrategy();
+        if (isBtD85JulyResearchStrategy(sid)) {
+          await refreshOverlaysVisible();
+          setStatus("Strategie: BT-D85 July 2026 · Backtester lädt gespeicherte Research-Trades");
+          return;
+        }
         if (isBtD7PoolLandscapeStrategy(sid)) {
           await refreshOverlaysVisible();
           setStatus("Strategie: Pool Landscape SHORT · Backtester lädt latest_result.json");
@@ -9116,6 +9217,15 @@
           await applyBtD26DynamicSelectorBacktester(true);
         } catch (err) {
           setStatus("BT-D26 Laden fehlgeschlagen: " + (err.message || err), "error");
+        }
+        return;
+      }
+      if (isBtD85JulyResearchStrategy(btStrategy())) {
+        setStatus("BT-D85: lade July 2026 research trades …");
+        try {
+          await applyBtD85JulyResearchBacktester(true);
+        } catch (err) {
+          setStatus("BT-D85 Laden fehlgeschlagen: " + (err.message || err), "error");
         }
         return;
       }

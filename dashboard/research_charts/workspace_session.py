@@ -53,6 +53,16 @@ from .bt_d46_chronological_backtester import (
     build_viewport_draw_specs as d46_build_viewport_draw_specs,
     position_detail_panel as d46_position_detail_panel,
 )
+from .bt_d85_july_research_backtester import (
+    BACKTESTER_SOURCE as BT_D85_SOURCE,
+    BOX_PREFIX as BT_D85_BOX_PREFIX,
+    LINK_PREFIX as BT_D85_LINK_PREFIX,
+    STRATEGY_ID as BT_D85_STRATEGY_ID,
+    build_drawing_specs as d85_build_drawing_specs,
+    build_summary as d85_build_summary,
+    load_trade_ledger as d85_load_trade_ledger,
+    validate_ledger as d85_validate_ledger,
+)
 from .stoch_backtester import BACKTESTER_SOURCE, signal_to_position_spec
 from .trp_import import load_trp
 
@@ -1425,6 +1435,7 @@ class ResearchWorkspace:
         self._clear_bt_d26_dynamic_selector_drawings(sym)
         self._bt_d26_catalog = None
         self._clear_bt_d46_chronological_drawings(sym)
+        self._clear_bt_d85_july_drawings(sym)
         self._bt_d46_catalog = {
             "symbol": sym,
             "overlay_doc": doc,
@@ -1553,6 +1564,135 @@ class ResearchWorkspace:
                 f"causal as-of {built.get('as_of_utc', '')} · SIMULATED — NOT EXCHANGE CONFIRMED"
             ),
             "time_span": (cat.get("summary") or {}).get("time_span"),
+        }
+        return snap
+
+    def _clear_bt_d85_july_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if (
+                did.startswith(BT_D85_BOX_PREFIX)
+                or did.startswith(BT_D85_LINK_PREFIX)
+                or origin == BT_D85_SOURCE
+            ):
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        return removed
+
+    def clear_bt_d85_july_backtester(self, symbol: str) -> dict[str, Any]:
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d85_july_drawings(sym)
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": BT_D85_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": BT_D85_SOURCE,
+            "payload_kind": "bt_d85_july_chart_integration_v1",
+            "message": "BT-D85 July research overlay hidden",
+        }
+        snap["bt_d85_july_research"] = {"visible": False}
+        return snap
+
+    def load_bt_d85_july_backtester(
+        self,
+        symbol: str,
+        rows: list[dict[str, Any]],
+        summary: dict[str, Any],
+        *,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d23_catalog = None
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._bt_d26_catalog = None
+        self._clear_bt_d46_chronological_drawings(sym)
+        self._bt_d46_catalog = None
+        self._clear_bt_d85_july_drawings(sym)
+
+        positions, links = d85_build_drawing_specs(rows)
+        loaded = 0
+        for spec in positions:
+            drawing = trp["make_short_position"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["entry"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["target"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"],
+                entry_price=float(spec["entry"]),
+                stop_price=float(spec["stop"]),
+                target_price=float(spec["target"]),
+            )
+            meta = dict(spec.get("metadata") or {})
+            status = str(meta.get("trade_status") or "")
+            profit = "#22c55e" if status == "EXIT_TP" else "#ef4444"
+            base_style = self._snapshot_draw_style()
+            style = dc_replace(base_style, color="#f97316", width=1.5, profit_color=profit, loss_color="#ef4444")
+            drawing = dc_replace(drawing, metadata=meta, style=style)
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+
+        for spec in links:
+            link_style = dc_replace(
+                self._snapshot_draw_style(),
+                color="#94a3b8",
+                width=1.0,
+                line_style="dotted",
+                opacity=0.55,
+            )
+            drawing = trp["make_trend"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["price_a"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["price_b"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"],
+                style=link_style,
+            )
+            drawing = dc_replace(drawing, metadata=dict(spec.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["bt_d85_july_research"] = {
+            "visible": visible,
+            "summary": summary,
+            "trade_count": summary.get("trade_count"),
+            "tp_count": summary.get("tp_count"),
+            "sl_count": summary.get("sl_count"),
+            "payload_kind": "bt_d85_july_chart_integration_v1",
+        }
+        snap["backtester"] = {
+            "strategy_id": BT_D85_STRATEGY_ID,
+            "symbol": sym,
+            "loaded": loaded,
+            "visible": visible,
+            "source": BT_D85_SOURCE,
+            "payload_kind": "bt_d85_july_chart_integration_v1",
+            "summary": summary,
+            "simulated_only": True,
+            "plan_only": False,
+            "message": (
+                f"BT-D85 July 2026 · {summary.get('trade_count', 0)} modeled shorts · "
+                f"TP {summary.get('tp_count')} / SL {summary.get('sl_count')} · research replay only"
+            ),
+            "time_span": summary.get("time_span"),
         }
         return snap
 

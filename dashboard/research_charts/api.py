@@ -1456,6 +1456,67 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             selected_position_id=selected_position_id,
         )
 
+    @router.get("/api/research/backtester/bt-d85-july/meta")
+    async def api_research_backtester_bt_d85_july_meta(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .bt_d85_july_research_backtester import (
+            build_summary,
+            load_trade_ledger,
+            validate_ledger,
+        )
+
+        sym = str(symbol or "").strip().upper()
+        rows, path, errs = load_trade_ledger()
+        if errs:
+            return _error(404, "ledger_missing", ",".join(errs))
+        val = validate_ledger(rows)
+        summary = build_summary(rows, ledger_path=path)
+        if sym != "DOGEUSDT":
+            val.append("symbol_mismatch")
+        return {
+            "success": not val,
+            "symbol": sym,
+            "validation_errors": val,
+            "summary": summary,
+            "payload_kind": "bt_d85_july_chart_integration_v1",
+        }
+
+    @router.post("/api/research/backtester/bt-d85-july/load")
+    async def api_research_backtester_bt_d85_july_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .bt_d85_july_research_backtester import (
+            STRATEGY_ID as BT_D85_SID,
+            build_summary,
+            load_trade_ledger,
+            validate_ledger,
+        )
+
+        symbol = str(body.get("symbol") or "").strip().upper()
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        ws = get_workspace()
+        if visible is False:
+            return ws.clear_bt_d85_july_backtester(symbol)
+        rows, path, errs = load_trade_ledger()
+        if errs:
+            return _error(400, "ledger_invalid", ",".join(errs))
+        val = validate_ledger(rows)
+        if val:
+            return _error(400, "ledger_validation_failed", ",".join(val))
+        if symbol != "DOGEUSDT":
+            return _error(400, "symbol_mismatch", "BT-D85 ledger is DOGEUSDT only")
+        summary = build_summary(rows, ledger_path=path)
+        snap = ws.load_bt_d85_july_backtester(symbol, rows, summary, visible=True)
+        snap["backtester"]["strategy_id"] = BT_D85_SID
+        return snap
+
     @router.post("/api/research/backtester/load")
     async def api_research_backtester_load(
         user: dict = Depends(require_auth),
