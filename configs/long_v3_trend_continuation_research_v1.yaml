@@ -1,0 +1,25 @@
+# LONG V3 Trend Continuation — isolated research (does not enable live trading)
+long_trend_continuation:
+  enabled: false
+
+  support:
+    min_pool_age_bars: 5
+    min_pool_age_mode: consecutive_active_depth2_v1
+    min_pool_height_pct: 0.1
+    require_formation_below_price: true
+    min_unique_origins: 2
+    selection_mode: nearest_qualified_lower_support
+
+  entry:
+    order_type: buy_limit
+    price_edge: support_upper
+    lower_gap_threshold_pct: 0.6
+
+  stop_loss:
+    mode: next_deeper_qualified_lower_pool
+    price_edge: upper
+    max_risk_pct: null
+
+  research:
+    recovery_mode: next_bar
+    compare_same_bar_recovery: true
