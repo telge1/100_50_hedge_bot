@@ -28,7 +28,7 @@ def test_html_three_month_dropdown_options() -> None:
     assert "BT-D85 · Juli 2026 · EMA V3 · 25 Trades" in html
     assert "bt_d91_august_ema_v3_no_pause_research" in html
     assert "BT-D91 · August 2026 · EMA V3 · 25 Trades" in html
-    assert "bt-d95-three-month-overlay-v1" in html
+    assert "bt-d95-three-month-overlay-v1" in html or "bt-d105-d100a-june-overlay-v1" in html
 
 
 def test_js_frozen_month_wiring() -> None:

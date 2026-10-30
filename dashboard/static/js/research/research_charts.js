@@ -5900,6 +5900,10 @@
       loadUrl: "/api/research/backtester/bt-d94-june/load",
       label: "BT-D94R · Juni 2026 · EMA V3 · 34 Trades",
     },
+    bt_d100a_june_gap_anchor_research: {
+      loadUrl: "/api/research/backtester/bt-d100a-june/load",
+      label: "BT-D100-A · Juni 2026 · Gap-Anker · 14 Trades",
+    },
     bt_d85_july_ema_v3_no_pause_research: {
       loadUrl: "/api/research/backtester/bt-d85-july/load",
       label: "BT-D85 · Juli 2026 · EMA V3 · 25 Trades",
@@ -5907,6 +5911,30 @@
     bt_d91_august_ema_v3_no_pause_research: {
       loadUrl: "/api/research/backtester/bt-d91-august/load",
       label: "BT-D91 · August 2026 · EMA V3 · 25 Trades",
+    },
+    bt_d108_aug_structural_sl_research: {
+      loadUrl: "/api/research/backtester/bt-d108-aug-structural-sl/load",
+      label: "BT-D108 · August 2026 · Struktur-SL 1,2 % · 3 Trades",
+    },
+    short_main_v2_june_combined_exit_research: {
+      loadUrl: "/api/research/backtester/bt-short-main-v2-june/load",
+      label: "SHORT MAIN V2 · Juni 2026 · D107 SL + Dynamic TP · 10 Trades",
+    },
+    short_main_v2_july_combined_exit_research: {
+      loadUrl: "/api/research/backtester/bt-short-main-v2-july/load",
+      label: "SHORT MAIN V2 · Juli 2026 · D107 SL + Dynamic TP · 8 Trades",
+    },
+    short_main_v2_august_combined_exit_research: {
+      loadUrl: "/api/research/backtester/bt-short-main-v2-august/load",
+      label: "SHORT MAIN V2 · August 2026 · D107 SL + Dynamic TP · 3 Trades",
+    },
+    short_main_v2_september_partial_combined_exit_research: {
+      loadUrl: "/api/research/backtester/bt-short-main-v2-september-partial/load",
+      label: "SHORT MAIN V2 · September 2026 PARTIAL · D107 SL + Dynamic TP · 6 Trades",
+    },
+    long_v3_phase3a_jun_sep_frozen_a_research: {
+      loadUrl: "/api/research/backtester/bt-long-v3-phase3a/load",
+      label: "LONG V3 — Phase 3A — Juni–September 2026 — Frozen A",
     },
   };
 
@@ -6317,8 +6345,14 @@
     const parts = [
       cfg.label || sid,
       sum.trade_count != null ? (sum.trade_count + " fills") : "",
-      sum.tp_count != null ? (sum.tp_count + " TP") : "",
+      sum.gap_tp_count != null ? (sum.gap_tp_count + " Gap-TP") : "",
+      sum.tp_count != null && sum.gap_tp_count == null ? (sum.tp_count + " TP") : "",
       sum.sl_count != null ? (sum.sl_count + " SL") : "",
+      sum.ema_exit_count != null ? (sum.ema_exit_count + " EMA") : "",
+      sum.tp_limit_partial_count != null && sum.tp_limit_partial_count > 0
+        ? (sum.tp_limit_partial_count + " TP-Audit unvollständig")
+        : "",
+      sum.coverage === "PARTIAL" ? "PARTIAL coverage" : "",
       sum.fill_disclaimer || "SIMULATED — NOT EXCHANGE CONFIRMED",
     ].filter(Boolean);
     el.textContent = parts.join(" · ");

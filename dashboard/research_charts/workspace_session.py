@@ -61,6 +61,12 @@ from .frozen_month_research_overlay_v1 import (
     load_trade_ledger as frozen_month_load_trade_ledger,
     validate_ledger as frozen_month_validate_ledger,
 )
+from .short_main_v2_research_overlay_v1 import (
+    BACKTESTER_SOURCE as SHORT_MAIN_V2_BACKTESTER_SOURCE,
+    all_drawing_prefixes as short_main_v2_all_drawing_prefixes,
+    build_drawing_specs as short_main_v2_build_drawing_specs,
+    get_profile as short_main_v2_get_profile,
+)
 from .bt_d85_july_research_backtester import (
     BACKTESTER_SOURCE as BT_D85_SOURCE,
     BOX_PREFIX as BT_D85_BOX_PREFIX,
@@ -1638,11 +1644,18 @@ class ResearchWorkspace:
         self._clear_bt_d46_chronological_drawings(sym)
         self._bt_d46_catalog = None
         self._clear_frozen_month_research_drawings(sym)
+        self._clear_short_main_v2_research_drawings(sym)
 
         positions, links = frozen_month_build_drawing_specs(prof, rows)
         loaded = 0
         for spec in positions:
-            drawing = trp["make_short_position"](
+            factory = (
+                trp["make_long_position"]
+                if spec.get("drawing_type") == "long_position"
+                else trp["make_short_position"]
+            )
+            entry_color = "#3b82f6" if prof.position_side == "long" else "#f97316"
+            drawing = factory(
                 symbol=sym,
                 timestamp_a=spec["start"],
                 price_a=float(spec["entry"]),
@@ -1659,7 +1672,7 @@ class ResearchWorkspace:
             status = str(meta.get("trade_status") or "")
             profit = "#22c55e" if status == "EXIT_TP" else "#ef4444"
             base_style = self._snapshot_draw_style()
-            style = dc_replace(base_style, color="#f97316", width=1.5, profit_color=profit, loss_color="#ef4444")
+            style = dc_replace(base_style, color=entry_color, width=1.5, profit_color=profit, loss_color="#ef4444")
             drawing = dc_replace(drawing, metadata=meta, style=style)
             self.drawings.add_drawing(drawing)
             loaded += 1
@@ -1708,8 +1721,171 @@ class ResearchWorkspace:
             "simulated_only": True,
             "plan_only": False,
             "message": (
-                f"{prof.display_name} · {summary.get('trade_count', 0)} modeled shorts · "
+                f"{prof.display_name} · {summary.get('trade_count', 0)} modeled "
+                f"{'longs' if prof.position_side == 'long' else 'shorts'} · "
                 f"TP {summary.get('tp_count')} / SL {summary.get('sl_count')} · research replay only"
+            ),
+            "time_span": summary.get("time_span"),
+        }
+        return snap
+
+    def _clear_short_main_v2_research_drawings(self, symbol: str) -> int:
+        sym = str(symbol or "").strip().upper()
+        removed = 0
+        prefixes = short_main_v2_all_drawing_prefixes()
+        origins = {SHORT_MAIN_V2_BACKTESTER_SOURCE}
+        for drawing in list(self.drawings.get_drawings(sym, include_hidden=True)):
+            did = str(getattr(drawing, "drawing_id", "") or "")
+            meta = drawing.metadata or {}
+            origin = str(meta.get("origin") or "")
+            if any(did.startswith(p) for p in prefixes) or origin in origins:
+                self.drawings.remove_drawing(drawing.drawing_id)
+                removed += 1
+        return removed
+
+    def clear_short_main_v2_research_backtester(self, month_key: str, symbol: str) -> dict[str, Any]:
+        prof = short_main_v2_get_profile(month_key)
+        sym = str(symbol or "").strip().upper()
+        self._clear_short_main_v2_research_drawings(sym)
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap["backtester"] = {
+            "strategy_id": prof.strategy_id,
+            "symbol": sym,
+            "loaded": 0,
+            "visible": False,
+            "source": prof.backtester_source,
+            "payload_kind": prof.payload_kind,
+            "message": f"{prof.display_name} overlay hidden",
+        }
+        snap[prof.workspace_snap_key] = {"visible": False}
+        return snap
+
+    def load_short_main_v2_research_backtester(
+        self,
+        month_key: str,
+        symbol: str,
+        rows: list[dict[str, Any]],
+        summary: dict[str, Any],
+        *,
+        visible: bool = True,
+    ) -> dict[str, Any]:
+        prof = short_main_v2_get_profile(month_key)
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        sym = str(symbol or "").strip().upper()
+        self._clear_bt_d7_short_research_drawings(sym)
+        self._clear_bt_d23_setup_scanner_drawings(sym)
+        self._bt_d23_catalog = None
+        self._clear_bt_d26_dynamic_selector_drawings(sym)
+        self._bt_d26_catalog = None
+        self._clear_bt_d46_chronological_drawings(sym)
+        self._bt_d46_catalog = None
+        self._clear_frozen_month_research_drawings(sym)
+        self._clear_short_main_v2_research_drawings(sym)
+
+        positions, links, tp_segs = short_main_v2_build_drawing_specs(prof, rows)
+        loaded = 0
+        for spec in positions:
+            drawing = trp["make_short_position"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["entry"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["target"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"],
+                entry_price=float(spec["entry"]),
+                stop_price=float(spec["stop"]),
+                target_price=float(spec["target"]),
+            )
+            meta = dict(spec.get("metadata") or {})
+            gross = meta.get("gross_return_pct_short")
+            profit = "#22c55e" if (gross is not None and float(gross) > 0) else "#ef4444"
+            base_style = self._snapshot_draw_style()
+            style = dc_replace(base_style, color="#f97316", width=1.5, profit_color=profit, loss_color="#ef4444")
+            drawing = dc_replace(drawing, metadata=meta, style=style)
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+
+        for spec in links:
+            link_style = dc_replace(
+                self._snapshot_draw_style(),
+                color="#94a3b8",
+                width=1.0,
+                line_style="dotted",
+                opacity=0.55,
+            )
+            drawing = trp["make_trend"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["price_a"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["price_b"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"],
+                style=link_style,
+            )
+            drawing = dc_replace(drawing, metadata=dict(spec.get("metadata") or {}))
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+
+        for spec in tp_segs:
+            seg_meta = dict(spec.get("metadata") or {})
+            seg_style = dc_replace(
+                self._snapshot_draw_style(),
+                color=str(seg_meta.get("color") or "#38bdf8"),
+                width=float(seg_meta.get("width") or 1.0),
+                line_style=str(seg_meta.get("line_style") or "solid"),
+                opacity=float(seg_meta.get("opacity") or 0.85),
+            )
+            drawing = trp["make_trend"](
+                symbol=sym,
+                timestamp_a=spec["start"],
+                price_a=float(spec["price_a"]),
+                timestamp_b=spec["end"],
+                price_b=float(spec["price_b"]),
+                created_on_timeframe="5m",
+                timeframe_scope="all",
+                drawing_id=spec["drawing_id"],
+                style=seg_style,
+            )
+            drawing = dc_replace(drawing, metadata=seg_meta)
+            self.drawings.add_drawing(drawing)
+            loaded += 1
+
+        self.persist_drawings()
+        snap = self.snapshot()
+        snap[prof.workspace_snap_key] = {
+            "visible": visible,
+            "summary": summary,
+            "trade_count": summary.get("trade_count"),
+            "tp_count": summary.get("tp_count"),
+            "sl_count": summary.get("sl_count"),
+            "gap_tp_count": summary.get("gap_tp_count"),
+            "ema_exit_count": summary.get("ema_exit_count"),
+            "coverage": summary.get("coverage"),
+            "payload_kind": prof.payload_kind,
+        }
+        cov = summary.get("coverage") or prof.coverage
+        snap["backtester"] = {
+            "strategy_id": prof.strategy_id,
+            "symbol": sym,
+            "loaded": loaded,
+            "visible": visible,
+            "source": prof.backtester_source,
+            "payload_kind": prof.payload_kind,
+            "summary": summary,
+            "simulated_only": True,
+            "plan_only": False,
+            "message": (
+                f"{prof.display_name} · {summary.get('trade_count', 0)} modeled shorts · "
+                f"Gap-TP {summary.get('gap_tp_count')} / SL {summary.get('sl_count')} / "
+                f"EMA {summary.get('ema_exit_count')}"
+                + (f" · {cov}" if cov == "PARTIAL" else "")
+                + " · research replay only"
             ),
             "time_span": summary.get("time_span"),
         }
