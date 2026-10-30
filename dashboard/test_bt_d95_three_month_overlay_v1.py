@@ -112,6 +112,9 @@ def test_workspace_load_clears_other_months(month_key: str, expected_loaded: int
 
     sym = "DOGEUSDT"
     ws = ResearchWorkspace()
+    # Shared user_data/drawings.json may contain manual TRP shapes without metadata.origin;
+    # they are not cleared by frozen-month overlay loaders (pre-existing since BT-D95).
+    ws.drawings.replace_drawings([])
     for key in ("july", "june", "august"):
         prof = get_profile(key)
         rows, path, _ = load_trade_ledger(prof)
