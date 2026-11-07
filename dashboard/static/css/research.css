@@ -294,6 +294,56 @@
     color: #d1d4dc;
     font-family: Inter, "Segoe UI", Ubuntu, system-ui, sans-serif;
     font-size: 12px;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.trp-toolbar-p17 {
+    border-top: 1px solid #2a2e39;
+    background: #131820;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.research-p17-signal-pick {
+    min-width: 280px;
+    max-width: min(560px, 52vw);
+    flex: 1 1 280px;
+}
+
+.research-p17-nav-hint {
+    font-size: 11px;
+    flex: 0 1 auto;
+}
+
+.research-archive-panel {
+    border-top: 1px solid #2a2e39;
+    background: #12161e;
+}
+
+.research-archive-panel > summary {
+    cursor: pointer;
+    padding: 6px 14px;
+    color: #8b93a7;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    list-style: none;
+}
+
+.research-archive-panel > summary::-webkit-details-marker { display: none; }
+
+.research-archive-body {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    padding: 0 14px 10px;
+    max-width: 100%;
+}
+
+.research-archive-footer {
+    border-top: none;
 }
 
 .trp-footerbar {

@@ -1088,6 +1088,13 @@ def pane_bundle(
         indicators = _trim_indicators_to_visible(indicators, start_unix=visible_start)
         packed["indicator_warmup_from"] = int(load_start)
         packed["indicator_warmup_bars"] = int(warm_bars)
+    if getattr(ws, "_ema59_6m_band_visible", False) and str(symbol).upper() == "DOGEUSDT" and timeframe == "5m":
+        from .ema59_6m_band_overlay_v1 import build_verified_ema_payload
+
+        indicators["ema"] = build_verified_ema_payload(
+            indicators.get("ema") or {"series": []},
+            candles,
+        )
     liquidity_meta = section["liquidity_meta"]
     return {
         **packed,

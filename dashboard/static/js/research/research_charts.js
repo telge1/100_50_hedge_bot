@@ -31,7 +31,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "phase6xt-bt-d36-density-supersede-v1";
+  const ASSET_V = "future-anchor-1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
@@ -45,6 +45,9 @@
   const OBL_KEY = "research.orderbook_levels.v3";
   const PTB_KEY = "research.trade_bubbles";
   const VP_DEBOUNCE_MS = 400;
+  const GOTO_NAV_PREFETCH_DEBOUNCE_MS = 400;
+  /** Max seconds to extend loaded candle span per prefetch batch (left/right). */
+  const GOTO_NAV_EXTEND_BATCH_SEC = 35 * 86400;
   // Match OB1000 levels: continuous WS book via collector keeper + 2s poll.
   const OBP_REFRESH_MS = 2 * 1000;
   const OBL_REFRESH_MS = 5 * 1000;
@@ -165,6 +168,10 @@
     liquidityLocationAsOf: null,
     /** Canonical GO TO unix (UTC seconds); drives as-of + chart focus. */
     gotoTsUtc: null,
+    /** Last GO-TO navigation target (UTC unix); re-focus after TF change without replay. */
+    gotoNavTargetTs: null,
+    /** Center of last visible chart window (UTC unix); TF change keeps camera region. */
+    gotoNavViewCenterTs: null,
     chartTimeMode: CHART_TIME_LIVE,
     replayTargetTs: null,
     replayWindow: null,
@@ -367,6 +374,85 @@
       return { from: Math.floor(Number(opts.from)), to: Math.floor(Number(opts.to)) };
     }
     return computeHistoryRangeUnix();
+  }
+
+  /**
+   * Pane candle window for free historical navigation (GO TO nav, TF change after pan): centered on
+   * the user's view; left edge may extend to saved History `from`, but **`to` is never** taken from
+   * custom History end (avoids Sept cap when CH has October). Upper bound is wall-clock `now`.
+   */
+  function navPaneLoadRangeForFreeNav(centerTs) {
+    if (centerTs == null) return { from: null, to: null };
+    readHistoryFromUi();
+    const center = Math.floor(Number(centerTs));
+    if (!Number.isFinite(center)) return { from: null, to: null };
+    const nowSec = Math.floor(Date.now() / 1000);
+    let spanSec = historySpanSeconds();
+    if (!Number.isFinite(spanSec) || spanSec < 86400) {
+      spanSec = 30 * 86400;
+    }
+    const half = Math.ceil(spanSec / 2);
+    let from = center - half;
+    let to = Math.min(center + half, nowSec);
+    const hist = computeHistoryRangeUnix();
+    if (hist && hist.from != null && Number.isFinite(Number(hist.from))) {
+      from = Math.min(from, Math.floor(Number(hist.from)));
+    }
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+      return { from: null, to: null };
+    }
+    return { from: Math.floor(from), to: Math.floor(to) };
+  }
+
+  /**
+   * Candle load window for GO-TO as free navigation (not replay): center on target with wide
+   * symmetric context. Does not merge with History preset `to` (avoids custom-pinned end caps).
+   */
+  function gotoNavCandleLoadRange(gotoTs, win) {
+    if (gotoTs == null) return { from: null, to: null };
+    const ts = Math.floor(Number(gotoTs));
+    if (!Number.isFinite(ts)) return { from: null, to: null };
+    readHistoryFromUi();
+    const contextSec = 45 * 86400;
+    const half = win && Number.isFinite(Number(win.viewPad)) ? Math.max(4 * 3600, Math.floor(Number(win.viewPad))) : 4 * 3600;
+    const span = Math.max(contextSec, half);
+    let from = ts - span;
+    let to = ts + span;
+    const hist = computeHistoryRangeUnix();
+    if (hist && hist.from != null && Number.isFinite(Number(hist.from))) {
+      from = Math.min(from, Math.floor(Number(hist.from)));
+    }
+    const now = Math.floor(Date.now() / 1000);
+    to = Math.min(Math.floor(to), now);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+      return { from: null, to: null };
+    }
+    return { from: Math.floor(from), to: Math.floor(to) };
+  }
+
+  /**
+   * Explicit pane load window for „Zurück zu Live“ / LLD-as-of clear: History preset for the left
+   * edge where applicable, but never cap `to` to an old custom end — use wall-clock `now`.
+   */
+  function liveRestorePaneLoadRange() {
+    readHistoryFromUi();
+    const now = Math.floor(Date.now() / 1000);
+    const p = state.history.preset || "30d";
+    if (p === "rolling") {
+      return { from: null, to: null };
+    }
+    if (p === "7d" || p === "30d" || p === "90d") {
+      const days = HISTORY_SPAN_DAYS[p] || 30;
+      return { from: now - days * 86400, to: now };
+    }
+    if (p === "custom") {
+      const from = utcInputToUnix(state.history.customStart);
+      if (from != null && Number.isFinite(Number(from))) {
+        return { from: Math.floor(Number(from)), to: now };
+      }
+      return { from: null, to: null };
+    }
+    return { from: null, to: null };
   }
 
   function updateHistoryHint(range) {
@@ -668,6 +754,8 @@
   }
 
   function enterHistoricalReplay(goto_ts_utc, win) {
+    state.gotoNavTargetTs = null;
+    state.gotoNavViewCenterTs = null;
     state.chartTimeMode = CHART_TIME_REPLAY;
     state.replayTargetTs = Math.floor(Number(goto_ts_utc));
     state.replayWindow = Object.assign({}, win, { goto_ts_utc: state.replayTargetTs });
@@ -683,6 +771,8 @@
   }
 
   function exitHistoricalReplay() {
+    state.gotoNavTargetTs = null;
+    state.gotoNavViewCenterTs = null;
     state.chartTimeMode = CHART_TIME_LIVE;
     state.replayTargetTs = null;
     state.replayWindow = null;
@@ -716,10 +806,11 @@
     readHistoryFromUi();
     const o = opts || {};
     const range = resolvePaneLoadRange(o);
+    const pinHistory = o.pinHistory !== false;
     if (range.from != null) {
       state.history.loadedFrom = range.from;
       state.history.loadedTo = range.to;
-      state.history.pinned = true;
+      if (pinHistory) state.history.pinned = true;
     } else {
       state.history.loadedFrom = null;
       state.history.loadedTo = null;
@@ -741,11 +832,15 @@
       if (!isHistoricalReplay() || o.replayGen == null || o.replayGen === state.replayGen) {
         // Focus first; do not re-lock to full candle span (that squeezes the chart).
         await jumpChartsToUnix(o.jumpToUnix, o.jumpPadSec);
-        lockReplayViewOnAllPanes(state.replayWindow || {
-          from: o.jumpToUnix - (o.jumpPadSec || 4 * 3600),
-          to: o.jumpToUnix + (o.jumpPadSec || 4 * 3600),
-          goto_ts_utc: o.jumpToUnix,
-        });
+        if (isHistoricalReplay()) {
+          lockReplayViewOnAllPanes(state.replayWindow || {
+            from: o.jumpToUnix - (o.jumpPadSec || 4 * 3600),
+            to: o.jumpToUnix + (o.jumpPadSec || 4 * 3600),
+            goto_ts_utc: o.jumpToUnix,
+          });
+        } else {
+          unlockReplayViewOnAllPanes();
+        }
       }
     }
   }
@@ -828,6 +923,33 @@
     return from == null ? null : { from: from, to: to };
   }
 
+  /** Focus each visible pane on its last loaded bar (tip), after a live restore. */
+  async function focusChartsOnLatestLoadedCandle() {
+    const ids = visibleIds();
+    await Promise.all(ids.map(async function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      const b = paneCandleBounds(pane);
+      if (!b) return;
+      const center = b.to;
+      if (!Number.isFinite(center)) return;
+      const step = TF_SEC[pane.tf] || 60;
+      const pad = Math.max(8 * step, 4 * 3600);
+      const chart = api(pane) || await whenReady(pane, 8000);
+      if (!chart) return;
+      try {
+        if (chart.setFollowLive) chart.setFollowLive(false);
+      } catch (e) { /* ignore */ }
+      if (chart.focusOnTime && chart.focusOnTime(center, pad)) return;
+      if (chart.setVisibleTimeRange) {
+        try {
+          if (chart.setVisibleTimeRange(center - pad, center + pad)) return;
+        } catch (e) { /* ignore */ }
+      }
+      if (chart.resetView) chart.resetView();
+    }));
+  }
+
   function unixToIsoZ(unix) {
     const n = Number(unix);
     if (!Number.isFinite(n)) return null;
@@ -880,10 +1002,19 @@
 
   async function restoreLiveCharts(statusMsg) {
     exitHistoricalReplay();
+    state.gotoNavTargetTs = null;
+    state.gotoNavViewCenterTs = null;
     updateLldAsOfHint(null);
     updateGotoSyncHint(null);
     state.history.pinned = false;
-    await reloadVisibleHistory({ sourceAction: "lld-asof-clear" });
+    const liveRange = liveRestorePaneLoadRange();
+    await reloadVisibleHistory({
+      sourceAction: "lld-asof-clear",
+      from: liveRange.from,
+      to: liveRange.to,
+      pinHistory: false,
+    });
+    await focusChartsOnLatestLoadedCandle();
     startPoll();
     if (scannerPoolsCommonEnabled()) {
       try {
@@ -965,30 +1096,49 @@
       return;
     }
     const lldOn = $("researchIndLld") && $("researchIndLld").checked;
-    enterHistoricalReplay(goto_ts_utc, win);
-    updateReplayExitUi();
-    if (lldOn) {
-      state.liquidityLocationAsOf = asOfIso;
-      updateLldAsOfHint(asOfIso);
+    const replayMode = $("researchGoToReplayMode") && $("researchGoToReplayMode").checked;
+    let loadRange;
+    let reqReplayGen = state.replayGen;
+    if (replayMode) {
+      enterHistoricalReplay(goto_ts_utc, win);
+      reqReplayGen = state.replayGen;
+      updateReplayExitUi();
+      if (lldOn) {
+        state.liquidityLocationAsOf = asOfIso;
+        updateLldAsOfHint(asOfIso);
+      } else {
+        state.liquidityLocationAsOf = null;
+        updateLldAsOfHint(null);
+      }
+      state.history.pinned = true;
+      loadRange = gotoCandleLoadRange(goto_ts_utc, win);
+      setStatus(
+        "REPLAY: " + fmtUtcSeconds(goto_ts_utc) +
+        (lldOn ? " · LLD as-of laden …" : " · Chart laden …")
+      );
     } else {
+      if (isHistoricalReplay()) {
+        exitHistoricalReplay();
+      }
+      unlockReplayViewOnAllPanes();
+      state.gotoTsUtc = Math.floor(Number(goto_ts_utc));
+      state.gotoNavTargetTs = Math.floor(Number(goto_ts_utc));
+      state.gotoNavViewCenterTs = Math.floor(Number(goto_ts_utc));
       state.liquidityLocationAsOf = null;
       updateLldAsOfHint(null);
+      updateReplayExitUi();
+      loadRange = gotoNavCandleLoadRange(goto_ts_utc, win);
+      setStatus("GO TO (Navigation): " + fmtUtcSeconds(goto_ts_utc) + " · Chart laden …");
     }
-    state.history.pinned = true;
-    setStatus(
-      "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
-      (lldOn ? " · LLD as-of laden …" : " · Chart laden …")
-    );
-    const reqReplayGen = state.replayGen;
-    const loadRange = gotoCandleLoadRange(goto_ts_utc, win);
     try {
       await reloadVisibleHistory({
         from: loadRange.from,
         to: loadRange.to,
         jumpToUnix: goto_ts_utc,
         jumpPadSec: win.viewPad,
-        sourceAction: "go-to",
-        replayGen: reqReplayGen,
+        sourceAction: replayMode ? "go-to-replay" : "go-to-nav",
+        replayGen: replayMode ? reqReplayGen : null,
+        pinHistory: !!replayMode,
       });
     } catch (err) {
       await restoreLiveCharts(
@@ -996,7 +1146,9 @@
       );
       return;
     }
-    if (!isHistoricalReplay() || reqReplayGen !== state.replayGen) return;
+    if (replayMode) {
+      if (!isHistoricalReplay() || reqReplayGen !== state.replayGen) return;
+    }
     if (!visiblePanesContainTime(goto_ts_utc)) {
       const bounds = mergedPaneBounds();
       const detail = bounds
@@ -1007,8 +1159,11 @@
       );
       return;
     }
-    // Soft follow-lock, then focus ±4h on the target (retry once after layout).
-    lockReplayViewOnAllPanes(state.replayWindow);
+    if (replayMode) {
+      lockReplayViewOnAllPanes(state.replayWindow);
+    } else {
+      unlockReplayViewOnAllPanes();
+    }
     let jumped = await jumpChartsToUnix(goto_ts_utc, win.viewPad);
     if (!jumped) {
       await new Promise(function (r) { setTimeout(r, 50); });
@@ -1020,7 +1175,6 @@
       );
       return;
     }
-    // Re-assert focus after EMA/overlays settle (they must not re-fit the camera).
     await new Promise(function (r) {
       if (typeof requestAnimationFrame === "function") requestAnimationFrame(function () { r(); });
       else setTimeout(r, 16);
@@ -1028,9 +1182,12 @@
     await jumpChartsToUnix(goto_ts_utc, win.viewPad);
     const focusPane = visibleIds()[0];
     if (focusPane) handleClick(focusPane, goto_ts_utc);
-    updateGotoSyncHint(win);
+    updateGotoSyncHint(replayMode ? state.replayWindow : win);
     updateHistoryHint({ from: loadRange.from, to: loadRange.to });
     updateReplayExitUi();
+    if (!replayMode) {
+      startPoll();
+    }
     if (scannerPoolsCommonEnabled()) {
       try {
         await refreshScannerCommonPools(null, { force: true });
@@ -1136,11 +1293,18 @@
         });
       }
     }
-    setStatus(
-      "GO TO: " + fmtUtcSeconds(goto_ts_utc) +
-      (lldOn ? " · LLD as-of " + asOfIso : "") +
-      " · Fokus ±4h · History geladen · [Zurück zu Live]"
-    );
+    if (replayMode) {
+      setStatus(
+        "REPLAY: " + fmtUtcSeconds(goto_ts_utc) +
+        (lldOn ? " · LLD as-of " + asOfIso : "") +
+        " · Fokus ±4h · History geladen · [Zurück zu Live]"
+      );
+    } else {
+      setStatus(
+        "GO TO (Navigation): " + fmtUtcSeconds(goto_ts_utc) +
+        " · Kontext geladen · Pan rechts lädt weiter bis Datenende · Replay/As-of optional"
+      );
+    }
   }
 
   async function syncChartAfterBacktest(startIso, endIso, focusIso) {
@@ -1583,6 +1747,7 @@
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
       on_visible_range: function (from, to) {
         if (pane._suppressOverlayViewportFeedback) return;
+        handleVisibleRangeForGotoNav(pane.id, from, to);
         scheduleVolumeProfile(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
@@ -1627,6 +1792,52 @@
     refreshStatusLine();
   }
 
+  function overlayFingerprintForSync(p) {
+    if (!p) return "";
+    // Avoid JSON.stringify of multi-MB EZM metadata on every sync.
+    if (p.type === "zone") {
+      return [
+        p.type || "",
+        p.start_timestamp != null ? p.start_timestamp : "",
+        p.end_timestamp != null ? p.end_timestamp : "",
+        p.top_price != null ? p.top_price : "",
+        p.bottom_price != null ? p.bottom_price : "",
+        p.opacity != null ? p.opacity : "",
+        p.border_color || "",
+        (p.style && p.style.color) || "",
+        p.visible === false ? "0" : "1",
+      ].join("|");
+    }
+    if (p.type === "line") {
+      const meta = p.metadata || {};
+      const ext = p.extend_right || meta.extend_right ? "1" : "0";
+      return [
+        p.type || "",
+        p.kind || "",
+        p.start_timestamp != null ? p.start_timestamp : "",
+        p.start_price != null ? p.start_price : "",
+        p.end_timestamp != null ? p.end_timestamp : "",
+        p.end_price != null ? p.end_price : "",
+        p.timestamp != null ? p.timestamp : "",
+        p.price != null ? p.price : "",
+        meta.selected ? "1" : "0",
+        ext,
+        p.style && p.style.width != null ? p.style.width : "",
+        (p.style && p.style.color) || "",
+        p.visible === false ? "0" : "1",
+      ].join("|");
+    }
+    return [
+      p.type || "",
+      p.shape || "",
+      p.timestamp || "",
+      p.price || "",
+      p.text || "",
+      (p.style && p.style.color) || "",
+      p.visible === false ? "0" : "1",
+    ].join("|");
+  }
+
   function syncOverlays(pane, payloads) {
     const chart = api(pane);
     const list = payloads || [];
@@ -1646,35 +1857,11 @@
     Object.keys(prev).forEach(function (id) {
       if (!wanted[id]) chart.removeOverlay(id);
     });
-    function overlayFp(p) {
-      if (!p) return "";
-      // Avoid JSON.stringify of multi-MB EZM metadata on every sync.
-      if (p.type === "zone") {
-        return [
-          p.type || "",
-          p.start_timestamp != null ? p.start_timestamp : "",
-          p.end_timestamp != null ? p.end_timestamp : "",
-          p.top_price != null ? p.top_price : "",
-          p.bottom_price != null ? p.bottom_price : "",
-          p.opacity != null ? p.opacity : "",
-          p.border_color || "",
-          (p.style && p.style.color) || "",
-          p.visible === false ? "0" : "1",
-        ].join("|");
-      }
-      return [
-        p.type || "",
-        p.shape || "",
-        p.timestamp || "",
-        p.price || "",
-        p.text || "",
-        (p.style && p.style.color) || "",
-        p.visible === false ? "0" : "1",
-      ].join("|");
-    }
     Object.keys(wanted).forEach(function (id) {
       if (!prev[id]) chart.addOverlay(wanted[id]);
-      else if (overlayFp(prev[id]) !== overlayFp(wanted[id])) chart.updateOverlay(wanted[id]);
+      else if (overlayFingerprintForSync(prev[id]) !== overlayFingerprintForSync(wanted[id])) {
+        chart.updateOverlay(wanted[id]);
+      }
     });
     pane.overlayPayloads = wanted;
     if (chart.layoutOverlays) {
@@ -4335,7 +4522,41 @@
             setStatus("TF-Wechsel Replay fehlgeschlagen: " + (err.message || err), "error");
           });
         } else {
-          loadPane(pid, { force: true, sourceAction: "tf-change" });
+          readHistoryFromUi();
+          let center = null;
+          if (state.gotoNavViewCenterTs != null && Number.isFinite(Number(state.gotoNavViewCenterTs))) {
+            center = Math.floor(Number(state.gotoNavViewCenterTs));
+          } else if (state.gotoNavTargetTs != null && Number.isFinite(Number(state.gotoNavTargetTs))) {
+            center = Math.floor(Number(state.gotoNavTargetTs));
+          }
+          if (center == null) {
+            loadPane(pid, { force: true, sourceAction: "tf-change" }).catch(function (err) {
+              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+            });
+          } else {
+            const range = navPaneLoadRangeForFreeNav(center);
+            const fallback = resolvePaneLoadRange({});
+            const useRange = range.from != null && range.to != null ? range : fallback;
+            const target = center;
+            const gen = state.loadGen;
+            const needJump = !isHistoricalReplay() && Number.isFinite(target);
+            const win = needJump && typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.gotoLoadWindow
+              ? ResearchGotoTime.gotoLoadWindow(target)
+              : null;
+            const pad = win && win.viewPad != null ? win.viewPad : 4 * 3600;
+            loadPane(pid, Object.assign({
+              force: true,
+              sourceAction: "tf-change",
+            }, useRange.from != null && useRange.to != null ? { from: useRange.from, to: useRange.to } : {})).then(function () {
+              if (gen !== state.loadGen || !needJump) return;
+              return whenReady(pane, 8000).then(function () {
+                if (gen !== state.loadGen) return;
+                return jumpChartsToUnix(target, pad);
+              });
+            }).catch(function (err) {
+              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+            });
+          }
         }
         if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
           PD1ExactOriginResearch.onPaneTimeframeChange(pane);
@@ -5908,6 +6129,10 @@
       loadUrl: "/api/research/backtester/bt-d85-july/load",
       label: "BT-D85 · Juli 2026 · EMA V3 · 25 Trades",
     },
+    ema59_e1c_long_signals_july_2026_research: {
+      loadUrl: "/api/research/backtester/ema59-e1c-july/load",
+      label: "EMA59 −2σ Signale — Juli 2026",
+    },
     bt_d91_august_ema_v3_no_pause_research: {
       loadUrl: "/api/research/backtester/bt-d91-august/load",
       label: "BT-D91 · August 2026 · EMA V3 · 25 Trades",
@@ -5935,6 +6160,10 @@
     long_v3_phase3a_jun_sep_frozen_a_research: {
       loadUrl: "/api/research/backtester/bt-long-v3-phase3a/load",
       label: "LONG V3 — Phase 3A — Juni–September 2026 — Frozen A",
+    },
+    long_v3_phase3g_sept_2026_sl_cap_1p2_research: {
+      loadUrl: "/api/research/backtester/bt-long-v3-phase3g-sept-sl-cap/load",
+      label: "LONG V3 — September 2026 — SL max. 1,2 %",
     },
   };
 
@@ -6784,9 +7013,206 @@
     if (sel && ez.layer_mode) sel.value = ez.layer_mode;
   }
 
+  function syncCurrentBacktestCatalog(snap) {
+    const cbt = $("researchCurrentBacktestSelect");
+    if (!cbt || !snap) return;
+    const catalog = snap.current_backtests_catalog || [];
+    const cur = snap.current_backtest_id || "";
+    cbt.innerHTML = "<option value=\"\">— Backtest wählen —</option>";
+    catalog.forEach(function (entry) {
+      const opt = document.createElement("option");
+      opt.value = entry.id || "";
+      opt.textContent = (entry.label || entry.id || "") + (entry.research_disclaimer ? " (FORSCHUNG)" : "");
+      cbt.appendChild(opt);
+    });
+    cbt.value = cur;
+  }
+
+  function syncEma59ResearchOverlayUi(snap) {
+    const pilot = $("researchEma59PilotOverlay");
+    if (pilot && snap) pilot.checked = !!snap.ema59_pilot_overlay;
+    const band = $("researchEma59_6mBandOverlay");
+    if (band && snap) band.checked = !!snap.ema59_6m_band_overlay;
+    const p17 = $("researchEma59P17Landscape");
+    if (p17 && snap) p17.checked = !!snap.ema59_p17_landscape_overlay;
+    const p17Jump = $("researchEma59P17Jump");
+    if (p17Jump && snap) p17Jump.hidden = !snap.ema59_p17_landscape_overlay;
+    const p17AbEl = $("researchP17AbDiagnosticOverlay");
+    const p17AbMode = $("researchP17AbFilterMode");
+    if (p17AbEl && snap && typeof snap.p17_ab_diagnostic_overlay === "boolean") {
+      p17AbEl.checked = snap.p17_ab_diagnostic_overlay;
+    }
+    if (p17AbMode && snap && snap.p17_ab_filter_mode) {
+      p17AbMode.value = snap.p17_ab_filter_mode;
+    }
+    const p17AgEl = $("researchP17AgRestoredOverlay");
+    if (p17AgEl && snap && typeof snap.p17_ag_restored_overlay === "boolean") {
+      p17AgEl.checked = snap.p17_ag_restored_overlay;
+    }
+    const jump = $("researchEma59_6mCrossJump");
+    if (jump && snap) jump.hidden = !snap.ema59_6m_band_overlay;
+    const cbt = $("researchCurrentBacktestSelect");
+    if (cbt && snap) {
+      syncCurrentBacktestCatalog(snap);
+    }
+    applyResearchToolbarMode(snap);
+  }
+
+  function applyResearchToolbarMode(snap) {
+    const legacy = !!(snap && snap.research_legacy_mode);
+    const legacyEl = $("researchLegacyMode");
+    if (legacyEl && snap) legacyEl.checked = legacy;
+    const panel = $("researchLegacyArchivePanel");
+    if (panel) panel.hidden = !legacy;
+    const secBt = $("researchSecCurrentBacktests");
+    if (secBt) secBt.hidden = legacy;
+    const ot = $("researchOverlayTest");
+    if (ot && !legacy) ot.checked = false;
+    const pilot = $("researchEma59PilotOverlay");
+    if (pilot && !legacy) pilot.checked = false;
+  }
+
+  async function setResearchLegacyMode(enabled) {
+    const snap = await sendJson("/api/research/legacy-mode", "POST", {
+      enabled: !!enabled,
+    }, { sourceAction: "research-legacy-mode" });
+    applyWorkspace(snap);
+    await reloadVisible();
+    await refreshOverlaysVisible();
+    if (!enabled) {
+      setStatus("Legacy aus · archivierte Backtest-Zeichnungen entfernt");
+    } else {
+      setStatus("Legacy / Archiv aktiv — alte Backtester & P5-Pilot verfügbar");
+    }
+    return snap;
+  }
+
+  function syncP17AqSelect(sel, signals, placeholder) {
+    if (!sel) return;
+    const prev = sel.value;
+    sel.textContent = "";
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = placeholder || "— Signal —";
+    sel.appendChild(opt0);
+    (signals || []).forEach(function (s) {
+      const o = document.createElement("option");
+      o.value = String(s.signal_id || "");
+      o.textContent = String(s.label || s.signal_id || "");
+      const gotoUtc = String(s.goto_ts_utc || s.entry_utc || "");
+      o.dataset.gotoUtc = gotoUtc;
+      sel.appendChild(o);
+    });
+    if (prev && sel.querySelector('option[value="' + prev + '"]')) sel.value = prev;
+  }
+  function p17NavGroupKey() {
+    const g = ($("researchP17SignalGroup") || {}).value || "executed";
+    return g === "august_diagnostic" ? "august_diagnostic" : "executed";
+  }
+  function p17NavLegacySelect(groupKey) {
+    return groupKey === "august_diagnostic"
+      ? $("researchP17AqAugustDiagSignal")
+      : $("researchP17AqExecutedSignal");
+  }
+  function syncP17CentralNavUi(pq) {
+    pq = pq || {};
+    const hint = $("researchP17NavHint");
+    if (hint) {
+      const exN = pq.executed_count != null ? pq.executed_count : (pq.executed_signals || []).length;
+      const augN = pq.august_count != null ? pq.august_count : (pq.august_signals || []).length;
+      hint.textContent = exN + " Executed · " + augN + " Aug · Entry-Zeit sortiert";
+    }
+    const groupKey = p17NavGroupKey();
+    const legacySel = p17NavLegacySelect(groupKey);
+    const pick = $("researchP17SignalPick");
+    if (pick && legacySel) {
+      const prev = pick.value;
+      pick.textContent = "";
+      for (let i = 0; i < legacySel.options.length; i++) {
+        pick.appendChild(legacySel.options[i].cloneNode(true));
+      }
+      if (prev && pick.querySelector('option[value="' + prev + '"]')) pick.value = prev;
+      else pick.value = "";
+    }
+    const mt = $("researchP17MarkersToggle");
+    const exCb = $("researchP17AqExecutedOverlay");
+    const augCb = $("researchP17AqAugustDiagOverlay");
+    if (mt) {
+      mt.checked = groupKey === "august_diagnostic"
+        ? !!(augCb && augCb.checked)
+        : !!(exCb && exCb.checked);
+    }
+  }
+  function syncP17AqUi(snap) {
+    const pq = (snap && snap.p17aq) || {};
+    const exCb = $("researchP17AqExecutedOverlay");
+    const augCb = $("researchP17AqAugustDiagOverlay");
+    if (exCb && typeof pq.executed_visible === "boolean") exCb.checked = pq.executed_visible;
+    if (augCb && typeof pq.august_visible === "boolean") augCb.checked = pq.august_visible;
+    syncP17AqSelect($("researchP17AqExecutedSignal"), pq.executed_signals, "— Executed Signal —");
+    syncP17AqSelect($("researchP17AqAugustDiagSignal"), pq.august_signals, "— August Kandidat —");
+    syncP17CentralNavUi(pq);
+  }
+  async function jumpP17AqFromSelect(sel, group) {
+    if (!sel || !sel.value) return;
+    const opt = sel.options[sel.selectedIndex];
+    const raw = (opt && (opt.dataset.gotoUtc || opt.getAttribute("data-goto-utc"))) || "";
+    if (!raw) return;
+    const cbId = group === "august"
+      ? "researchP17AqAugustDiagOverlay"
+      : "researchP17AqExecutedOverlay";
+    const cb = $(cbId);
+    if (cb && !cb.checked) {
+      cb.checked = true;
+      if (group === "august") await applyP17AqAugustDiagOverlay();
+      else await applyP17AqExecutedOverlay();
+    }
+    const gt = window.ResearchGotoTime;
+    const unix = gt && gt.parseGotoUtcToUnix
+      ? gt.parseGotoUtcToUnix(raw)
+      : null;
+    const input = $("researchGoTo");
+    if (input) {
+      input.value = unix != null && gt && gt.fmtUtcSeconds
+        ? gt.fmtUtcSeconds(unix)
+        : String(raw).replace("T", " ").replace("Z", " UTC");
+    }
+    const replayCb = $("researchGoToReplayMode");
+    const prevReplay = replayCb && replayCb.checked;
+    if (replayCb) replayCb.checked = true;
+    try {
+      await goToDateTime();
+    } finally {
+      if (replayCb) replayCb.checked = !!prevReplay;
+    }
+    await refreshOverlaysVisible();
+  }
+  async function applyP17AqExecutedOverlay() {
+    const cb = $("researchP17AqExecutedOverlay");
+    if (!cb) return;
+    applyWorkspace(await sendJson("/api/research/p17aq-executed-overlay", "POST", {
+      enabled: cb.checked,
+      symbol: state.symbol || "DOGEUSDT",
+    }));
+    await reloadVisible();
+    await refreshOverlaysVisible();
+  }
+  async function applyP17AqAugustDiagOverlay() {
+    const cb = $("researchP17AqAugustDiagOverlay");
+    if (!cb) return;
+    applyWorkspace(await sendJson("/api/research/p17aq-august-diagnostic-overlay", "POST", {
+      enabled: cb.checked,
+      symbol: state.symbol || "DOGEUSDT",
+    }));
+    await reloadVisible();
+    await refreshOverlaysVisible();
+  }
+
   function applyWorkspace(snap) {
     if (!snap || snap.success === false) return;
     state.workspace = snap;
+    syncEma59ResearchOverlayUi(snap);
+    if (typeof syncP17AqUi === "function") syncP17AqUi(snap);
     document.querySelectorAll(".trp-tool-btn[data-tool]").forEach(function (btn) {
       btn.classList.toggle("active", btn.dataset.tool === snap.tool);
     });
@@ -6795,6 +7221,13 @@
       if (snap.style.width) $("trpDrawWidth").value = String(Math.round(snap.style.width));
     }
     $("trpPositionSettings").disabled = !snap.position_settings;
+    const erBtn = $("trpExtendRight");
+    if (erBtn) {
+      const er = snap.extend_right || {};
+      erBtn.disabled = !er.available;
+      erBtn.classList.toggle("active", !!er.enabled);
+      erBtn.setAttribute("aria-pressed", er.enabled ? "true" : "false");
+    }
     $("researchIndStoch").checked = !!(snap.stochastic && snap.stochastic.enabled);
     if ($("researchIndOi")) {
       $("researchIndOi").checked = !!(snap.open_interest && snap.open_interest.enabled);
@@ -7029,6 +7462,117 @@
       applyFormingToPane(pane, packed.forming);
     }
     return nextClosedOpen;
+  }
+
+  function scheduleGotoNavViewportPrefetch(paneId, fromUnix, toUnix) {
+    const pane = state.panes[paneId];
+    if (!pane) return;
+    if (isHistoricalReplay()) return;
+    if ($("researchGoToReplayMode") && $("researchGoToReplayMode").checked) return;
+    if (pane._gotoNavPrefetchTimer) {
+      clearTimeout(pane._gotoNavPrefetchTimer);
+      pane._gotoNavPrefetchTimer = null;
+    }
+    pane._gotoNavPrefetchTimer = setTimeout(function () {
+      pane._gotoNavPrefetchTimer = null;
+      void extendPaneCandleRangeIfNeeded(paneId, fromUnix, toUnix).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] goto-nav prefetch", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, GOTO_NAV_PREFETCH_DEBOUNCE_MS);
+  }
+
+  function handleVisibleRangeForGotoNav(paneId, fromUnix, toUnix) {
+    if (isHistoricalReplay()) return;
+    if ($("researchGoToReplayMode") && $("researchGoToReplayMode").checked) return;
+    scheduleGotoNavViewportPrefetch(paneId, fromUnix, toUnix);
+  }
+
+  function gotoNavExtendBatchLimit(pane) {
+    const lim = historyLoadLimitForTimeframe(pane && pane.tf ? pane.tf : "5m");
+    return Math.min(3000, Math.max(120, Math.floor(lim / 3)));
+  }
+
+  async function extendPaneCandleRangeIfNeeded(paneId, fromVisible, toVisible) {
+    const pane = state.panes[paneId];
+    if (!pane || !state.symbol) return;
+    if (isHistoricalReplay()) return;
+    if ($("researchGoToReplayMode") && $("researchGoToReplayMode").checked) return;
+    if (pane._gotoNavExtendInflight) return;
+    const b = paneCandleBounds(pane);
+    if (!b) return;
+    const margin = (b.barSec || TF_SEC[pane.tf] || 900) * 4;
+    const vFrom = Math.floor(Number(fromVisible));
+    const vTo = Math.floor(Number(toVisible));
+    if (!Number.isFinite(vFrom) || !Number.isFinite(vTo)) return;
+    if (!isHistoricalReplay() && !($("researchGoToReplayMode") && $("researchGoToReplayMode").checked)) {
+      state.gotoNavViewCenterTs = Math.floor((vFrom + vTo) / 2);
+    }
+    const needRight = vTo > b.to + margin;
+    const needLeft = vFrom < b.from - margin;
+    if (!needRight && !needLeft) return;
+    const now = Math.floor(Date.now() / 1000);
+    const batchLim = gotoNavExtendBatchLimit(pane);
+    const gen = state.loadGen;
+    pane._gotoNavExtendInflight = true;
+    try {
+      if (needRight) {
+        const chunkEnd = Math.min(now, b.to + GOTO_NAV_EXTEND_BATCH_SEC);
+        if (chunkEnd > b.to + margin) {
+          const last = b.to;
+          const pollLimit = Math.min(batchLim, pollLimitForPaneLag(pane));
+          const url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+            "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
+          const packed = await getJson(url, {
+            sourceAction: "goto-nav-extend",
+            pane: paneId,
+            timeframe: pane.tf,
+            start: last,
+          });
+          if (gen !== state.loadGen) return;
+          const incoming = packed.candles || [];
+          if (incoming.length) {
+            mergePollCandlesIntoPane(pane, incoming, packed);
+            const times = (pane.pendingData.candles || []).map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+            if (times.length) {
+              state.history.loadedFrom = Math.min.apply(null, times);
+              state.history.loadedTo = Math.max.apply(null, times);
+              updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+            }
+          }
+        }
+      }
+      if (needLeft) {
+        const chunkStart = b.from - GOTO_NAV_EXTEND_BATCH_SEC;
+        const anchorEnd = b.from - 1;
+        if (anchorEnd > chunkStart + margin) {
+          const fresh = paneCandleBounds(pane);
+          if (!fresh) return;
+          const leftUrl = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+            "&timeframe=" + encodeURIComponent(pane.tf) + "&end=" + anchorEnd + "&limit=" + batchLim;
+          const packedLeft = await getJson(leftUrl, {
+            sourceAction: "goto-nav-extend-left",
+            pane: paneId,
+            timeframe: pane.tf,
+            end: anchorEnd,
+          });
+          if (gen !== state.loadGen) return;
+          const incomingLeft = packedLeft.candles || [];
+          if (incomingLeft.length) {
+            mergePollCandlesIntoPane(pane, incomingLeft, packedLeft);
+            const timesL = (pane.pendingData.candles || []).map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+            if (timesL.length) {
+              state.history.loadedFrom = Math.min.apply(null, timesL);
+              state.history.loadedTo = Math.max.apply(null, timesL);
+              updateHistoryHint({ from: state.history.loadedFrom, to: state.history.loadedTo });
+            }
+          }
+        }
+      }
+    } finally {
+      pane._gotoNavExtendInflight = false;
+    }
   }
 
   async function ensurePaneCaughtUp(pane, opts) {
@@ -7865,6 +8409,8 @@
     const gen = ++state.loadGen;
     state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
     state.symbol = next;
+    state.gotoNavViewCenterTs = null;
+    state.gotoNavTargetTs = null;
     state.scannerCommonCache = {};
     state.causalLldCache = {};
     state.liveMicroLldV2Cache = {};
@@ -8337,6 +8883,374 @@
       }));
       await refreshOverlaysVisible();
     });
+    const ema59PilotEl = $("researchEma59PilotOverlay");
+    if (ema59PilotEl) {
+      ema59PilotEl.addEventListener("change", async function () {
+        const snap = await sendJson("/api/research/ema59-pilot-overlay", "POST", {
+          enabled: ema59PilotEl.checked, symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "ema59-p5-pilot-overlay" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        const ep = snap.ema59_pilot || {};
+        if (ema59PilotEl.checked && ep.visible && ep.time_span) {
+          const span = ep.time_span;
+          try {
+            await zoomChartToIsoRange(span.start, span.end, span.start);
+          } catch (zoomErr) {
+            try {
+              console.warn("[research] ema59 pilot zoom", zoomErr);
+            } catch (ignore) { /* ignore */ }
+          }
+        }
+        if (ep.message) setStatus(ep.message);
+        else if (ep.error === "overlay_file_missing") {
+          setStatus("EMA59 July Pilot: Overlay fehlt — " + (ep.expected_path || ""));
+        } else if (ep.error === "symbol_not_dogeusdt") {
+          setStatus("EMA59 July Pilot nur für DOGEUSDT");
+        }
+      });
+    }
+    const ema59P11ArchiveEl = $("researchEma59P11ArchiveOverlay");
+    if (ema59P11ArchiveEl) {
+      ema59P11ArchiveEl.addEventListener("change", async function () {
+        const snap = await sendJson("/api/research/ema59-p11-archive-overlay", "POST", {
+          enabled: ema59P11ArchiveEl.checked, symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "ema59-p11-archive-overlay" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        const ar = snap.ema59_p11_archive || {};
+        if (ar.message) setStatus(ar.message);
+        else if (ar.error === "legacy_mode_required") {
+          setStatus("P11 Archiv nur mit Legacy / Archiv");
+          ema59P11ArchiveEl.checked = false;
+        }
+      });
+    }
+    const ema59P9bEl = $("researchEma59P9bDiagnostic");
+    if (ema59P9bEl) {
+      ema59P9bEl.addEventListener("change", async function () {
+        if (!ema59P9bEl.checked) {
+          const snap = await sendJson("/api/research/ema59-6m-watch-diagnostic", "POST", {
+            cross_index: null,
+            symbol: state.symbol || "DOGEUSDT",
+          }, { sourceAction: "ema59-p9b-watch-diagnostic-off" });
+          applyWorkspace(snap);
+          await refreshOverlaysVisible();
+          setStatus("WATCH A/B/C Diagnose aus");
+        }
+      });
+    }
+    const currentBtEl = $("researchCurrentBacktestSelect");
+    if (currentBtEl) {
+      currentBtEl.addEventListener("change", async function () {
+        const bid = currentBtEl.value || null;
+        const snap = await sendJson("/api/research/current-backtest", "POST", {
+          backtest_id: bid,
+          symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "ema59-p11-current-backtest" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        const cb = snap.current_backtest || {};
+        if (cb.zoom_july_2026 && typeof zoomChartToIsoRange === "function") {
+          const z = cb.zoom_july_2026;
+          await zoomChartToIsoRange(z.start, z.end, z.focus);
+        }
+        if (cb.message) setStatus(cb.message);
+        else if (cb.error === "overlay_file_missing") {
+          setStatus("P12 Overlay fehlt — " + (cb.expected_path || ""));
+        } else if (!bid) {
+          setStatus("Aktueller Backtest aus · Long-Boxen entfernt");
+        }
+      });
+    }
+    const ema59_6mBandEl = $("researchEma59_6mBandOverlay");
+    const ema59_6mCrossJump = $("researchEma59_6mCrossJump");
+    let ema59_6mCrossMeta = [];
+
+    async function refreshEma59_6mCrossList() {
+      if (!ema59_6mCrossJump) return;
+      try {
+        const meta = await getJson("/api/research/ema59-6m-band-overlay/meta");
+        ema59_6mCrossMeta = (meta && meta.crosses) || [];
+        ema59_6mCrossJump.innerHTML = "<option value=\"\">6M Cross / WATCH …</option>";
+        ema59_6mCrossMeta.forEach(function (c, idx) {
+          const opt = document.createElement("option");
+          opt.value = String(idx);
+          const label = c.watch_episode_id || c.cross_id || ("Cross " + (idx + 1));
+          opt.textContent = label + " · " + (c.decision_close_utc || "");
+          ema59_6mCrossJump.appendChild(opt);
+        });
+      } catch (e) {
+        ema59_6mCrossMeta = [];
+      }
+    }
+
+    function formatEma59_6mCrossStatus(c) {
+      if (!c) return "";
+      return [
+        c.cross_id,
+        "UTC " + (c.decision_close_utc || "—"),
+        "close " + (c.close != null ? c.close : "—"),
+        "EMA59 " + (c.ema59 != null ? c.ema59 : "—"),
+        "dist " + (c.ema_dist_pct != null ? c.ema_dist_pct + "%" : "—"),
+        "thr " + (c.thr_long != null ? c.thr_long + "%" : "—"),
+        "E1C_V_MONTHLY_FIXED",
+      ].join(" · ");
+    }
+
+    if (ema59_6mCrossJump) {
+      ema59_6mCrossJump.addEventListener("change", async function () {
+        const idx = ema59_6mCrossJump.value;
+        if (idx === "" || !ema59_6mCrossMeta.length) return;
+        const c = ema59_6mCrossMeta[Number(idx)];
+        if (!c || !c.decision_close_utc) return;
+        const focus = c.chart_open_utc || c.decision_close_utc;
+        const start = c.decision_close_utc;
+        const endEx = c.next_cross_decision_utc || null;
+        try {
+          await zoomChartToIsoRange(start, endEx || start, focus);
+        } catch (zoomErr) {
+          try { console.warn("[research] ema59 6m cross jump", zoomErr); } catch (ignore) { /* ignore */ }
+        }
+        const p9bEl = $("researchEma59P9bDiagnostic");
+        if (p9bEl && p9bEl.checked) {
+          try {
+            const diagSnap = await sendJson("/api/research/ema59-6m-watch-diagnostic", "POST", {
+              cross_index: Number(idx),
+              symbol: state.symbol || "DOGEUSDT",
+            }, { sourceAction: "ema59-p9b-watch-diagnostic" });
+            applyWorkspace(diagSnap);
+            await refreshOverlaysVisible();
+            const p9b = diagSnap.ema59_p9b || {};
+            if (p9b.message) {
+              setStatus(p9b.message + " · " + formatEma59_6mCrossStatus(c));
+            }
+          } catch (diagErr) {
+            try { console.warn("[research] ema59 p9b diagnostic", diagErr); } catch (ignore) { /* ignore */ }
+          }
+        } else {
+          setStatus(formatEma59_6mCrossStatus(c) + " · Zoom (P9B aus)");
+        }
+        ema59_6mCrossJump.value = "";
+      });
+    }
+
+    if (ema59_6mBandEl) {
+      refreshEma59_6mCrossList();
+      ema59_6mBandEl.addEventListener("change", async function () {
+        const snap = await sendJson("/api/research/ema59-6m-band-overlay", "POST", {
+          enabled: ema59_6mBandEl.checked, symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "ema59-p7b-6m-band" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        await refreshOverlaysVisible();
+        const band = snap.ema59_6m_band || {};
+        if (ema59_6mCrossJump) {
+          ema59_6mCrossJump.hidden = !ema59_6mBandEl.checked;
+        }
+        if (ema59_6mBandEl.checked && band.visible && band.time_span) {
+          const span = band.time_span;
+          try {
+            await zoomChartToIsoRange(span.start, span.end, span.start);
+          } catch (zoomErr) {
+            try { console.warn("[research] ema59 6m band zoom", zoomErr); } catch (ignore) { /* ignore */ }
+          }
+        }
+        if (band.message) {
+          setStatus(band.message + (band.data_gap_note ? " — " + band.data_gap_note : ""));
+        } else if (band.error === "symbol_not_dogeusdt") {
+          setStatus("EMA59 6M + −2σ nur für DOGEUSDT");
+        } else if (band.error === "crosses_unavailable") {
+          setStatus("EMA59 6M: Cross-Daten fehlen");
+        }
+      });
+    }
+    const ema59P17El = $("researchEma59P17Landscape");
+    const ema59P17Jump = $("researchEma59P17Jump");
+    let ema59P17JumpMeta = [];
+
+    function refreshEma59P17JumpList(jumpList) {
+      if (!ema59P17Jump) return;
+      ema59P17JumpMeta = jumpList || [];
+      ema59P17Jump.innerHTML = "<option value=\"\">P17 Entry …</option>";
+      ema59P17JumpMeta.forEach(function (row, idx) {
+        const opt = document.createElement("option");
+        opt.value = String(idx);
+        opt.textContent = row.label || row.entry_decision_close_utc || ("Entry " + idx);
+        ema59P17Jump.appendChild(opt);
+      });
+    }
+
+    if (ema59P17Jump) {
+      ema59P17Jump.addEventListener("change", async function () {
+        const idx = ema59P17Jump.value;
+        if (idx === "" || !ema59P17JumpMeta.length) return;
+        const row = ema59P17JumpMeta[Number(idx)];
+        if (!row || !row.entry_decision_close_utc) return;
+        const focus = row.chart_open_utc || row.entry_decision_close_utc;
+        try {
+          await zoomChartToIsoRange(row.entry_decision_close_utc, row.entry_decision_close_utc, focus);
+        } catch (zoomErr) {
+          try { console.warn("[research] p17 jump", zoomErr); } catch (ignore) { /* ignore */ }
+        }
+        ema59P17Jump.value = "";
+      });
+    }
+
+    if (ema59P17El) {
+      ema59P17El.addEventListener("change", async function () {
+        const snap = await sendJson("/api/research/ema59-p17-landscape-overlay", "POST", {
+          enabled: ema59P17El.checked,
+          symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "ema59-p17-landscape" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        await refreshOverlaysVisible();
+        const p17snap = snap.ema59_p17_landscape || {};
+        if (ema59P17Jump) {
+          ema59P17Jump.hidden = !ema59P17El.checked;
+        }
+        if (ema59P17El.checked && p17snap.jump_list) {
+          refreshEma59P17JumpList(p17snap.jump_list);
+        }
+        if (p17snap.message) {
+          setStatus(p17snap.message);
+        } else if (p17snap.error === "artifact_missing") {
+          setStatus("P17 Overlay: Audit-Artefakt fehlt — run_phase_ema59_bt_p17_july_audit_v1.py");
+        } else if (p17snap.error === "symbol_not_dogeusdt") {
+          setStatus("P17 Landscape LONG nur für DOGEUSDT");
+        }
+      });
+    }
+    async function applyP17AbDiagnosticOverlay() {
+      const cb = $("researchP17AbDiagnosticOverlay");
+      const sel = $("researchP17AbFilterMode");
+      if (!cb) return;
+      const snap = await sendJson("/api/research/p17-ab-diagnostic-overlay", "POST", {
+        enabled: cb.checked,
+        filter_mode: sel ? sel.value : "first_only",
+        symbol: state.symbol || "DOGEUSDT",
+      }, { sourceAction: "p17-ab-diagnostic-overlay" });
+      applyWorkspace(snap);
+      await reloadVisible();
+      await refreshOverlaysVisible();
+      const diag = snap.p17_ab_diagnostic || {};
+      if (cb.checked && diag.loaded_positions && typeof zoomChartToIsoRange === "function") {
+        try {
+          await zoomChartToIsoRange("2026-07-07T11:00:00Z", "2026-07-08T12:00:00Z", "2026-07-07T11:10:00Z");
+        } catch (zoomErr) {
+          try { console.warn("[research] p17ab zoom", zoomErr); } catch (ignore) { /* ignore */ }
+        }
+      }
+      if (diag.message) {
+        setStatus(diag.message);
+      } else if (diag.error === "symbol_not_dogeusdt") {
+        setStatus("P17AB Diagnostic nur für DOGEUSDT");
+      } else if (diag.error) {
+        setStatus("P17AB: " + diag.error);
+      } else if (!cb.checked) {
+        setStatus("P17 – 0.20% Upper-Gate Diagnostic aus");
+      }
+    }
+    const p17AbEl = $("researchP17AbDiagnosticOverlay");
+    const p17AbModeEl = $("researchP17AbFilterMode");
+    if (p17AbEl) {
+      p17AbEl.addEventListener("change", applyP17AbDiagnosticOverlay);
+    }
+    if (p17AbModeEl) {
+      p17AbModeEl.addEventListener("change", async function () {
+        if (p17AbEl && p17AbEl.checked) await applyP17AbDiagnosticOverlay();
+      });
+    }
+    const p17AqExCb = $("researchP17AqExecutedOverlay");
+    const p17AqAugCb = $("researchP17AqAugustDiagOverlay");
+    const p17AqExSel = $("researchP17AqExecutedSignal");
+    const p17AqAugSel = $("researchP17AqAugustDiagSignal");
+    if (p17AqExCb) p17AqExCb.addEventListener("change", applyP17AqExecutedOverlay);
+    if (p17AqAugCb) p17AqAugCb.addEventListener("change", applyP17AqAugustDiagOverlay);
+    if (p17AqExSel) {
+      p17AqExSel.addEventListener("change", function () {
+        void jumpP17AqFromSelect(p17AqExSel, "executed");
+      });
+    }
+    if (p17AqAugSel) {
+      p17AqAugSel.addEventListener("change", function () {
+        void jumpP17AqFromSelect(p17AqAugSel, "august");
+      });
+    }
+    const p17GroupEl = $("researchP17SignalGroup");
+    const p17PickEl = $("researchP17SignalPick");
+    const p17MarkersEl = $("researchP17MarkersToggle");
+    if (p17GroupEl) {
+      p17GroupEl.addEventListener("change", function () {
+        syncP17CentralNavUi((state.workspace && state.workspace.p17aq) || {});
+      });
+    }
+    if (p17PickEl) {
+      p17PickEl.addEventListener("change", function () {
+        const groupKey = p17NavGroupKey();
+        const legacySel = p17NavLegacySelect(groupKey);
+        if (!legacySel || !p17PickEl.value) return;
+        legacySel.value = p17PickEl.value;
+        void jumpP17AqFromSelect(
+          legacySel,
+          groupKey === "august_diagnostic" ? "august" : "executed",
+        );
+      });
+    }
+    if (p17MarkersEl) {
+      p17MarkersEl.addEventListener("change", async function () {
+        const groupKey = p17NavGroupKey();
+        const on = p17MarkersEl.checked;
+        const exCb = $("researchP17AqExecutedOverlay");
+        const augCb = $("researchP17AqAugustDiagOverlay");
+        if (groupKey === "august_diagnostic") {
+          if (augCb) augCb.checked = on;
+          await applyP17AqAugustDiagOverlay();
+        } else {
+          if (exCb) exCb.checked = on;
+          await applyP17AqExecutedOverlay();
+        }
+      });
+    }
+    const p17AgEl = $("researchP17AgRestoredOverlay");
+    if (p17AgEl) {
+      p17AgEl.addEventListener("change", async function () {
+        const snap = await sendJson("/api/research/p17-ag-restored-overlay", "POST", {
+          enabled: p17AgEl.checked,
+          symbol: state.symbol || "DOGEUSDT",
+        }, { sourceAction: "p17-ag-restored-overlay" });
+        applyWorkspace(snap);
+        await reloadVisible();
+        await refreshOverlaysVisible();
+        const restored = snap.p17_ag_restored || {};
+        if (p17AgEl.checked && restored.loaded_positions && typeof zoomChartToIsoRange === "function") {
+          try {
+            await zoomChartToIsoRange(
+              "2026-07-01T00:00:00Z",
+              "2026-07-31T23:55:00Z",
+              "2026-07-07T11:10:00Z"
+            );
+          } catch (zoomErr) {
+            try { console.warn("[research] p17ag zoom", zoomErr); } catch (ignore) { /* ignore */ }
+          }
+        }
+        if (restored.message) {
+          setStatus(restored.message);
+        } else if (restored.error === "symbol_not_dogeusdt") {
+          setStatus("P17AG Restored LONG nur für DOGEUSDT");
+        } else if (restored.error) {
+          setStatus("P17AG: " + restored.error);
+        }
+      });
+    }
+    const legacyModeEl = $("researchLegacyMode");
+    if (legacyModeEl) {
+      legacyModeEl.addEventListener("change", async function () {
+        await setResearchLegacyMode(legacyModeEl.checked);
+      });
+    }
+    applyResearchToolbarMode(state.workspace || {});
     const fsBtn = $("researchFullscreenBtn");
     if (fsBtn) {
       fsBtn.addEventListener("click", function (ev) {
@@ -9299,7 +10213,10 @@
       if (isBtFrozenMonthResearchStrategy(btStrategy())) {
         const sid = btStrategy();
         const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
-        setStatus((cfg.label || sid) + ": lade gespeicherte Research-Trades …");
+        const loadMsg = sid === "ema59_e1c_long_signals_july_2026_research"
+          ? (cfg.label || sid) + ": lade EMA59-Signale …"
+          : (cfg.label || sid) + ": lade gespeicherte Research-Trades …";
+        setStatus(loadMsg);
         try {
           await applyBtFrozenMonthResearchBacktester(sid, true);
         } catch (err) {
@@ -9549,7 +10466,10 @@
       if (isBtFrozenMonthResearchStrategy(btStrategy())) {
         const sid = btStrategy();
         const cfg = BT_FROZEN_MONTH_RESEARCH[sid] || {};
-        setStatus((cfg.label || sid) + ": lade gespeicherte Research-Trades …");
+        const loadMsg = sid === "ema59_e1c_long_signals_july_2026_research"
+          ? (cfg.label || sid) + ": lade EMA59-Signale …"
+          : (cfg.label || sid) + ": lade gespeicherte Research-Trades …";
+        setStatus(loadMsg);
         try {
           await applyBtFrozenMonthResearchBacktester(sid, true);
         } catch (err) {
@@ -9914,6 +10834,14 @@
       applyWorkspace(await sendJson("/api/research/drawings/delete", "POST", {}));
       await refreshOverlaysVisible();
     });
+    const erToggle = $("trpExtendRight");
+    if (erToggle) {
+      erToggle.addEventListener("click", async function () {
+        if (erToggle.disabled) return;
+        applyWorkspace(await sendJson("/api/research/drawings/extend-right", "POST", {}));
+        await refreshOverlaysVisible();
+      });
+    }
     $("trpClear").addEventListener("click", async function () {
       if (!window.confirm("Zeichnungen dieses Symbols löschen?")) return;
       applyWorkspace(await sendJson("/api/research/drawings/clear", "POST", { symbol: state.symbol }));

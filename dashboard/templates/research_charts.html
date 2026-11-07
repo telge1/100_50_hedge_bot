@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=phase6xt-chart-immersive-fs-v2">
+    <link rel="stylesheet" href="/static/css/research.css?v=p17at-1">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -33,17 +33,79 @@
 
             <div id="researchFullscreenHost" class="research-fullscreen-host">
             <div class="trp-chrome">
-                <div class="trp-toolbar" id="trpToolbar">
+                <div class="trp-toolbar trp-toolbar-main" id="trpToolbar">
                     <div class="trp-title-box">
-                        <div class="trp-app-title">Trading Research Platform</div>
-                        <div class="trp-app-sub">Browser research workspace · TRP chart.js</div>
+                        <div class="trp-app-title">Research Charts</div>
+                        <div class="trp-app-sub">P17 LONG · DOGEUSDT 5m · UTC</div>
                     </div>
                     <span class="trp-field-label">SYMBOL</span>
                     <select id="researchSymbol" class="trp-select"></select>
-                    <label class="trp-check"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair Sync</label>
-                    <label class="trp-check"><input type="checkbox" id="researchOverlayTest"> Overlay Test</label>
-                    <button type="button" class="trp-text-btn trp-primary" id="researchBacktesterBtn" title="Backtester-Ergebnisse ein-/ausblenden">Backtester</button>
-                    <select id="researchBtStrategy" class="trp-select" title="Research-Strategie">
+                    <label class="trp-check" title="Crosshair über alle Panes synchronisieren"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair</label>
+                </div>
+
+                <div class="trp-toolbar trp-toolbar-p17" id="researchP17NavRow">
+                    <span class="trp-field-label">P17 LONG</span>
+                    <select id="researchP17SignalGroup" class="trp-select" title="Signalgruppe">
+                        <option value="executed" selected>Executed · 11 Trades</option>
+                        <option value="august_diagnostic">August Diagnostic · 58 Kandidaten</option>
+                    </select>
+                    <select id="researchP17SignalPick" class="trp-select research-p17-signal-pick" title="Signal wählen → Go To + Marker">
+                        <option value="">— Signal wählen —</option>
+                    </select>
+                    <label class="trp-check" title="Marker der gewählten Gruppe einblenden">
+                        <input type="checkbox" id="researchP17MarkersToggle"> Marker
+                    </label>
+                    <span id="researchP17NavHint" class="trp-muted research-p17-nav-hint"></span>
+                    <span class="visually-hidden" id="researchP17AqWrap" aria-hidden="true">
+                        <input type="checkbox" id="researchP17AqExecutedOverlay" tabindex="-1">
+                        <select id="researchP17AqExecutedSignal" tabindex="-1"><option value="">—</option></select>
+                        <input type="checkbox" id="researchP17AqAugustDiagOverlay" tabindex="-1">
+                        <select id="researchP17AqAugustDiagSignal" tabindex="-1"><option value="">—</option></select>
+                    </span>
+                </div>
+
+                <details class="research-archive-panel" id="researchArchivePanel">
+                    <summary>Archiv · Backtests · P17-Diagnose · Debug</summary>
+                    <div class="research-archive-body">
+                    <span class="research-toolbar-group" id="researchSecEmaSignals">
+                        <span class="trp-field-label">EMA &amp; Signale</span>
+                        <label class="trp-check"><input type="checkbox" id="researchEma59_6mBandOverlay"> EMA59 6M + −2σ</label>
+                        <select id="researchEma59_6mCrossJump" class="trp-select" title="6M Cross — nur Chart-Zoom (keine Diagnose)" hidden>
+                            <option value="">6M Cross / WATCH …</option>
+                        </select>
+                        <label class="trp-check"><input type="checkbox" id="researchEma59P17Landscape"> P17 Landscape LONG</label>
+                        <select id="researchEma59P17Jump" class="trp-select" title="P17 Entry — Chart-Zoom" hidden>
+                            <option value="">P17 Entry …</option>
+                        </select>
+                        <span id="researchP17AbDiagnosticWrap">
+                            <label class="trp-check">
+                                <input type="checkbox" id="researchP17AbDiagnosticOverlay"> P17 – 0.20% Upper-Gate Diagnostic
+                            </label>
+                            <select id="researchP17AbFilterMode" class="trp-select" title="Erste Freigaben vs. alle 9 Kandidaten">
+                                <option value="first_only">5 erste (Episode)</option>
+                                <option value="all">9 Kandidaten</option>
+                            </select>
+                        </span>
+                        <label class="trp-check" id="researchP17AgRestoredWrap">
+                            <input type="checkbox" id="researchP17AgRestoredOverlay"> P17 – Restored EMA→WATCH LONG
+                        </label>
+                    </span>
+                    <span class="research-toolbar-group" id="researchSecCurrentBacktests">
+                        <span class="trp-field-label">Aktuelle Backtests</span>
+                        <select id="researchCurrentBacktestSelect" class="trp-select" title="Freigegebene Forschungs-Backtests (nicht Legacy)">
+                            <option value="">— Backtest wählen —</option>
+                        </select>
+                    </span>
+                    <label class="trp-check" id="researchLegacyModeWrap" title="Archivierte BT-D / P5 / Monats-Overlays">
+                        <input type="checkbox" id="researchLegacyMode"> Legacy / Archiv
+                    </label>
+                    <span id="researchLegacyArchivePanel" class="research-toolbar-group" hidden>
+                        <label class="trp-check"><input type="checkbox" id="researchOverlayTest"> Overlay Test</label>
+                        <label class="trp-check"><input type="checkbox" id="researchEma59PilotOverlay"> EMA59 July Pilot (P5)</label>
+                        <label class="trp-check"><input type="checkbox" id="researchEma59P11ArchiveOverlay"> EMA59 P11 SL-Diagnose (Archiv)</label>
+                        <label class="trp-check"><input type="checkbox" id="researchEma59P9bDiagnostic"> WATCH A/B/C Diagnose (P9B)</label>
+                        <button type="button" class="trp-text-btn trp-primary" id="researchBacktesterBtn" title="Backtester-Ergebnisse ein-/ausblenden">Backtester</button>
+                        <select id="researchBtStrategy" class="trp-select" title="Archiv-Strategien (Legacy)">
                         <option value="ob_exit_pool_liquidity_v1_phase1h" selected>Exit Pool phase1h (mass+fee, +6.71%)</option>
                         <option value="ob_exit_pool_liquidity_v1_phase1e">Exit Pool phase1e (5m meaningful, +7.98%)</option>
                         <option value="pool_landscape_v1_candidate_bt_d7">Pool Landscape SHORT · Depth 2 (Research)</option>
@@ -53,6 +115,7 @@
                         <option value="bt_d94_june_ema_v3_no_pause_research">BT-D94R · Juni 2026 · EMA V3 · 34 Trades</option>
                         <option value="bt_d100a_june_gap_anchor_research">BT-D100-A · Juni 2026 · Gap-Anker · 14 Trades</option>
                         <option value="bt_d85_july_ema_v3_no_pause_research">BT-D85 · Juli 2026 · EMA V3 · 25 Trades</option>
+                        <option value="ema59_e1c_long_signals_july_2026_research">EMA59 −2σ Signale — Juli 2026</option>
                         <option value="bt_d91_august_ema_v3_no_pause_research">BT-D91 · August 2026 · EMA V3 · 25 Trades</option>
                         <option value="bt_d108_aug_structural_sl_research">BT-D108 · August 2026 · Struktur-SL 1,2 % · 3 Trades</option>
                         <option value="short_main_v2_june_combined_exit_research">SHORT MAIN V2 · Juni 2026 · D107 SL + Dynamic TP · 10 Trades</option>
@@ -60,7 +123,9 @@
                         <option value="short_main_v2_august_combined_exit_research">SHORT MAIN V2 · August 2026 · D107 SL + Dynamic TP · 3 Trades</option>
                         <option value="short_main_v2_september_partial_combined_exit_research">SHORT MAIN V2 · September 2026 PARTIAL · D107 SL + Dynamic TP · 6 Trades</option>
                         <option value="long_v3_phase3a_jun_sep_frozen_a_research">LONG V3 — Phase 3A — Juni–September 2026 — Frozen A</option>
+                        <option value="long_v3_phase3g_sept_2026_sl_cap_1p2_research">LONG V3 — September 2026 — SL max. 1,2 %</option>
                     </select>
+                    </span>
                     <span id="researchBtD23Wrap" class="research-ezm-layer-wrap" hidden>
                         <span class="trp-field-label">Setup Scanner Run</span>
                         <select id="researchBtD23Run" class="trp-select" title="BT-D23 setups.json (keine Fills/PnL)">
@@ -134,8 +199,9 @@
                         <button type="button" class="trp-text-btn" id="researchEdcZoom" title="Zoom auf Kandidat">Zoom</button>
                     </span>
                     <span id="researchCswDebugBadge" class="research-chip research-csw-debug" hidden>Low-pool debug</span>
-                </div>
-                <div class="trp-footerbar">
+                    </div>
+                </details>
+                <div class="trp-footerbar research-archive-footer">
                     <span class="trp-field-label">EMA OVERLAYS</span>
                     <button type="button" class="trp-text-btn" id="trpEmaSettings">Settings</button>
                     <span class="trp-muted" id="trpEmaSummary">off</span>
@@ -160,6 +226,7 @@
                     <select id="trpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
                         <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
                     </select>
+                    <button type="button" class="trp-tool-btn" id="trpExtendRight" title="Trendlinie nach rechts verlängern (Ray)" disabled aria-pressed="false">⇢</button>
                     <button type="button" class="trp-tool-btn" id="trpPositionSettings" title="Positionseinstellungen" disabled>⚙</button>
                     <button type="button" class="trp-tool-btn" id="trpDelete" title="Löschen">⌫</button>
                     <button type="button" class="trp-tool-btn" id="trpClear" title="Zeichnungen dieses Symbols löschen">⊘</button>
@@ -174,6 +241,7 @@
                            title="UTC-Vorlage: Jahr-Monat-Tag Stunde:Minute:Sekunde UTC — nur Zahlen ändern"
                            aria-label="Go To UTC with seconds">
                     <button type="button" class="trp-text-btn" id="researchGoToBtn" title="Zu Datum springen">Springen</button>
+                    <label class="trp-check trp-dock-ind" title="Zeitliche Simulation: Poll stoppt, LLD/Research as-of wie bisher"><input type="checkbox" id="researchGoToReplayMode" autocomplete="off"> Replay / As-of</label>
                     <span class="trp-pane-header-sep" aria-hidden="true"></span>
                     <span class="trp-field-label">LAYOUT</span>
                     <div class="trp-layout-group" id="trpLayouts">
@@ -605,8 +673,8 @@
     <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-bt-d34-density-cache-v1"></script>
     <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-bt-d34-density-cache-v1"></script>
     <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-bt-d36-density-supersede-v1"></script>
-    <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 -->
-    <script src="/static/js/research/research_charts.js?v=phase6xt-long-v3-phase3a-chart-overlay-v1"></script>
+    <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 long-v3-phase3g-sept-sl-cap-v1 -->
+    <script src="/static/js/research/research_charts.js?v=future-anchor-1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

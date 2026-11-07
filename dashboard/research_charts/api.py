@@ -1126,6 +1126,13 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     async def api_research_workspace(user: dict = Depends(require_auth)):
         return get_workspace().snapshot()
 
+    @router.get("/api/research/layer-audit")
+    async def api_research_layer_audit(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        return {"success": True, **get_workspace().audit_chart_layers(symbol)}
+
     @router.get("/api/research/scanner-pool-engine")
     async def api_research_scanner_pool_engine(user: dict = Depends(require_auth)):
         """Frozen COMMON scanner pool engine (read-only; not workspace LLD)."""
@@ -1175,6 +1182,137 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     ):
         return get_workspace().set_overlay_test(
             bool(body.get("enabled")), str(body.get("symbol") or "").upper()
+        )
+
+    @router.post("/api/research/ema59-pilot-overlay")
+    async def api_research_ema59_pilot_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_ema59_pilot_overlay(
+            bool(body.get("enabled")), str(body.get("symbol") or "DOGEUSDT").upper()
+        )
+
+    @router.post("/api/research/ema59-p11-archive-overlay")
+    async def api_research_ema59_p11_archive_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_ema59_p11_archive_overlay(
+            bool(body.get("enabled")), str(body.get("symbol") or "DOGEUSDT").upper()
+        )
+
+    @router.post("/api/research/current-backtest")
+    async def api_research_current_backtest(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        backtest_id = body.get("backtest_id")
+        if backtest_id is not None and str(backtest_id).strip() == "":
+            backtest_id = None
+        return get_workspace().set_ema59_current_backtest(
+            backtest_id,
+            str(body.get("symbol") or "DOGEUSDT").upper(),
+        )
+
+    @router.post("/api/research/legacy-mode")
+    async def api_research_legacy_mode(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        snap = get_workspace().set_research_legacy_mode(bool(body.get("enabled")))
+        return snap
+
+    @router.post("/api/research/ema59-6m-band-overlay")
+    async def api_research_ema59_6m_band_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_ema59_6m_band_overlay(
+            bool(body.get("enabled")), str(body.get("symbol") or "DOGEUSDT").upper()
+        )
+
+    @router.get("/api/research/ema59-6m-band-overlay/meta")
+    async def api_research_ema59_6m_band_meta(
+        user: dict = Depends(require_auth),
+    ):
+        from .ema59_6m_band_overlay_v1 import build_summary
+
+        return {"success": True, **build_summary()}
+
+    @router.post("/api/research/ema59-p17-landscape-overlay")
+    async def api_research_ema59_p17_landscape_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_ema59_p17_landscape_overlay(
+            bool(body.get("enabled")), str(body.get("symbol") or "DOGEUSDT").upper()
+        )
+
+    @router.post("/api/research/p17-ab-diagnostic-overlay")
+    async def api_research_p17_ab_diagnostic_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_p17_ab_diagnostic_overlay(
+            bool(body.get("enabled")),
+            str(body.get("symbol") or "DOGEUSDT").upper(),
+            filter_mode=str(body.get("filter_mode") or "first_only"),
+        )
+
+    @router.post("/api/research/p17aq-executed-overlay")
+    async def api_research_p17aq_executed_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_p17aq_executed_overlay(
+            bool(body.get("enabled")),
+            str(body.get("symbol") or "DOGEUSDT").upper(),
+        )
+
+    @router.post("/api/research/p17aq-august-diagnostic-overlay")
+    async def api_research_p17aq_august_diagnostic_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_p17aq_august_diagnostic_overlay(
+            bool(body.get("enabled")),
+            str(body.get("symbol") or "DOGEUSDT").upper(),
+        )
+
+    @router.post("/api/research/p17-ag-restored-overlay")
+    async def api_research_p17_ag_restored_overlay(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return get_workspace().set_p17_ag_restored_overlay(
+            bool(body.get("enabled")),
+            str(body.get("symbol") or "DOGEUSDT").upper(),
+        )
+
+    @router.get("/api/research/ema59-p17-landscape-overlay/meta")
+    async def api_research_ema59_p17_landscape_meta(
+        user: dict = Depends(require_auth),
+    ):
+        from .ema59_p17_landscape_long_overlay_v1 import artifacts_available, load_chart_payload, build_summary
+
+        payload = load_chart_payload() or {}
+        return {"success": True, "artifacts": artifacts_available(), "summary": build_summary(payload) if payload else {}}
+
+    @router.post("/api/research/ema59-6m-watch-diagnostic")
+    async def api_research_ema59_6m_watch_diagnostic(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        raw_idx = body.get("cross_index")
+        cross_index: int | None
+        if raw_idx is None or raw_idx == "":
+            cross_index = None
+        else:
+            cross_index = int(raw_idx)
+        return get_workspace().set_ema59_p9b_watch_diagnostic(
+            cross_index,
+            str(body.get("symbol") or "DOGEUSDT").upper(),
         )
 
     @router.post("/api/research/backtester/bt-d12/load-latest")
@@ -1517,6 +1655,78 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         snap["backtester"]["strategy_id"] = BT_D85_SID
         return snap
 
+    @router.get("/api/research/backtester/ema59-e1c-july/meta")
+    async def api_research_backtester_ema59_e1c_july_meta(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .ema59_e1c_signal_overlay_v1 import (
+            EXPECTED_SIGNAL_COUNT,
+            STRATEGY_ID,
+            build_marker_specs,
+            build_summary,
+            load_long_cross_rows,
+        )
+
+        sym = str(symbol or "").strip().upper()
+        rows, path, digest, errs = load_long_cross_rows()
+        marker_specs = build_marker_specs(rows)
+        summary = build_summary(
+            rows,
+            ledger_path=path,
+            source_sha256=digest,
+            marker_count=len(marker_specs),
+        )
+        val = list(errs)
+        if sym != "DOGEUSDT":
+            val.append("symbol_mismatch")
+        return {
+            "success": not val,
+            "symbol": sym,
+            "strategy_id": STRATEGY_ID,
+            "validation_errors": val,
+            "expected_signal_count": EXPECTED_SIGNAL_COUNT,
+            "summary": summary,
+            "payload_kind": summary.get("payload_kind"),
+        }
+
+    @router.post("/api/research/backtester/ema59-e1c-july/load")
+    async def api_research_backtester_ema59_e1c_july_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from .ema59_e1c_signal_overlay_v1 import (
+            STRATEGY_ID,
+            build_marker_specs,
+            build_summary,
+            load_long_cross_rows,
+        )
+
+        symbol = str(body.get("symbol") or "").strip().upper()
+        visible = body.get("visible")
+        if visible is None:
+            visible = True
+        if not symbol:
+            return _error(400, "symbol_required", "symbol required")
+        ws = get_workspace()
+        if visible is False:
+            return ws.clear_ema59_e1c_july_signals_backtester(symbol)
+        rows, path, digest, errs = load_long_cross_rows()
+        if errs:
+            return _error(400, "ledger_invalid", ",".join(errs))
+        if symbol != "DOGEUSDT":
+            return _error(400, "symbol_mismatch", "E1C EMA59 signals are DOGEUSDT 5m only")
+        marker_specs = build_marker_specs(rows)
+        summary = build_summary(
+            rows,
+            ledger_path=path,
+            source_sha256=digest,
+            marker_count=len(marker_specs),
+        )
+        snap = ws.load_ema59_e1c_july_signals_backtester(symbol, rows, summary, visible=True)
+        snap["backtester"]["strategy_id"] = STRATEGY_ID
+        return snap
+
     def _frozen_month_api_load(month_key: str, user: dict, body: dict[str, Any]) -> dict[str, Any]:
         from .frozen_month_research_overlay_v1 import (
             build_summary,
@@ -1810,6 +2020,37 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "payload_kind": prof.payload_kind,
         }
 
+    @router.post("/api/research/backtester/bt-long-v3-phase3g-sept-sl-cap/load")
+    async def api_research_backtester_bt_long_v3_phase3g_sept_sl_cap_load(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        return _frozen_month_api_load("long_v3_phase3g_sept_sl_cap", user, body)
+
+    @router.get("/api/research/backtester/bt-long-v3-phase3g-sept-sl-cap/meta")
+    async def api_research_backtester_bt_long_v3_phase3g_sept_sl_cap_meta(
+        user: dict = Depends(require_auth),
+        symbol: str = Query("DOGEUSDT"),
+    ):
+        from .frozen_month_research_overlay_v1 import build_summary, get_profile, load_trade_ledger, validate_ledger
+
+        prof = get_profile("long_v3_phase3g_sept_sl_cap")
+        sym = str(symbol or "").strip().upper()
+        rows, path, errs = load_trade_ledger(prof)
+        if errs:
+            return _error(404, "ledger_missing", ",".join(errs))
+        val = validate_ledger(prof, rows)
+        summary = build_summary(prof, rows, ledger_path=path)
+        if sym != "DOGEUSDT":
+            val.append("symbol_mismatch")
+        return {
+            "success": not val,
+            "symbol": sym,
+            "validation_errors": val,
+            "summary": summary,
+            "payload_kind": prof.payload_kind,
+        }
+
     @router.post("/api/research/backtester/load")
     async def api_research_backtester_load(
         user: dict = Depends(require_auth),
@@ -1872,6 +2113,12 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "bt-long-v3-phase3a",
         ):
             return await api_research_backtester_bt_long_v3_phase3a_load(user=user, body=body)
+        if strategy_id in (
+            "long_v3_phase3g_sept_2026_sl_cap_1p2_research",
+            "long_v3_phase3g_sept_sl_cap",
+            "bt-long-v3-phase3g-sept-sl-cap",
+        ):
+            return await api_research_backtester_bt_long_v3_phase3g_sept_sl_cap_load(user=user, body=body)
         if strategy_id in (POOL_LANDSCAPE_BT_D7_STRATEGY_ID,):
             symbol = str(body.get("symbol") or "").strip().upper()
             visible = body.get("visible")
@@ -2494,6 +2741,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             color=body.get("color"),
             width=body.get("width"),
         )
+
+    @router.post("/api/research/drawings/extend-right")
+    async def api_research_drawings_extend_right(user: dict = Depends(require_auth)):
+        return get_workspace().toggle_selected_extend_right()
 
     @router.get("/api/research/overlays")
     async def api_research_overlays(

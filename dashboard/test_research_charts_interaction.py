@@ -483,6 +483,170 @@ def test_drawing_tools_hline_vline_trend_rectangle_measure_positions(tmp_path, m
     assert ws.snapshot()["pending"] is False
 
 
+def test_future_time_coordinate_regression():
+    import subprocess
+
+    script = DASHBOARD_ROOT / "scripts" / "test_research_future_time_coords.mjs"
+    proc = subprocess.run(
+        ["node", str(script)],
+        cwd=str(DASHBOARD_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
+def test_host_overlay_fingerprint_trend_selection_regression():
+    import subprocess
+
+    script = DASHBOARD_ROOT / "scripts" / "test_research_overlay_fp.mjs"
+    proc = subprocess.run(
+        ["node", str(script)],
+        cwd=str(DASHBOARD_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+    assert "all assertions passed" in proc.stdout
+
+
+def test_trend_select_drag_anchor_move_deselect(tmp_path, monkeypatch):
+    ws = _ws(tmp_path, monkeypatch)
+    symbol = "APTUSDT"
+    ts_a = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+    ts_b = datetime(2026, 2, 1, 14, 0, tzinfo=timezone.utc)
+    ws.set_drawing_tool("trend")
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_a, price=1.4)
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_b, price=1.6)
+    trend = next(d for d in ws.drawings.get_drawings(symbol) if d.drawing_type == "trend")
+    trend_id = trend.drawing_id
+    overlay_id = trend_id + ":line"
+    ws.on_hit(overlay_id)
+    assert ws.snapshot()["selected_id"] == trend_id
+    moved_start = ts_a.timestamp() + 300
+    ws.on_drag(
+        overlay_id,
+        None,
+        None,
+        {
+            "mode": "resize-start",
+            "start_timestamp": moved_start,
+            "start_price": 1.35,
+            "end_timestamp": ts_b.timestamp(),
+            "end_price": 1.6,
+        },
+    )
+    after_anchor = ws.drawings.get_drawing(trend_id)
+    assert after_anchor.drawing_id == trend_id
+    assert abs(after_anchor.start_timestamp.timestamp() - moved_start) < 1
+    assert abs(float(after_anchor.start_price) - 1.35) < 1e-9
+    moved_both = moved_start + 600
+    ws.on_drag(
+        overlay_id,
+        None,
+        None,
+        {
+            "mode": "move",
+            "start_timestamp": moved_both,
+            "start_price": 1.38,
+            "end_timestamp": ts_b.timestamp() + 600,
+            "end_price": 1.63,
+        },
+    )
+    after_move = ws.drawings.get_drawing(trend_id)
+    assert after_move.drawing_id == trend_id
+    assert abs(after_move.start_timestamp.timestamp() - moved_both) < 1
+    assert abs(after_move.end_timestamp.timestamp() - (ts_b.timestamp() + 600)) < 1
+    ws.on_deselect()
+    assert ws.snapshot()["selected_id"] is None
+    payloads_5m = {p["id"]: p for p in ws.composed_overlays(symbol, "5m")}
+    payloads_1h = {p["id"]: p for p in ws.composed_overlays(symbol, "1h")}
+    assert overlay_id in payloads_5m and overlay_id in payloads_1h
+    line_5m = payloads_5m[overlay_id]
+    line_1h = payloads_1h[overlay_id]
+    assert line_5m["start_timestamp"] == line_1h["start_timestamp"]
+    assert line_5m["start_price"] == line_1h["start_price"]
+    assert line_5m["end_timestamp"] == line_1h["end_timestamp"]
+    assert line_5m["end_price"] == line_1h["end_price"]
+    snap = ws.handle_event({"type": "drag", "overlay_id": overlay_id, "mode": "resize-end",
+        "start_timestamp": after_move.start_timestamp.timestamp(),
+        "start_price": float(after_move.start_price),
+        "end_timestamp": after_move.end_timestamp.timestamp() + 900,
+        "end_price": 1.7,
+    })
+    assert snap["selected_id"] == trend_id
+
+
+def test_trend_extend_right_toggle_and_overlay(tmp_path, monkeypatch):
+    ws = _ws(tmp_path, monkeypatch)
+    symbol = "APTUSDT"
+    ts_a = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+    ts_b = datetime(2026, 2, 1, 14, 0, tzinfo=timezone.utc)
+    ws.set_drawing_tool("trend")
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_a, price=1.4)
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_b, price=1.6)
+    trend = next(d for d in ws.drawings.get_drawings(symbol) if d.drawing_type == "trend")
+    ws.on_hit(trend.drawing_id + ":line")
+    assert ws.snapshot()["extend_right"] == {"available": True, "enabled": False}
+    ws.toggle_selected_extend_right()
+    meta = ws.drawings.get_drawing(trend.drawing_id).metadata
+    assert meta.get("extend_right") is True
+    payloads = ws.composed_overlays(symbol, "5m")
+    line = next(p for p in payloads if p.get("id") == trend.drawing_id + ":line")
+    assert line.get("extend_right") is True
+    ws.toggle_selected_extend_right()
+    assert not ws.drawings.get_drawing(trend.drawing_id).metadata.get("extend_right")
+
+
+def test_trend_future_end_timestamp_persists(tmp_path, monkeypatch):
+    ws = _ws(tmp_path, monkeypatch)
+    symbol = "APTUSDT"
+    ts_a = datetime(2026, 2, 1, 13, 0, tzinfo=timezone.utc)
+    ts_future = datetime(2026, 2, 1, 18, 0, tzinfo=timezone.utc)
+    ws.set_drawing_tool("trend")
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_a, price=1.4)
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_future, price=1.55)
+    trend = next(d for d in ws.drawings.get_drawings(symbol) if d.drawing_type == "trend")
+    assert abs(trend.end_timestamp.timestamp() - ts_future.timestamp()) < 1
+    assert trend.end_timestamp > ts_a
+    payloads = ws.composed_overlays(symbol, "5m")
+    line = next(p for p in payloads if p.get("id") == trend.drawing_id + ":line")
+    assert line["end_timestamp"] == int(ts_future.timestamp())
+    payloads_1h = ws.composed_overlays(symbol, "1h")
+    line_1h = next(p for p in payloads_1h if p.get("id") == trend.drawing_id + ":line")
+    assert line_1h["end_timestamp"] == line["end_timestamp"]
+
+
+def test_rectangle_drag_updates_geometry_same_id(tmp_path, monkeypatch):
+    ws = _ws(tmp_path, monkeypatch)
+    symbol = "APTUSDT"
+    ts_a = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+    ts_b = datetime(2026, 2, 1, 14, 0, tzinfo=timezone.utc)
+    ws.set_drawing_tool("rectangle")
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_a, price=1.2)
+    ws.on_point(pane_id="pane-0", timeframe="5m", symbol=symbol, ts=ts_b, price=1.5)
+    rect = next(d for d in ws.drawings.get_drawings(symbol) if d.drawing_type == "rectangle")
+    rid = rect.drawing_id
+    ws.on_hit(rid + ":zone")
+    ws.on_drag(
+        rid + ":zone",
+        None,
+        None,
+        {
+            "mode": "move",
+            "start_timestamp": ts_a.timestamp() + 300,
+            "start_price": 1.25,
+            "end_timestamp": ts_b.timestamp() + 300,
+            "end_price": 1.55,
+        },
+    )
+    after = ws.drawings.get_drawing(rid)
+    assert after.drawing_id == rid
+    assert abs(after.start_timestamp.timestamp() - (ts_a.timestamp() + 300)) < 1
+
+
 def test_clear_preserves_lld_namespace(tmp_path, monkeypatch):
     ws = _ws(tmp_path, monkeypatch)
     ws.set_indicator_enabled("liquidity", True)

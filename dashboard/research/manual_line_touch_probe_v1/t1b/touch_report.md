@@ -1,0 +1,37 @@
+# Manual line touch probe v1
+
+- **Data source**: `/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/user_data/drawings.json` (read-only)
+- **Symbol / TF**: DOGEUSDT 5m
+- **Window**: 2026-08-26 00:00:00 UTC .. 2026-08-27 00:00:00 UTC (end exclusive)
+- **Candles loaded**: 288
+- **Drawings evaluated**: 22 (17 trend, 5 horizontal)
+
+## Classifications (candle rows evaluated, excluding inactive segment)
+
+- TOUCH: 39
+- NEAR_0_10: 30
+- NEAR_0_20: 28
+- NO_TOUCH: 1950
+
+- **Touch episodes**: 64
+
+## Episode summary by line
+
+- `d-8dd3215253b5`: NEAR_0_20 2026-08-26 15:00:00 UTC→2026-08-26 15:00:00 UTC (1 bars)
+- `d-a6d9a05da2f1`: NEAR_0_10 2026-08-26 16:30:00 UTC→2026-08-26 16:35:00 UTC (2 bars), NEAR_0_20 2026-08-26 15:00:00 UTC→2026-08-26 15:00:00 UTC (1 bars), NEAR_0_20 2026-08-26 16:20:00 UTC→2026-08-26 16:20:00 UTC (1 bars), NEAR_0_20 2026-08-26 16:50:00 UTC→2026-08-26 16:50:00 UTC (1 bars), NEAR_0_20 2026-08-26 20:25:00 UTC→2026-08-26 20:25:00 UTC (1 bars), TOUCH 2026-08-26 16:25:00 UTC→2026-08-26 16:25:00 UTC (1 bars), TOUCH 2026-08-26 16:40:00 UTC→2026-08-26 16:45:00 UTC (2 bars), TOUCH 2026-08-26 20:20:00 UTC→2026-08-26 20:20:00 UTC (1 bars)
+- `d-c2578aa17564`: NEAR_0_10 2026-08-26 00:10:00 UTC→2026-08-26 00:10:00 UTC (1 bars), NEAR_0_10 2026-08-26 05:00:00 UTC→2026-08-26 05:00:00 UTC (1 bars), NEAR_0_10 2026-08-26 05:10:00 UTC→2026-08-26 05:10:00 UTC (1 bars), NEAR_0_10 2026-08-26 06:25:00 UTC→2026-08-26 06:30:00 UTC (2 bars), NEAR_0_10 2026-08-26 06:40:00 UTC→2026-08-26 06:45:00 UTC (2 bars), NEAR_0_10 2026-08-26 07:55:00 UTC→2026-08-26 07:55:00 UTC (1 bars), NEAR_0_10 2026-08-26 08:25:00 UTC→2026-08-26 08:25:00 UTC (1 bars), NEAR_0_10 2026-08-26 08:35:00 UTC→2026-08-26 08:45:00 UTC (3 bars), NEAR_0_10 2026-08-26 10:35:00 UTC→2026-08-26 10:40:00 UTC (2 bars), NEAR_0_10 2026-08-26 11:05:00 UTC→2026-08-26 11:05:00 UTC (1 bars), NEAR_0_20 2026-08-26 00:00:00 UTC→2026-08-26 00:00:00 UTC (1 bars), NEAR_0_20 2026-08-26 00:15:00 UTC→2026-08-26 00:15:00 UTC (1 bars), NEAR_0_20 2026-08-26 04:55:00 UTC→2026-08-26 04:55:00 UTC (1 bars), NEAR_0_20 2026-08-26 06:50:00 UTC→2026-08-26 06:50:00 UTC (1 bars), NEAR_0_20 2026-08-26 07:00:00 UTC→2026-08-26 07:00:00 UTC (1 bars), NEAR_0_20 2026-08-26 07:30:00 UTC→2026-08-26 07:30:00 UTC (1 bars), NEAR_0_20 2026-08-26 07:50:00 UTC→2026-08-26 07:50:00 UTC (1 bars), NEAR_0_20 2026-08-26 08:15:00 UTC→2026-08-26 08:15:00 UTC (1 bars), NEAR_0_20 2026-08-26 09:00:00 UTC→2026-08-26 09:10:00 UTC (3 bars), NEAR_0_20 2026-08-26 11:20:00 UTC→2026-08-26 11:20:00 UTC (1 bars), NEAR_0_20 2026-08-26 12:25:00 UTC→2026-08-26 12:25:00 UTC (1 bars), TOUCH 2026-08-26 05:05:00 UTC→2026-08-26 05:05:00 UTC (1 bars), TOUCH 2026-08-26 05:15:00 UTC→2026-08-26 05:20:00 UTC (2 bars), TOUCH 2026-08-26 06:35:00 UTC→2026-08-26 06:35:00 UTC (1 bars), TOUCH 2026-08-26 08:00:00 UTC→2026-08-26 08:05:00 UTC (2 bars), TOUCH 2026-08-26 08:20:00 UTC→2026-08-26 08:20:00 UTC (1 bars), TOUCH 2026-08-26 08:30:00 UTC→2026-08-26 08:30:00 UTC (1 bars), TOUCH 2026-08-26 08:50:00 UTC→2026-08-26 08:50:00 UTC (1 bars), TOUCH 2026-08-26 10:45:00 UTC→2026-08-26 11:00:00 UTC (4 bars), TOUCH 2026-08-26 11:10:00 UTC→2026-08-26 11:15:00 UTC (2 bars)
+- `d-ebc9baa9e585`: NEAR_0_10 2026-08-26 00:10:00 UTC→2026-08-26 00:15:00 UTC (2 bars), NEAR_0_10 2026-08-26 00:25:00 UTC→2026-08-26 00:25:00 UTC (1 bars), NEAR_0_10 2026-08-26 00:35:00 UTC→2026-08-26 00:35:00 UTC (1 bars), NEAR_0_10 2026-08-26 09:35:00 UTC→2026-08-26 09:35:00 UTC (1 bars), NEAR_0_10 2026-08-26 09:55:00 UTC→2026-08-26 10:10:00 UTC (4 bars), NEAR_0_10 2026-08-26 13:05:00 UTC→2026-08-26 13:05:00 UTC (1 bars), NEAR_0_10 2026-08-26 14:10:00 UTC→2026-08-26 14:15:00 UTC (2 bars), NEAR_0_10 2026-08-26 21:05:00 UTC→2026-08-26 21:05:00 UTC (1 bars), NEAR_0_20 2026-08-26 00:45:00 UTC→2026-08-26 00:45:00 UTC (1 bars), NEAR_0_20 2026-08-26 09:20:00 UTC→2026-08-26 09:20:00 UTC (1 bars), NEAR_0_20 2026-08-26 09:30:00 UTC→2026-08-26 09:30:00 UTC (1 bars), NEAR_0_20 2026-08-26 09:50:00 UTC→2026-08-26 09:50:00 UTC (1 bars), NEAR_0_20 2026-08-26 14:05:00 UTC→2026-08-26 14:05:00 UTC (1 bars), NEAR_0_20 2026-08-26 14:25:00 UTC→2026-08-26 14:25:00 UTC (1 bars), NEAR_0_20 2026-08-26 21:20:00 UTC→2026-08-26 21:30:00 UTC (3 bars), NEAR_0_20 2026-08-26 21:45:00 UTC→2026-08-26 21:45:00 UTC (1 bars), TOUCH 2026-08-26 00:00:00 UTC→2026-08-26 00:05:00 UTC (2 bars), TOUCH 2026-08-26 00:20:00 UTC→2026-08-26 00:20:00 UTC (1 bars), TOUCH 2026-08-26 00:40:00 UTC→2026-08-26 00:40:00 UTC (1 bars), TOUCH 2026-08-26 09:40:00 UTC→2026-08-26 09:45:00 UTC (2 bars), TOUCH 2026-08-26 12:30:00 UTC→2026-08-26 12:30:00 UTC (1 bars), TOUCH 2026-08-26 13:10:00 UTC→2026-08-26 13:20:00 UTC (3 bars), TOUCH 2026-08-26 13:30:00 UTC→2026-08-26 14:00:00 UTC (7 bars), TOUCH 2026-08-26 14:20:00 UTC→2026-08-26 14:20:00 UTC (1 bars), TOUCH 2026-08-26 21:10:00 UTC→2026-08-26 21:15:00 UTC (2 bars)
+
+## Coordinate notes
+
+- d-289deb31eb84: end anchor time before start anchor time in storage
+- d-7f4519d5ce5b: end anchor time before start anchor time in storage
+- d-988236deb817: end anchor time before start anchor time in storage
+- d-a6d9a05da2f1: end anchor time before start anchor time in storage
+- d-ac60572bfc69: end anchor time before start anchor time in storage
+
+## Method
+
+- Touch detection uses **5m interval** line price band vs candle low/high (see `distance_method`).
+- Finite trend segments: no rows with `distance_method=inactive` outside anchor span (no artificial touches).
+- `anchor_availability_status` flags lookahead (candles after 2nd anchor without extend_right still inactive for touch).

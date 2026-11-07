@@ -286,7 +286,8 @@
   };
 
   const DEFAULT_VISIBLE_BARS = 120;
-  const DEFAULT_RIGHT_OFFSET = 6;
+  /** Empty bars right of last candle (pan + anchors in kerzenfreiem Bereich). */
+  const DEFAULT_RIGHT_OFFSET = 96;
   const DEFAULT_BAR_SPACING = 7;
   const PRICE_SCALE_MARGINS = { top: 0.08, bottom: 0.08 };
   const OSC_SCALE_MARGINS = { top: 0.04, bottom: 0.04 };
@@ -809,6 +810,9 @@
       if (hit) {
         emitDrawing({ type: "hit", overlay_id: hit });
         return;
+      }
+      if (interactionMode === "select") {
+        emitDrawing({ type: "deselect" });
       }
       if (pt.time == null) return;
       if (typeof window.bridge.on_chart_click === "function") {
@@ -1524,6 +1528,9 @@
         priceScaleId: "right",
         priceFormat: lastPriceFormat,
       });
+      if (spec.line_style) {
+        seriesOpts.lineStyle = lineStyleEnum(spec.line_style);
+      }
       if (!series) {
         series = chart.addLineSeries(seriesOpts);
         emaOverlaySeries.set(id, series);
@@ -2071,6 +2078,17 @@
     if (!Number.isFinite(t)) return null;
     let coord = chart.timeScale().timeToCoordinate(t);
     if (coord != null) return coord;
+    const logical = logicalFromUnix(t);
+    if (logical != null) {
+      try {
+        if (chart.timeScale().logicalToCoordinate) {
+          coord = chart.timeScale().logicalToCoordinate(logical);
+          if (coord != null) return coord;
+        }
+      } catch (err) {
+        /* ignore */
+      }
+    }
     const snapped = snapUnixToBar(t);
     if (snapped == null) return null;
     coord = chart.timeScale().timeToCoordinate(Number(snapped));
@@ -2625,8 +2643,15 @@
       hideEl(el);
       return;
     }
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    let ex = x2;
+    let ey = y2;
+    if (drawingExtendRight(p)) {
+      const ext = segmentExtendedEnd(x1, y1, x2, y2);
+      ex = ext.x;
+      ey = ext.y;
+    }
+    const dx = ex - x1;
+    const dy = ey - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
     el.style.display = "block";
     el.style.left = x1 + "px";
@@ -3204,13 +3229,17 @@
     if (rec.el) {
       if (rec.payload.metadata && rec.payload.metadata.selected) {
         rec.el.classList.add("ov-selected");
+        if (isEditableTrendSegment(rec.payload)) {
+          rec.el.style.zIndex = "36";
+        }
       } else {
         rec.el.classList.remove("ov-selected");
+        if (rec.el.style.zIndex === "36") rec.el.style.zIndex = "";
       }
     }
     const selected = rec.payload.metadata && rec.payload.metadata.selected;
     const p = rec.payload;
-    if (selected && p.kind === "arrow") {
+    if (selected && (p.kind === "arrow" || isEditableUserSegment(p))) {
       const ax1 = xOf(p.start_timestamp);
       const ay1 = yOf(p.start_price);
       const ax2 = xOf(p.end_timestamp);
@@ -3223,6 +3252,33 @@
       } else {
         clearHandles(rec);
       }
+    } else if (selected && p.type === "line" && p.kind === "horizontal" && isUserDrawing(p)) {
+      const py = yOf(p.price);
+      const midX = Math.max(20, plotInteractionMaxX() * 0.5);
+      if (py != null) syncHandles(rec, [{ x: midX, y: py }]);
+      else clearHandles(rec);
+    } else if (selected && p.type === "line" && p.kind === "vertical" && isUserDrawing(p)) {
+      const px = xOf(p.timestamp);
+      const midY = Math.max(20, plotBottomY() * 0.5);
+      if (px != null) syncHandles(rec, [{ x: px, y: midY }]);
+      else clearHandles(rec);
+    } else if (selected && isEditableUserZone(p)) {
+      const zx1 = xOf(p.start_timestamp);
+      const zx2 = p.end_timestamp != null ? xOf(p.end_timestamp) : null;
+      const zy1 = yOf(p.top_price);
+      const zy2 = yOf(p.bottom_price);
+      if (zx1 != null && zx2 != null && zy1 != null && zy2 != null) {
+        const left = Math.min(zx1, zx2);
+        const right = Math.max(zx1, zx2);
+        const top = Math.min(zy1, zy2);
+        const bot = Math.max(zy1, zy2);
+        syncHandles(rec, [
+          { x: left, y: top },
+          { x: right, y: top },
+          { x: left, y: bot },
+          { x: right, y: bot },
+        ]);
+      } else clearHandles(rec);
     } else if (selected && p.type === "position") {
       const pts = positionHandlePoints(p);
       if (pts) {
@@ -4166,6 +4222,83 @@
     return Number.isFinite(d) && d > 0 ? d : 60;
   }
 
+  function timeframeBarSecFallback() {
+    const tf = String((lastPayload && lastPayload.timeframe) || "").toLowerCase();
+    const map = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400 };
+    return map[tf] || 300;
+  }
+
+  function seriesBarSec(candles) {
+    const sec = estimateBarSec(candles);
+    return sec > 0 ? sec : timeframeBarSecFallback();
+  }
+
+  /** Map UTC to continuous bar index (fractional); extends past last / before first candle. */
+  function logicalFromUnix(unix) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length || unix == null) return null;
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return null;
+    const lastIdx = candles.length - 1;
+    const barSec = seriesBarSec(candles);
+    const firstT = Number(candles[0].time);
+    const lastT = Number(candles[lastIdx].time);
+    if (t >= lastT) return lastIdx + (t - lastT) / barSec;
+    if (t <= firstT) return (t - firstT) / barSec;
+    const idx = candleIndexForTime(t, candles);
+    if (idx == null) return null;
+    const t0 = Number(candles[idx].time);
+    const t1 =
+      idx + 1 <= lastIdx ? Number(candles[idx + 1].time) : t0 + barSec;
+    const span = t1 - t0;
+    const frac = span > 0 ? (t - t0) / span : 0;
+    return idx + Math.max(0, Math.min(1, frac));
+  }
+
+  /** Inverse of logicalFromUnix — future bars use uniform barSec (no fake candles). */
+  function unixFromLogical(logical) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length || logical == null) return null;
+    const L = Number(logical);
+    if (!Number.isFinite(L)) return null;
+    const lastIdx = candles.length - 1;
+    const barSec = seriesBarSec(candles);
+    const firstT = Number(candles[0].time);
+    const lastT = Number(candles[lastIdx].time);
+    if (L >= lastIdx) return lastT + (L - lastIdx) * barSec;
+    if (L <= 0) return firstT + L * barSec;
+    const idx = Math.floor(L);
+    const frac = L - idx;
+    const i = Math.max(0, Math.min(lastIdx, idx));
+    const t0 = Number(candles[i].time);
+    const t1 = i + 1 <= lastIdx ? Number(candles[i + 1].time) : t0 + barSec;
+    return t0 + frac * (t1 - t0);
+  }
+
+  /** Plot X → UTC; coordinateToTime is null in kerzenfreiem rightOffset — use logical extrapolation. */
+  function unixFromPlotX(x) {
+    if (!chart || x == null || !Number.isFinite(Number(x))) return null;
+    let t = null;
+    try {
+      t = chart.timeScale().coordinateToTime(x);
+    } catch (err) {
+      t = null;
+    }
+    if (t != null && Number.isFinite(Number(t))) return Number(t);
+    let logical = null;
+    try {
+      if (chart.timeScale().coordinateToLogical) {
+        logical = chart.timeScale().coordinateToLogical(x);
+      }
+    } catch (err2) {
+      logical = null;
+    }
+    if (logical != null && Number.isFinite(Number(logical))) {
+      return unixFromLogical(logical);
+    }
+    return null;
+  }
+
   function focusOnTime(centerUnix, padSec) {
     if (!chart) return false;
     const candles = (lastPayload && lastPayload.candles) || [];
@@ -4767,7 +4900,7 @@
     if (param.time != null) {
       pt.time = Number(param.time);
     } else if (pt.x != null && chart) {
-      const t = chart.timeScale().coordinateToTime(pt.x);
+      const t = unixFromPlotX(pt.x);
       if (t != null) pt.time = Number(t);
     }
     return pt;
@@ -4797,7 +4930,72 @@
     return Math.max(6, w + 4);
   }
 
+  function isUserDrawing(p) {
+    return !!(p && p.metadata && p.metadata.drawing_id);
+  }
+
+  function userDrawingType(p) {
+    return String((p && p.metadata && p.metadata.drawing_type) || "");
+  }
+
+  function drawingExtendRight(p) {
+    if (!p) return false;
+    if (p.extend_right) return true;
+    const meta = p.metadata || {};
+    return !!meta.extend_right;
+  }
+
+  function isEditableUserSegment(p) {
+    if (!p || p.type !== "line" || p.kind !== "segment" || !isUserDrawing(p)) return false;
+    const t = userDrawingType(p);
+    return t === "trend" || t === "measure";
+  }
+
+  function isEditableTrendSegment(p) {
+    return isEditableUserSegment(p) && userDrawingType(p) === "trend";
+  }
+
+  function isEditableUserZone(p) {
+    if (!p || p.type !== "zone" || !isUserDrawing(p)) return false;
+    const t = userDrawingType(p);
+    return t === "rectangle" || t === "circle";
+  }
+
+  function isEditableTwoPointLine(p) {
+    if (!p || p.type !== "line" || !isUserDrawing(p)) return false;
+    return p.kind === "arrow" || isEditableUserSegment(p);
+  }
+
+  function plotInteractionMaxX() {
+    return Math.max(0, plotRightX() - 1);
+  }
+
+  function isPlotInteractionX(x) {
+    if (x == null || !Number.isFinite(Number(x))) return false;
+    return Number(x) <= plotInteractionMaxX();
+  }
+
+  function clampPlotXY(xy) {
+    if (!xy) return null;
+    const maxX = plotInteractionMaxX();
+    const pb = plotBottomY();
+    return {
+      x: Math.max(0, Math.min(maxX, xy.x)),
+      y: Math.max(0, Math.min(pb > 2 ? pb - 2 : pb, xy.y)),
+    };
+  }
+
+  function segmentExtendedEnd(x1, y1, x2, y2) {
+    const plotRight = plotRightX();
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (Math.abs(dx) < 1e-6) return { x: x2, y: y2 };
+    const yAtRight = y1 + (dy / dx) * (plotRight - x1);
+    return { x: plotRight, y: yAtRight };
+  }
+
   function hitTestXY(x, y) {
+    if (!isPlotInteractionX(x)) return null;
     let best = null;
     let bestZ = -1e9;
     overlayRegistry.forEach(function (rec) {
@@ -4808,17 +5006,27 @@
       const thresh = hitThreshold(p);
       if (p.type === "line" && p.kind === "horizontal") {
         const py = yOf(p.price);
-        hit = py != null && Math.abs(py - y) <= thresh;
+        hit = py != null && Math.abs(py - y) <= thresh && isPlotInteractionX(x);
       } else if (p.type === "line" && p.kind === "vertical") {
         const px = xOf(p.timestamp);
-        hit = px != null && Math.abs(px - x) <= thresh;
+        hit = px != null && Math.abs(px - x) <= thresh && isPlotInteractionX(px);
       } else if (p.type === "line" && (p.kind === "segment" || p.kind === "arrow")) {
         const x1 = xOf(p.start_timestamp);
         const y1 = yOf(p.start_price);
         const x2 = xOf(p.end_timestamp);
         const y2 = yOf(p.end_price);
         if (x1 != null && y1 != null && x2 != null && y2 != null) {
-          hit = distToSeg(x, y, x1, y1, x2, y2) <= Math.max(7, thresh);
+          const segThresh = isEditableUserSegment(p)
+            ? Math.max(12, thresh + 6)
+            : Math.max(7, thresh);
+          let ex = x2;
+          let ey = y2;
+          if (drawingExtendRight(p)) {
+            const ext = segmentExtendedEnd(x1, y1, x2, y2);
+            ex = ext.x;
+            ey = ext.y;
+          }
+          hit = distToSeg(x, y, x1, y1, ex, ey) <= segThresh;
         }
       } else if (p.type === "zone") {
         const x1 = xOf(p.start_timestamp);
@@ -5047,7 +5255,7 @@
     const el = $("chart");
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+    return clampPlotXY({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
   }
 
   function marketPointFromXY(xy) {
@@ -5073,41 +5281,7 @@
     }
     if (price == null || Number.isNaN(Number(price))) return null;
 
-    let time = null;
-    try {
-      time = chart.timeScale().coordinateToTime(xy.x);
-    } catch (err) {
-      time = null;
-    }
-
-    // Empty right/left padding (common after TF change / Zentrieren) returns
-    // null from coordinateToTime — clamp to the nearest candle instead so
-    // Shift+measure still starts.
-    if (time == null) {
-      let logical = null;
-      try {
-        if (chart.timeScale().coordinateToLogical) {
-          logical = chart.timeScale().coordinateToLogical(xy.x);
-        }
-      } catch (err2) {
-        logical = null;
-      }
-      if (logical != null && Number.isFinite(Number(logical))) {
-        const idx = Math.max(0, Math.min(candles.length - 1, Math.round(Number(logical))));
-        time = candles[idx].time;
-      } else {
-        // Past the live tip → last bar; before history → first bar.
-        try {
-          const lastX = chart.timeScale().timeToCoordinate(candles[candles.length - 1].time);
-          const firstX = chart.timeScale().timeToCoordinate(candles[0].time);
-          if (lastX != null && xy.x >= lastX) time = candles[candles.length - 1].time;
-          else if (firstX != null && xy.x <= firstX) time = candles[0].time;
-          else time = candles[candles.length - 1].time;
-        } catch (err3) {
-          time = candles[candles.length - 1].time;
-        }
-      }
-    }
+    const time = unixFromPlotX(xy.x);
     if (time == null || !Number.isFinite(Number(time))) return null;
     return { time: Number(time), price: Number(price) };
   }
@@ -5142,7 +5316,13 @@
       }
       return "move";
     }
-    if (p.kind === "arrow") {
+    if (p.type === "line" && p.kind === "horizontal" && isUserDrawing(p)) {
+      return "move";
+    }
+    if (p.type === "line" && p.kind === "vertical" && isUserDrawing(p)) {
+      return "move";
+    }
+    if (isEditableTwoPointLine(p)) {
       const x1 = xOf(p.start_timestamp);
       const y1 = yOf(p.start_price);
       const x2 = xOf(p.end_timestamp);
@@ -5155,7 +5335,7 @@
       }
       return "move";
     }
-    if (p.shape === "ellipse") {
+    if (p.shape === "ellipse" || isEditableUserZone(p)) {
       const x1 = xOf(p.start_timestamp);
       const x2 = p.end_timestamp != null ? xOf(p.end_timestamp) : null;
       const y1 = yOf(p.top_price);
@@ -5902,8 +6082,9 @@
     const p = rec.payload;
     const kind = p.kind;
     const movable =
-      (p.type === "line" && (kind === "horizontal" || kind === "vertical" || kind === "arrow")) ||
-      (p.type === "zone" && p.shape === "ellipse") ||
+      (p.type === "line" && (kind === "horizontal" || kind === "vertical" || kind === "arrow") && isUserDrawing(p)) ||
+      isEditableUserSegment(p) ||
+      (p.type === "zone" && (p.shape === "ellipse" || isEditableUserZone(p))) ||
       p.type === "position";
     if (!movable) return;
     if (ev.preventDefault) ev.preventDefault();
@@ -5965,7 +6146,7 @@
       return;
     }
     if (dragState.kind === "vertical") {
-      const t = chart.timeScale().coordinateToTime(xy.x);
+      const t = unixFromPlotX(xy.x);
       if (t == null) return;
       rec.payload.timestamp = Number(t);
       renderVertical(rec);
@@ -5979,12 +6160,12 @@
     if (mode === "move" && grab) {
       const dt = mp.time - grab.time;
       const dp = mp.price - grab.price;
-      if (rec.payload.kind === "arrow") {
+      if (isEditableTwoPointLine(rec.payload)) {
         rec.payload.start_timestamp = orig.start_timestamp + dt;
         rec.payload.end_timestamp = orig.end_timestamp + dt;
         rec.payload.start_price = orig.start_price + dp;
         rec.payload.end_price = orig.end_price + dp;
-      } else if (rec.payload.shape === "ellipse") {
+      } else if (rec.payload.shape === "ellipse" || isEditableUserZone(rec.payload)) {
         rec.payload.start_timestamp = orig.start_timestamp + dt;
         rec.payload.end_timestamp = orig.end_timestamp + dt;
         rec.payload.top_price = orig.top_price + dp;
@@ -6017,7 +6198,7 @@
     } else if (mode === "resize-end") {
       rec.payload.end_timestamp = mp.time;
       rec.payload.end_price = mp.price;
-    } else if (mode.indexOf("resize-") === 0 && rec.payload.shape === "ellipse") {
+    } else if (mode.indexOf("resize-") === 0 && (rec.payload.shape === "ellipse" || isEditableUserZone(rec.payload))) {
       if (mode === "resize-nw" || mode === "resize-sw") {
         rec.payload.start_timestamp = mp.time;
       } else {
@@ -6073,12 +6254,12 @@
         price: payload.price != null ? payload.price : payload.end_price,
         mode: mode,
       };
-      if (payload.kind === "arrow") {
+      if (isEditableTwoPointLine(payload)) {
         event.start_timestamp = payload.start_timestamp;
         event.start_price = payload.start_price;
         event.end_timestamp = payload.end_timestamp;
         event.end_price = payload.end_price;
-      } else if (payload.shape === "ellipse") {
+      } else if (payload.shape === "ellipse" || isEditableUserZone(payload)) {
         event.start_timestamp = payload.start_timestamp;
         event.start_price = payload.top_price;
         event.end_timestamp = payload.end_timestamp;

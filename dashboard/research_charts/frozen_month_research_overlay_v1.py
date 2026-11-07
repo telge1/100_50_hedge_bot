@@ -40,6 +40,8 @@ class FrozenMonthProfile:
     tp_exit_reasons: tuple[str, ...] = ("SIMULATED_TP",)
     sl_exit_reasons: tuple[str, ...] = ("SIMULATED_SL",)
     ledger_format: str = "short_frozen"
+    fill_month_prefix: str | None = None
+    fill_time_end_inclusive: str | None = None
 
 
 PROFILES: dict[str, FrozenMonthProfile] = {
@@ -163,6 +165,41 @@ PROFILES: dict[str, FrozenMonthProfile] = {
         tp_exit_reasons=("FIXED_UPPER_TP", "UPPER_POOL_GAP_TP"),
         sl_exit_reasons=("STRUCTURAL_SL",),
         ledger_format="long_v3_phase3",
+    ),
+    "long_v3_phase3g_sept_sl_cap": FrozenMonthProfile(
+        key="long_v3_phase3g_sept_sl_cap",
+        strategy_id="long_v3_phase3g_sept_2026_sl_cap_1p2_research",
+        display_name="LONG V3 — September 2026 — SL max. 1,2 %",
+        results_subdir="long_v3_phase3g_unused",
+        ledger_filename="trade_ledger.json",
+        bundled_filename="long_v3_phase3g_sept_sl_cap_trade_ledger.json",
+        expected_fills=15,
+        expected_tp=10,
+        expected_sl=5,
+        box_prefix="longv3p3g-box-",
+        link_prefix="longv3p3g-link-",
+        backtester_source="long_v3_phase3g_sept_sl_cap_chart_overlay_v1",
+        payload_kind="long_v3_phase3g_sept_sl_cap_chart_integration_v1",
+        workspace_snap_key="long_v3_phase3g_sept_sl_cap_research",
+        execution_model=(
+            "LONG V3 Phase 3D · Variant A + fill-time SL cap 1.2% · "
+            "September 2026 slice · COMPLETED_VALIDATED"
+        ),
+        position_side="long",
+        pools_repo_relpath=(
+            "logs/research/long_v3_phase3d_sl_cap_v1/"
+            "phase3d_sl_cap_1p2_20261030T171923Z_cecdcd44/trade_ledger.json"
+        ),
+        run_status_relpath=(
+            "logs/research/long_v3_phase3d_sl_cap_v1/"
+            "phase3d_sl_cap_1p2_20261030T171923Z_cecdcd44/run_status.json"
+        ),
+        required_run_state="COMPLETED_VALIDATED",
+        tp_exit_reasons=("FIXED_UPPER_TP", "UPPER_POOL_GAP_TP"),
+        sl_exit_reasons=("STRUCTURAL_SL",),
+        ledger_format="long_v3_phase3",
+        fill_month_prefix="2026-09",
+        fill_time_end_inclusive="2026-09-30T23:40:00Z",
     ),
 }
 
@@ -296,6 +333,23 @@ def normalize_event_stream_ledger(rows: list[dict[str, Any]]) -> list[dict[str, 
     return out
 
 
+def _filter_ledger_rows(profile: FrozenMonthProfile, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    out = rows
+    if profile.fill_month_prefix:
+        out = [r for r in out if str(r.get("fill_time_utc") or "").startswith(profile.fill_month_prefix)]
+    if profile.fill_time_end_inclusive:
+        end = _parse_utc(profile.fill_time_end_inclusive)
+        filtered: list[dict[str, Any]] = []
+        for r in out:
+            try:
+                if _parse_utc(str(r.get("fill_time_utc") or "")) <= end:
+                    filtered.append(r)
+            except (TypeError, ValueError):
+                continue
+        out = filtered
+    return out
+
+
 def load_trade_ledger(profile: FrozenMonthProfile) -> tuple[list[dict[str, Any]], Path, list[str]]:
     pools_path, bundled_path = ledger_paths(profile)
     path = pools_path if pools_path.is_file() else bundled_path
@@ -322,6 +376,7 @@ def load_trade_ledger(profile: FrozenMonthProfile) -> tuple[list[dict[str, Any]]
         rows = normalize_long_v3_phase3_ledger(rows)
     else:
         rows = normalize_event_stream_ledger(rows)
+    rows = _filter_ledger_rows(profile, rows)
     return rows, path, errs
 
 
