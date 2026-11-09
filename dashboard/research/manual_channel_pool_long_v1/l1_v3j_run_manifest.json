@@ -1,0 +1,254 @@
+{
+  "mode": "DRAWINGS_AUTO_WINDOW",
+  "line_selection_mode": "DYNAMIC_SUPPORT",
+  "drawings_sha256": "0380057b4660d3090d51eaeae22ea609aaae382aa9af699912be93c73c4a8b3f",
+  "drawings_count": 14,
+  "support_line_count": 13,
+  "support_line_ids": [
+    "d-03350098db64",
+    "d-036ba7cefe2e",
+    "d-0e5e7004dccd",
+    "d-1f70c9798935",
+    "d-248d74050cc8",
+    "d-289deb31eb84",
+    "d-3bd7446b7a5b",
+    "d-5c8ffbfb8a06",
+    "d-7f4519d5ce5b",
+    "d-988236deb817",
+    "d-a6d9a05da2f1",
+    "d-ac60572bfc69",
+    "d-e1c6e07765fe"
+  ],
+  "window_start_utc": "2026-03-29 16:00:00 UTC",
+  "window_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "data_end_bar_utc": "2026-10-19 13:00:00 UTC",
+  "simulation_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "run_end_status": "DATA_END_REACHED",
+  "per_line_research_window": [
+    {
+      "drawing_id": "d-03350098db64",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-28 00:00:00 UTC",
+      "anchor_t2_utc": "2026-09-06 11:00:00 UTC",
+      "research_start_utc": "2026-08-28 00:00:00 UTC",
+      "research_end_utc": "2026-09-06 11:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-036ba7cefe2e",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-03-29 16:00:00 UTC",
+      "anchor_t2_utc": "2026-04-26 16:00:00 UTC",
+      "research_start_utc": "2026-03-29 16:00:00 UTC",
+      "research_end_utc": "2026-04-26 16:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-0e5e7004dccd",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-28 17:00:00 UTC",
+      "anchor_t2_utc": "2026-08-31 04:00:00 UTC",
+      "research_start_utc": "2026-08-28 17:00:00 UTC",
+      "research_end_utc": "2026-08-31 04:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-1f70c9798935",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-09-16 12:00:00 UTC",
+      "anchor_t2_utc": "2026-10-02 04:00:00 UTC",
+      "research_start_utc": "2026-09-16 12:00:00 UTC",
+      "research_end_utc": "2026-10-02 04:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-248d74050cc8",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-28 19:00:00 UTC",
+      "anchor_t2_utc": "2026-08-31 08:00:00 UTC",
+      "research_start_utc": "2026-08-28 19:00:00 UTC",
+      "research_end_utc": "2026-08-31 08:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-289deb31eb84",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-10-25 04:00:00 UTC",
+      "anchor_t2_utc": "2026-10-02 08:00:00 UTC",
+      "research_start_utc": "2026-10-02 08:00:00 UTC",
+      "research_end_utc": "2026-10-25 04:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-3bd7446b7a5b",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-09-02 01:30:00 UTC",
+      "anchor_t2_utc": "2026-09-03 13:30:00 UTC",
+      "research_start_utc": "2026-09-02 01:30:00 UTC",
+      "research_end_utc": "2026-09-03 13:30:00 UTC"
+    },
+    {
+      "drawing_id": "d-5c8ffbfb8a06",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-30 19:00:00 UTC",
+      "anchor_t2_utc": "2026-09-01 17:00:00 UTC",
+      "research_start_utc": "2026-08-30 19:00:00 UTC",
+      "research_end_utc": "2026-09-01 17:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-7f4519d5ce5b",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-10-19 00:00:00 UTC",
+      "anchor_t2_utc": "2026-10-18 12:00:00 UTC",
+      "research_start_utc": "2026-10-18 12:00:00 UTC",
+      "research_end_utc": "2026-10-19 00:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-988236deb817",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-10-24 04:00:00 UTC",
+      "anchor_t2_utc": "2026-10-14 12:00:00 UTC",
+      "research_start_utc": "2026-10-14 12:00:00 UTC",
+      "research_end_utc": "2026-10-24 04:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-a6d9a05da2f1",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-28 06:00:00 UTC",
+      "anchor_t2_utc": "2026-08-26 12:55:00 UTC",
+      "research_start_utc": "2026-08-26 12:55:00 UTC",
+      "research_end_utc": "2026-08-28 06:00:00 UTC"
+    },
+    {
+      "drawing_id": "d-ac60572bfc69",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-09-15 19:20:00 UTC",
+      "anchor_t2_utc": "2026-09-02 23:20:00 UTC",
+      "research_start_utc": "2026-09-02 23:20:00 UTC",
+      "research_end_utc": "2026-09-15 19:20:00 UTC"
+    },
+    {
+      "drawing_id": "d-e1c6e07765fe",
+      "extend_right": false,
+      "anchor_t1_utc": "2026-08-31 02:00:00 UTC",
+      "anchor_t2_utc": "2026-09-02 05:00:00 UTC",
+      "research_start_utc": "2026-08-31 02:00:00 UTC",
+      "research_end_utc": "2026-09-02 05:00:00 UTC"
+    }
+  ],
+  "snapshot_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/l1_v3j_drawings_snapshot_0380057b4660d309.json",
+  "v3i_dynamic_parity": {
+    "A": {
+      "v3j_engine": "DYNAMIC_SUPPORT",
+      "trade_signature": [
+        [
+          "2026-08-26 15:10:00 UTC",
+          "d-a6d9a05da2f1",
+          "CHANNEL_UPPER",
+          6.5449
+        ],
+        [
+          "2026-08-28 16:30:00 UTC",
+          "d-03350098db64",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-08-29 07:20:00 UTC",
+          "d-248d74050cc8",
+          "CHANNEL_UPPER",
+          2.3755
+        ],
+        [
+          "2026-08-31 02:15:00 UTC",
+          "d-e1c6e07765fe",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-09-01 18:55:00 UTC",
+          "d-03350098db64",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-09-02 02:00:00 UTC",
+          "d-3bd7446b7a5b",
+          "CHANNEL_UPPER",
+          1.5347
+        ]
+      ],
+      "n": 6
+    },
+    "B": {
+      "v3j_engine": "DYNAMIC_SUPPORT",
+      "trade_signature": [
+        [
+          "2026-08-26 15:10:00 UTC",
+          "d-a6d9a05da2f1",
+          "CHANNEL_UPPER",
+          6.5449
+        ],
+        [
+          "2026-08-29 07:20:00 UTC",
+          "d-248d74050cc8",
+          "CHANNEL_UPPER",
+          2.3755
+        ],
+        [
+          "2026-08-31 02:15:00 UTC",
+          "d-e1c6e07765fe",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-09-01 18:55:00 UTC",
+          "d-03350098db64",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-09-02 02:00:00 UTC",
+          "d-3bd7446b7a5b",
+          "CHANNEL_UPPER",
+          1.5347
+        ]
+      ],
+      "n": 5
+    },
+    "C": {
+      "v3j_engine": "DYNAMIC_SUPPORT",
+      "trade_signature": [
+        [
+          "2026-08-26 15:10:00 UTC",
+          "d-a6d9a05da2f1",
+          "CHANNEL_UPPER",
+          6.5449
+        ],
+        [
+          "2026-08-29 07:20:00 UTC",
+          "d-248d74050cc8",
+          "CHANNEL_UPPER",
+          2.3755
+        ],
+        [
+          "2026-08-31 02:15:00 UTC",
+          "d-e1c6e07765fe",
+          "SL",
+          -1.2
+        ],
+        [
+          "2026-09-02 02:15:00 UTC",
+          "d-03350098db64",
+          "CHANNEL_UPPER",
+          1.3086
+        ]
+      ],
+      "n": 4
+    }
+  },
+  "candle_count": 58717,
+  "touch_events_total": 188,
+  "long_triggers_allowed": 129,
+  "c1_candidates": 71,
+  "variant_a_trades": 6,
+  "variant_a_gross_pct": 6.8551,
+  "variant_b_trades": 5,
+  "variant_b_gross_pct": 8.0551,
+  "variant_c_trades": 4,
+  "variant_c_gross_pct": 9.029000000000002
+}

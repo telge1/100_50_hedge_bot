@@ -1,0 +1,140 @@
+{
+  "run_id": "20261109T125737Z",
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/support_break_exit_v3ab/l1_v3ab_drawings_snapshot_b0718d82a94e8ad1.json",
+  "variant": "V3E-B",
+  "tp_model": "CAP6_D20_BLOCK",
+  "confirm_delta_pct": 0.2,
+  "sl_pct": 1.2,
+  "near_cap_pct": 2.5,
+  "entry_gate_specs": [
+    {
+      "code": "E0_BASELINE",
+      "params": null
+    },
+    {
+      "code": "E1_SUBSTANTIAL_TP2a",
+      "params": {
+        "min_width_pct": 0.08,
+        "min_depth": 3,
+        "min_origins": 3
+      }
+    },
+    {
+      "code": "E2_SUBSTANTIAL_TP2b",
+      "params": {
+        "min_width_pct": 0.12,
+        "min_depth": 4,
+        "min_origins": 4
+      }
+    },
+    {
+      "code": "E3_SUBSTANTIAL_TP2c",
+      "params": {
+        "min_width_pct": 0.15,
+        "min_depth": 5,
+        "min_origins": 4
+      }
+    }
+  ],
+  "stats": {
+    "E0_BASELINE": {
+      "entry_candidates": 22,
+      "trades_executed": 3,
+      "blocked_substantial_gate": 0,
+      "wins": 1,
+      "losses": 2,
+      "exit_counts": {
+        "TP": 1,
+        "SUPPORT_BREAK_EXIT": 1,
+        "SL": 1
+      },
+      "gross_pct_sum": 3.6988,
+      "avg_pct_per_trade": 1.2329,
+      "longest_loss_streak": 2,
+      "new_slots_vs_E0": [],
+      "dropped_vs_E0": []
+    },
+    "E1_SUBSTANTIAL_TP2a": {
+      "entry_candidates": 22,
+      "trades_executed": 3,
+      "blocked_substantial_gate": 5,
+      "wins": 1,
+      "losses": 2,
+      "exit_counts": {
+        "TP": 1,
+        "SUPPORT_BREAK_EXIT": 1,
+        "SL": 1
+      },
+      "gross_pct_sum": 3.6988,
+      "avg_pct_per_trade": 1.2329,
+      "longest_loss_streak": 2,
+      "new_slots_vs_E0": [],
+      "dropped_vs_E0": []
+    },
+    "E2_SUBSTANTIAL_TP2b": {
+      "entry_candidates": 22,
+      "trades_executed": 3,
+      "blocked_substantial_gate": 11,
+      "wins": 1,
+      "losses": 2,
+      "exit_counts": {
+        "TP": 1,
+        "SUPPORT_BREAK_EXIT": 1,
+        "SL": 1
+      },
+      "gross_pct_sum": 3.6988,
+      "avg_pct_per_trade": 1.2329,
+      "longest_loss_streak": 2,
+      "new_slots_vs_E0": [],
+      "dropped_vs_E0": []
+    },
+    "E3_SUBSTANTIAL_TP2c": {
+      "entry_candidates": 22,
+      "trades_executed": 3,
+      "blocked_substantial_gate": 15,
+      "wins": 2,
+      "losses": 1,
+      "exit_counts": {
+        "TP": 2,
+        "SL": 1
+      },
+      "gross_pct_sum": 4.4766,
+      "avg_pct_per_trade": 1.4922,
+      "longest_loss_streak": 1,
+      "new_slots_vs_E0": [
+        "te-d-ea081434c5d3-0003",
+        "te-d-ea081434c5d3-0012"
+      ],
+      "dropped_vs_E0": [
+        "te-d-1731fb4bb889-0002",
+        "te-d-8521dc37f7b9-0002"
+      ]
+    }
+  },
+  "reference_trade": [
+    {
+      "model": "E0_BASELINE",
+      "pass": true,
+      "zone": "n/a"
+    },
+    {
+      "model": "E1_SUBSTANTIAL_TP2a",
+      "pass": true,
+      "zone": "0.08536-0.08546",
+      "detail": ""
+    },
+    {
+      "model": "E2_SUBSTANTIAL_TP2b",
+      "pass": true,
+      "zone": "0.08604-0.086276",
+      "detail": ""
+    },
+    {
+      "model": "E3_SUBSTANTIAL_TP2c",
+      "pass": true,
+      "zone": "0.08604-0.086276",
+      "detail": ""
+    }
+  ]
+}

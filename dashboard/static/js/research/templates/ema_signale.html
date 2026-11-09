@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ema-Signal - Daten & Signale</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/stoch.css?v=11">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'daten-signale-ema-signal' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="stoch-page-header">
+                <div>
+                    <div class="stoch-research-banner">
+                        <div class="stoch-research-banner-title">{{ banner.title or "EMA 59 BAND · MULTIPLIKATOR 3" }}</div>
+                        <div class="stoch-research-banner-sub">{{ banner.body or "Signal-Generator · Zeiten in UTC" }}</div>
+                        {% if window_label %}
+                        <div class="stoch-research-banner-flag">{{ window_label }}</div>
+                        {% endif %}
+                    </div>
+                    <h1>📉 Ema-Signal</h1>
+                    <p>Live-Signale aus dem Signal-Generator (EMA 59 Band, Multiplikator 3). Timestamp und Symbol in <strong>UTC</strong>.</p>
+                </div>
+            </div>
+
+            {% if not feed_ready %}
+            <div class="stoch-feed-banner" id="emaFeedBanner">{{ feed_message or "EMA-Artefakt nicht verfügbar" }}</div>
+            {% endif %}
+
+            <div class="stoch-perf" aria-live="polite">
+                <div class="stoch-perf-row">
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Signals</div><div class="stoch-perf-value">{{ summary.signals if summary.signals is not none else 0 }}</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Created</div><div class="stoch-perf-value stoch-perf-win">{{ summary.created if summary.created is not none else 0 }}</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Completed</div><div class="stoch-perf-value">{{ summary.completed if summary.completed is not none else 0 }}</div></div>
+                    <div class="stoch-perf-card"><div class="stoch-perf-label">Cancelled/Error</div><div class="stoch-perf-value stoch-perf-loss">{{ summary.cancelled if summary.cancelled is not none else 0 }}</div></div>
+                </div>
+            </div>
+
+            <form class="stoch-filter-bar" id="emaFilterForm" method="get" action="/ema-signale">
+                <input type="hidden" name="page" id="emaFilterPage" value="{{ signal_page }}">
+                <div class="stoch-filter-field">
+                    <label for="emaFilterSymbol">Symbol</label>
+                    <select class="stoch-filter-select" id="emaFilterSymbol" name="symbol">
+                        <option value="">Alle</option>
+                        {% for sym in symbols %}
+                        <option value="{{ sym }}" {% if filter_symbol == sym %}selected{% endif %}>{{ sym }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="emaFilterDirection">Direction</label>
+                    <select class="stoch-filter-select" id="emaFilterDirection" name="direction">
+                        <option value="">Alle</option>
+                        <option value="LONG" {% if filter_direction == "LONG" %}selected{% endif %}>LONG</option>
+                        <option value="SHORT" {% if filter_direction == "SHORT" %}selected{% endif %}>SHORT</option>
+                    </select>
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="emaFilterState">Status</label>
+                    <select class="stoch-filter-select" id="emaFilterState" name="state">
+                        <option value="">Alle</option>
+                        <option value="CREATED" {% if filter_state == "CREATED" %}selected{% endif %}>CREATED</option>
+                        <option value="COMPLETED" {% if filter_state == "COMPLETED" %}selected{% endif %}>COMPLETED</option>
+                        <option value="CANCELLED" {% if filter_state == "CANCELLED" %}selected{% endif %}>CANCELLED</option>
+                        <option value="ERROR" {% if filter_state == "ERROR" %}selected{% endif %}>ERROR</option>
+                    </select>
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="emaFilterStart">Von</label>
+                    <input
+                        class="stoch-filter-input"
+                        id="emaFilterStart"
+                        name="start_time"
+                        type="datetime-local"
+                        value="{{ filter_start_time }}"
+                    >
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="emaFilterEnd">Bis</label>
+                    <input
+                        class="stoch-filter-input"
+                        id="emaFilterEnd"
+                        name="end_time"
+                        type="datetime-local"
+                        value="{{ filter_end_time }}"
+                    >
+                </div>
+                <div class="stoch-filter-field">
+                    <label for="emaPageSize">Blockgröße</label>
+                    <select class="stoch-filter-select" id="emaPageSize" name="page_size">
+                        <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                        <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+                <button class="stoch-btn" id="emaFilterApply" type="submit">Anwenden</button>
+                <a class="stoch-btn stoch-btn-ghost" id="emaFilterReset" href="/ema-signale">Zurücksetzen</a>
+                <div class="stoch-filter-pagination">
+                    <button class="stoch-btn stoch-btn-ghost" id="emaPagePrev" type="button" {% if not pagination.has_prev %}disabled{% endif %}>Zurück</button>
+                    <button class="stoch-btn stoch-btn-ghost" id="emaPageNext" type="button" {% if not pagination.has_next %}disabled{% endif %}>Weiter</button>
+                    <span class="stoch-filter-pagination-info" id="emaPaginationInfo">
+                        {% if pagination.total_filtered %}
+                            {% set start_idx = pagination.page * pagination.page_size + 1 %}
+                            {% set end_idx = pagination.page * pagination.page_size + signals|length %}
+                            Zeige {{ start_idx }}-{{ end_idx }} von {{ pagination.total_filtered }} Signale
+                        {% else %}
+                            Keine Signale
+                        {% endif %}
+                    </span>
+                </div>
+            </form>
+
+            <div class="stoch-table-wrap">
+                <table class="stoch-table" id="emaSignalsTable">
+                    <thead>
+                        <tr>
+                            <th>Timestamp (UTC)</th>
+                            <th>Symbol</th>
+                            <th>Direction</th>
+                            <th>Status</th>
+                            <th>Preis</th>
+                            <th>Distance</th>
+                            <th>THR</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emaSignalsBody">
+                        {% if signals %}
+                            {% for row in signals %}
+                            <tr data-signal-id="{{ row.signal_id or '' }}">
+                                <td>{{ row.signal_time_label }}</td>
+                                <td>{{ row.symbol or "–" }}</td>
+                                <td>
+                                    {% set dir_label = row.direction_label or "" %}
+                                    <span class="stoch-chip {% if dir_label == 'LONG' %}stoch-chip-long{% elif dir_label == 'SHORT' %}stoch-chip-short{% endif %}">{{ dir_label or "–" }}</span>
+                                </td>
+                                <td><span class="stoch-chip {{ row.result_chip }}">{{ row.state_label }}</span></td>
+                                <td>{{ row.entry_price_label }}</td>
+                                <td>{{ row.distance_label }}</td>
+                                <td>{{ row.thr_label }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr><td colspan="7" class="stoch-empty">Keine Signale</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        window.EMA_SIGNAL_PAGE = {{ signal_page }};
+        window.EMA_SIGNAL_PAGE_SIZE = {{ page_size }};
+        window.EMA_SIGNAL_HAS_PREV = {{ 'true' if pagination.has_prev else 'false' }};
+        window.EMA_SIGNAL_HAS_NEXT = {{ 'true' if pagination.has_next else 'false' }};
+    </script>
+    <script src="/static/js/ema_signale.js?v=1"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

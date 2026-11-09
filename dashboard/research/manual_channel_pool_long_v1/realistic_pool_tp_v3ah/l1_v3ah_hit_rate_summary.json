@@ -1,0 +1,67 @@
+{
+  "0.5_2": {
+    "candidates": 30,
+    "touched_high": 30,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 28,
+    "executable_rate_pct": 93.33,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 76.27,
+    "missed_no_touch": 0
+  },
+  "2_3": {
+    "candidates": 20,
+    "touched_high": 20,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 8,
+    "executable_rate_pct": 40.0,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 713.05,
+    "missed_no_touch": 0
+  },
+  "3_5": {
+    "candidates": 32,
+    "touched_high": 32,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 4,
+    "executable_rate_pct": 12.5,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 1219.12,
+    "missed_no_touch": 0
+  },
+  "5_6": {
+    "candidates": 15,
+    "touched_high": 15,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 2,
+    "executable_rate_pct": 13.33,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 1844.07,
+    "missed_no_touch": 0
+  },
+  "6_8": {
+    "candidates": 63,
+    "touched_high": 63,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 0,
+    "executable_rate_pct": 0.0,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 1995.24,
+    "missed_no_touch": 0
+  },
+  "8_12": {
+    "candidates": 88,
+    "touched_high": 88,
+    "hit_rate_pct": 100.0,
+    "executable_tp_exits": 0,
+    "executable_rate_pct": 0.0,
+    "touch_before_adverse_not_tp": 0,
+    "avg_bars_to_first_touch": 2052.2,
+    "missed_no_touch": 0
+  },
+  "_meta": {
+    "observation_horizon": "From entry bar (inclusive) through pilot simulation_end (last loaded 5m bar). No extension beyond L1 pilot candle window.",
+    "simulation_end_utc": "2026-10-19 13:00:00 UTC",
+    "candle_bars": 15510
+  }
+}

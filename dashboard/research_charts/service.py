@@ -6,7 +6,7 @@ import os
 import threading
 import time
 from collections import OrderedDict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from .boundary import SUPPORTED_TIMEFRAMES
@@ -31,6 +31,7 @@ DEFAULT_LIMIT_BY_TF = {
     "30m": 1800,
     "1h": 2200,
     "4h": 1800,
+    "1d": 600,
 }
 _TF_SEC = {
     "1m": 60,
@@ -39,6 +40,7 @@ _TF_SEC = {
     "30m": 1800,
     "1h": 3600,
     "4h": 14400,
+    "1d": 86400,
 }
 # Pine `amount` is a newest-N box cap. Same cap on 1h/4h drops old extreme pools.
 LLD_AMOUNT_MULTIPLIER_BY_TF = {
@@ -48,6 +50,7 @@ LLD_AMOUNT_MULTIPLIER_BY_TF = {
     "30m": 2.0,
     "1h": 3.0,
     "4h": 4.0,
+    "1d": 4.0,
 }
 # Newest-N display cap (Pine box.all). Research chart selection prefers
 # currently-active pools (few, deep history) then a small ghost budget —
@@ -575,7 +578,38 @@ def _load_candles_compute(trp, sym, timeframe, start, end, lim, src_name, cache_
     else:
         need = int(trp["expected_source_bars"](SOURCE_TF, timeframe))
         pad = need  # extra 1m bars so the newest HTF bucket can complete
-        if start is None and end is None:
+        floor_utc = trp["floor_utc"]
+        ensure_utc = trp["ensure_utc"]
+        today_open = floor_utc(datetime.now(timezone.utc), "1d")
+        today_unix = int(today_open.timestamp())
+        if timeframe == "1d":
+            # Exclude the in-progress UTC day; only closed 1m candles before today 00:00 UTC.
+            agg_cutoff = today_open - timedelta(microseconds=1)
+            if start is None and end is None:
+                src_start = today_open - timedelta(days=int(lim) + 3)
+                source_1m = src.get_1m_candles(
+                    sym,
+                    start=ensure_utc(src_start),
+                    end=ensure_utc(agg_cutoff),
+                    newest_first_limit=False,
+                )
+            else:
+                src_start = start
+                if start is not None:
+                    src_start = int(start) - need * 60
+                if end is not None:
+                    end_dt = _unix_to_dt(end)
+                    if int(end) >= today_unix:
+                        end_dt = agg_cutoff
+                else:
+                    end_dt = agg_cutoff
+                source_1m = src.get_1m_candles(
+                    sym,
+                    start=_unix_to_dt(src_start),
+                    end=end_dt,
+                    newest_first_limit=False,
+                )
+        elif start is None and end is None:
             source_1m = src.get_1m_candles(
                 sym, limit=lim * need + pad, newest_first_limit=True
             )
@@ -591,6 +625,8 @@ def _load_candles_compute(trp, sym, timeframe, start, end, lim, src_name, cache_
             )
         t_db1 = time.perf_counter()
         candles = trp["aggregate"](source_1m, timeframe, strict_complete_buckets=True)
+        if timeframe == "1d":
+            candles = [c for c in candles if c.unix_seconds < today_unix]
         if start is not None:
             candles = [c for c in candles if c.unix_seconds >= int(start)]
         if end is not None:

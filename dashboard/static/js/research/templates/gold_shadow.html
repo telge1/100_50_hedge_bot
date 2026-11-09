@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Shadow - Profit-Verlauf</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/stoch.css">
+    <link rel="stylesheet" href="/static/css/gold_shadow.css">
+</head>
+<body>
+    <div class="dashboard-container gold-shadow-page">
+        <div class="dashboard-header">
+            <div class="dashboard-title">📊 Profit-Verlauf</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        {% set nav_active = 'profit-verlauf-gold-shadow' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="stoch-page-header">
+                <div>
+                    <h1>Gold Shadow</h1>
+                    <p>Read-only Ansicht der Frozen-Gold-Shadow-Pipeline. Zeiten in <strong>UTC</strong>. Keine Order-Buttons.</p>
+                </div>
+                <span class="status-badge gs-badge-shadow">SHADOW – KEINE ECHTE ORDER</span>
+            </div>
+            <div id="gsExchangeWarn" class="gs-warn" hidden>UNEXPECTED_EXCHANGE_ACTIVITY_IN_SHADOW</div>
+            <div id="gsOffline" class="gs-offline" hidden>Datenbank nicht erreichbar</div>
+            <div id="gsEmpty" class="stoch-research-banner" hidden>
+                <div class="stoch-research-banner-title">Noch keine echten Forward-Signale</div>
+                <div class="stoch-research-banner-sub">Sechs FREE-Slots bleiben sichtbar. Keine Testdaten in der Dev-Datenbank.</div>
+            </div>
+
+            <div class="profit-summary-grid" id="gsSummary"></div>
+
+            <div class="gs-tabs" role="tablist">
+                <button type="button" class="filter-btn gs-tab active" data-tab="overview">Übersicht</button>
+                <button type="button" class="filter-btn gs-tab" data-tab="signals">Signale</button>
+                <button type="button" class="filter-btn gs-tab" data-tab="trades">Trades</button>
+                <button type="button" class="filter-btn gs-tab" data-tab="events">Slot-Historie</button>
+            </div>
+
+            <section class="gs-panel" data-panel="overview">
+                <h2 class="gs-h2">Slots</h2>
+                <div class="stoch-table-wrap">
+                    <table class="stoch-table" id="gsSlotsTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Status</th><th>Symbol</th><th>Richtung</th><th>TF</th>
+                                <th>Signal</th><th>Trade</th><th>Notional</th><th>Version</th><th>Update (UTC)</th><th>Dauer</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <h2 class="gs-h2">Offene Shadow-Trades</h2>
+                <div class="stoch-table-wrap">
+                    <table class="stoch-table" id="gsOpenTradesTable">
+                        <thead>
+                            <tr>
+                                <th>Trade</th><th>Symbol</th><th>TF</th><th>Status</th><th>Entry</th><th>TP</th><th>SL</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <h2 class="gs-h2">Sicherheitsstatus</h2>
+                <div id="gsSafety" class="profit-summary-card"></div>
+            </section>
+
+            <section class="gs-panel" data-panel="signals" hidden>
+                <div class="trade-filter-bar">
+                    <div class="filter-field"><label>Symbol</label><input class="filter-input" id="gsFSymbol"></div>
+                    <div class="filter-field"><label>Timeframe</label>
+                        <select class="filter-select" id="gsFTf">
+                            <option value="">Alle</option>
+                            <option>15m</option><option>30m</option><option>1h</option><option>4h</option>
+                        </select>
+                    </div>
+                    <div class="filter-field"><label>Richtung</label>
+                        <select class="filter-select" id="gsFDir">
+                            <option value="">Alle</option><option>LONG</option><option>SHORT</option>
+                        </select>
+                    </div>
+                    <div class="filter-field"><label>Entscheidung</label>
+                        <select class="filter-select" id="gsFDec">
+                            <option value="">Alle</option>
+                            <option value="ACCEPTED">ACCEPTED</option>
+                            <option value="SKIPPED">SKIPPED</option>
+                        </select>
+                    </div>
+                    <div class="filter-field"><label>Skip-Grund</label><input class="filter-input" id="gsFReason"></div>
+                    <button type="button" class="filter-btn" id="gsFilterApply">Anwenden</button>
+                </div>
+                <div class="stoch-table-wrap">
+                    <table class="stoch-table" id="gsSignalsTable">
+                        <thead>
+                            <tr>
+                                <th>Signal</th><th>Symbol</th><th>Dir</th><th>TF</th><th>Conf</th><th>Entry</th>
+                                <th>Px</th><th>TP%</th><th>SL%</th><th>Tier-A</th><th>Strategy</th><th>Pin</th>
+                                <th>Created</th><th>Decision</th><th>Grund</th><th>Slot</th><th>Trade</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="stoch-pagination">
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsSigPrev">Zurück</button>
+                    <span id="gsSigPage">Seite 1</span>
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsSigNext">Weiter</button>
+                </div>
+            </section>
+
+            <section class="gs-panel" data-panel="trades" hidden>
+                <div class="stoch-table-wrap">
+                    <table class="stoch-table" id="gsTradesTable">
+                        <thead>
+                            <tr>
+                                <th>Trade</th><th>Signal</th><th>Slot</th><th>Symbol</th><th>Dir</th><th>TF</th>
+                                <th>Status</th><th>Theo</th><th>Shadow</th><th>TP</th><th>SL</th>
+                                <th>Entry</th><th>Exit</th><th>Grund</th><th>Gross</th><th>Fees</th><th>Net</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="stoch-pagination">
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsTrPrev">Zurück</button>
+                    <span id="gsTrPage">Seite 1</span>
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsTrNext">Weiter</button>
+                </div>
+            </section>
+
+            <section class="gs-panel" data-panel="events" hidden>
+                <div id="gsDecisionCounts" class="profit-summary-grid"></div>
+                <div class="stoch-table-wrap">
+                    <table class="stoch-table" id="gsEventsTable">
+                        <thead>
+                            <tr>
+                                <th>Zeit (UTC)</th><th>Slot</th><th>Alt</th><th>Neu</th><th>Signal</th><th>Trade</th><th>Grund</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div class="stoch-pagination">
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsEvPrev">Zurück</button>
+                    <span id="gsEvPage">Seite 1</span>
+                    <button type="button" class="stoch-btn stoch-btn-ghost" id="gsEvNext">Weiter</button>
+                </div>
+            </section>
+        </div>
+    </div>
+    <script>window.__GS_POLL_MS = {{ poll_interval_ms }};</script>
+    <script src="/static/js/gold_shadow.js"></script>
+</body>
+</html>

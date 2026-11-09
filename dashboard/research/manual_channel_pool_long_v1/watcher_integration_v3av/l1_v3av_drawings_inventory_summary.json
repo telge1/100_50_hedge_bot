@@ -1,0 +1,11 @@
+{
+  "total_drawings_in_json": 6,
+  "parsed_line_geometry": 6,
+  "trend_lines": 6,
+  "trend_lines_in_backtest": 6,
+  "vlines_unparsed_for_touch": 0,
+  "long_eligible_trends_sample": 6,
+  "long_support_lines_for_metrics": 6,
+  "lookahead_warning": "All manual chart lines are retrospective; anchors may post-date early touches.",
+  "multi_timeframe": "Single TF backtest (5m); line anchors are not re-sampled per TF"
+}

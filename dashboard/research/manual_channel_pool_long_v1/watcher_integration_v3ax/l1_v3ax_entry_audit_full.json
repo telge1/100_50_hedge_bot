@@ -1,0 +1,2690 @@
+{
+  "trades": [
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0016",
+      "variant": "V3AK",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-14 02:00:00 UTC",
+      "confirm_utc": "2026-07-14 02:05:00 UTC",
+      "entry_utc": "2026-07-14 02:10:00 UTC",
+      "entry_price": "0.0719500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.1991,
+      "touch_class": "NEAR_0_20",
+      "chart_review_start_utc": "2026-07-14 01:00:00 UTC",
+      "chart_review_end_utc": "2026-07-14 03:10:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-14 02:00:00 UTC",
+          "o": 0.07186,
+          "h": 0.07192,
+          "l": 0.07179,
+          "c": 0.0719,
+          "line_px": 0.07164736024046013,
+          "dist_pct": 0.1991,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-14 02:05:00 UTC",
+          "o": 0.0719,
+          "h": 0.07199,
+          "l": 0.0719,
+          "c": 0.07195,
+          "line_px": 0.07164737637457656,
+          "dist_pct": 0.3526,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-14 02:10:00 UTC",
+          "o": 0.07195,
+          "h": 0.07195,
+          "l": 0.07187,
+          "c": 0.07189,
+          "line_px": 0.07164739250869301,
+          "dist_pct": 0.3107,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0029",
+      "variant": "V3AK",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-19 18:05:00 UTC",
+      "confirm_utc": "2026-07-19 18:10:00 UTC",
+      "entry_utc": "2026-07-19 18:15:00 UTC",
+      "entry_price": "0.0720500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-19 17:05:00 UTC",
+      "chart_review_end_utc": "2026-07-19 19:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-19 18:05:00 UTC",
+          "o": 0.07203,
+          "h": 0.07203,
+          "l": 0.07162,
+          "c": 0.07202,
+          "line_px": 0.07167370725261059,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-19 18:10:00 UTC",
+          "o": 0.07202,
+          "h": 0.07211,
+          "l": 0.07201,
+          "c": 0.07205,
+          "line_px": 0.07167372338672702,
+          "dist_pct": 0.4692,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-19 18:15:00 UTC",
+          "o": 0.07205,
+          "h": 0.07205,
+          "l": 0.0719,
+          "c": 0.07203,
+          "line_px": 0.07167373952084347,
+          "dist_pct": 0.3157,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0034",
+      "variant": "V3AK",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-20 19:35:00 UTC",
+      "confirm_utc": "2026-07-20 19:40:00 UTC",
+      "entry_utc": "2026-07-20 19:45:00 UTC",
+      "entry_price": "0.0720500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-20 18:35:00 UTC",
+      "chart_review_end_utc": "2026-07-20 20:45:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-20 19:35:00 UTC",
+          "o": 0.07204,
+          "h": 0.07204,
+          "l": 0.07144,
+          "c": 0.07172,
+          "line_px": 0.07167864429224197,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-20 19:40:00 UTC",
+          "o": 0.07172,
+          "h": 0.07208,
+          "l": 0.07171,
+          "c": 0.07205,
+          "line_px": 0.0716786604263584,
+          "dist_pct": 0.0437,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-20 19:45:00 UTC",
+          "o": 0.07205,
+          "h": 0.07207,
+          "l": 0.07194,
+          "c": 0.07204,
+          "line_px": 0.07167867656047484,
+          "dist_pct": 0.3646,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-755b9ca8482c-0011",
+      "variant": "V3AK",
+      "line_id": "d-755b9ca8482c",
+      "touch_utc": "2026-07-25 05:45:00 UTC",
+      "confirm_utc": "2026-07-25 05:50:00 UTC",
+      "entry_utc": "2026-07-25 05:55:00 UTC",
+      "entry_price": "0.0693400000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.1926,
+      "touch_class": "NEAR_0_20",
+      "chart_review_start_utc": "2026-07-25 04:45:00 UTC",
+      "chart_review_end_utc": "2026-07-25 06:55:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-25 05:45:00 UTC",
+          "o": 0.06929,
+          "h": 0.06933,
+          "l": 0.06924,
+          "c": 0.06926,
+          "line_px": 0.06910332510903378,
+          "dist_pct": 0.1926,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-25 05:50:00 UTC",
+          "o": 0.06926,
+          "h": 0.06934,
+          "l": 0.06926,
+          "c": 0.06934,
+          "line_px": 0.06910688264958006,
+          "dist_pct": 0.2164,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-25 05:55:00 UTC",
+          "o": 0.06934,
+          "h": 0.06939,
+          "l": 0.06933,
+          "c": 0.06933,
+          "line_px": 0.06911044019012637,
+          "dist_pct": 0.3125,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0004",
+      "variant": "V3AK",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 13:30:00 UTC",
+      "confirm_utc": "2026-08-10 13:35:00 UTC",
+      "entry_utc": "2026-08-10 13:40:00 UTC",
+      "entry_price": "0.0697000000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.0982,
+      "touch_class": "NEAR_0_10",
+      "chart_review_start_utc": "2026-08-10 12:30:00 UTC",
+      "chart_review_end_utc": "2026-08-10 14:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 13:30:00 UTC",
+          "o": 0.06984,
+          "h": 0.06984,
+          "l": 0.06953,
+          "c": 0.06955,
+          "line_px": 0.0694604089474399,
+          "dist_pct": 0.0982,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 13:35:00 UTC",
+          "o": 0.06955,
+          "h": 0.06982,
+          "l": 0.06953,
+          "c": 0.0697,
+          "line_px": 0.06946175704458378,
+          "dist_pct": 0.0963,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 13:40:00 UTC",
+          "o": 0.0697,
+          "h": 0.06975,
+          "l": 0.0696,
+          "c": 0.06973,
+          "line_px": 0.06946310514172764,
+          "dist_pct": 0.1951,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0003",
+      "variant": "V3AK",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 15:10:00 UTC",
+      "confirm_utc": "2026-09-02 15:15:00 UTC",
+      "entry_utc": "2026-09-02 15:20:00 UTC",
+      "entry_price": "0.0813600000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.1251,
+      "touch_class": "NEAR_0_20",
+      "chart_review_start_utc": "2026-09-02 14:10:00 UTC",
+      "chart_review_end_utc": "2026-09-02 16:20:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 15:10:00 UTC",
+          "o": 0.08116,
+          "h": 0.08116,
+          "l": 0.08064,
+          "c": 0.08084,
+          "line_px": 0.0805339249033662,
+          "dist_pct": 0.1251,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 15:15:00 UTC",
+          "o": 0.08084,
+          "h": 0.08143,
+          "l": 0.08084,
+          "c": 0.08136,
+          "line_px": 0.08053928844930117,
+          "dist_pct": 0.3667,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 15:20:00 UTC",
+          "o": 0.08136,
+          "h": 0.08139,
+          "l": 0.08098,
+          "c": 0.08106,
+          "line_px": 0.08054465199523614,
+          "dist_pct": 0.5338,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0004",
+      "variant": "V3AK",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 17:20:00 UTC",
+      "confirm_utc": "2026-09-02 17:25:00 UTC",
+      "entry_utc": "2026-09-02 17:30:00 UTC",
+      "entry_price": "0.0810600000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.1751,
+      "touch_class": "NEAR_0_20",
+      "chart_review_start_utc": "2026-09-02 16:20:00 UTC",
+      "chart_review_end_utc": "2026-09-02 18:30:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 17:20:00 UTC",
+          "o": 0.08096,
+          "h": 0.08102,
+          "l": 0.08082,
+          "c": 0.08099,
+          "line_px": 0.0806733770976754,
+          "dist_pct": 0.1751,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 17:25:00 UTC",
+          "o": 0.08099,
+          "h": 0.08106,
+          "l": 0.08096,
+          "c": 0.08106,
+          "line_px": 0.08067874064361036,
+          "dist_pct": 0.342,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 17:30:00 UTC",
+          "o": 0.08106,
+          "h": 0.08127,
+          "l": 0.08104,
+          "c": 0.08124,
+          "line_px": 0.08068410418954533,
+          "dist_pct": 0.4345,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0006",
+      "variant": "V3AK",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 22:05:00 UTC",
+      "confirm_utc": "2026-09-02 22:10:00 UTC",
+      "entry_utc": "2026-09-02 22:15:00 UTC",
+      "entry_price": "0.0811200000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.1427,
+      "touch_class": "NEAR_0_20",
+      "chart_review_start_utc": "2026-09-02 21:05:00 UTC",
+      "chart_review_end_utc": "2026-09-02 23:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 22:05:00 UTC",
+          "o": 0.08149,
+          "h": 0.08149,
+          "l": 0.0811,
+          "c": 0.08111,
+          "line_px": 0.08097909921596864,
+          "dist_pct": 0.1427,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 22:10:00 UTC",
+          "o": 0.08111,
+          "h": 0.08117,
+          "l": 0.08109,
+          "c": 0.08112,
+          "line_px": 0.0809844627619036,
+          "dist_pct": 0.1237,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 22:15:00 UTC",
+          "o": 0.08112,
+          "h": 0.08123,
+          "l": 0.08107,
+          "c": 0.0811,
+          "line_px": 0.08098982630783857,
+          "dist_pct": 0.0924,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0010",
+      "variant": "V3AK",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-03 00:30:00 UTC",
+      "confirm_utc": "2026-09-03 00:35:00 UTC",
+      "entry_utc": "2026-09-03 00:40:00 UTC",
+      "entry_price": "0.0814400000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "V3AK C1 + 0.20% zone",
+      "touch_dist_pct": 0.0863,
+      "touch_class": "NEAR_0_10",
+      "chart_review_start_utc": "2026-09-02 23:30:00 UTC",
+      "chart_review_end_utc": "2026-09-03 01:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-03 00:30:00 UTC",
+          "o": 0.08131,
+          "h": 0.08136,
+          "l": 0.08121,
+          "c": 0.08121,
+          "line_px": 0.08113464204808274,
+          "dist_pct": 0.0863,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-03 00:35:00 UTC",
+          "o": 0.08121,
+          "h": 0.08148,
+          "l": 0.08119,
+          "c": 0.08144,
+          "line_px": 0.08114000559401771,
+          "dist_pct": 0.055,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-03 00:40:00 UTC",
+          "o": 0.08144,
+          "h": 0.08154,
+          "l": 0.08138,
+          "c": 0.0814,
+          "line_px": 0.08114536913995268,
+          "dist_pct": 0.2825,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_legacy_zone": true,
+          "approach_from_above": true,
+          "c1_bullish": true,
+          "c1_close_above_line": true,
+          "entry_is_next_open": true,
+          "entry_open_match": true,
+          "bars_touch_to_confirm": 1,
+          "bars_touch_to_entry": 2
+        }
+      },
+      "timing": {
+        "earliest_rule_conform": "V3AK_C1_first_touch_bar",
+        "notes": []
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0002",
+      "variant": "Watcher_A2",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-08 14:45:00 UTC",
+      "confirm_utc": "2026-07-08 14:55:00 UTC",
+      "entry_utc": "2026-07-08 15:00:00 UTC",
+      "entry_price": "0.0718300000",
+      "timing_bars_touch_to_entry": 3,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-08 13:45:00 UTC",
+      "chart_review_end_utc": "2026-07-08 16:00:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-08 14:45:00 UTC",
+          "o": 0.07176,
+          "h": 0.07176,
+          "l": 0.07144,
+          "c": 0.07152,
+          "line_px": 0.07162194900706333,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-08 14:55:00 UTC",
+          "o": 0.07181,
+          "h": 0.07184,
+          "l": 0.07174,
+          "c": 0.07183,
+          "line_px": 0.07162198127529622,
+          "dist_pct": 0.1648,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-08 15:00:00 UTC",
+          "o": 0.07183,
+          "h": 0.07189,
+          "l": 0.0717,
+          "c": 0.0717,
+          "line_px": 0.07162199740941266,
+          "dist_pct": 0.1089,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07183,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 3
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0003",
+      "variant": "Watcher_A2",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-08 15:05:00 UTC",
+      "confirm_utc": "2026-07-08 15:45:00 UTC",
+      "entry_utc": "2026-07-08 15:50:00 UTC",
+      "entry_price": "0.0718200000",
+      "timing_bars_touch_to_entry": 9,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-08 14:05:00 UTC",
+      "chart_review_end_utc": "2026-07-08 16:50:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-08 15:05:00 UTC",
+          "o": 0.0717,
+          "h": 0.07182,
+          "l": 0.07159,
+          "c": 0.0716,
+          "line_px": 0.0716220135435291,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-08 15:45:00 UTC",
+          "o": 0.07166,
+          "h": 0.07182,
+          "l": 0.07163,
+          "c": 0.07182,
+          "line_px": 0.07162214261646063,
+          "dist_pct": 0.0109,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-08 15:50:00 UTC",
+          "o": 0.07182,
+          "h": 0.07186,
+          "l": 0.07178,
+          "c": 0.07183,
+          "line_px": 0.07162215875057708,
+          "dist_pct": 0.2204,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07182,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 9
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0007",
+      "variant": "Watcher_A2",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-14 03:15:00 UTC",
+      "confirm_utc": "2026-07-14 03:35:00 UTC",
+      "entry_utc": "2026-07-14 03:40:00 UTC",
+      "entry_price": "0.0718800000",
+      "timing_bars_touch_to_entry": 5,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-14 02:15:00 UTC",
+      "chart_review_end_utc": "2026-07-14 04:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-14 03:15:00 UTC",
+          "o": 0.07173,
+          "h": 0.07177,
+          "l": 0.07142,
+          "c": 0.07152,
+          "line_px": 0.07164760225220676,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-14 03:35:00 UTC",
+          "o": 0.07165,
+          "h": 0.0719,
+          "l": 0.07165,
+          "c": 0.07188,
+          "line_px": 0.07164766678867253,
+          "dist_pct": 0.0032,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-14 03:40:00 UTC",
+          "o": 0.07188,
+          "h": 0.07192,
+          "l": 0.07182,
+          "c": 0.07189,
+          "line_px": 0.07164768292278897,
+          "dist_pct": 0.2405,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07188,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 5
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0012",
+      "variant": "Watcher_A2",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-19 18:05:00 UTC",
+      "confirm_utc": "2026-07-19 18:10:00 UTC",
+      "entry_utc": "2026-07-19 18:15:00 UTC",
+      "entry_price": "0.0720500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-19 17:05:00 UTC",
+      "chart_review_end_utc": "2026-07-19 19:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-19 18:05:00 UTC",
+          "o": 0.07203,
+          "h": 0.07203,
+          "l": 0.07162,
+          "c": 0.07202,
+          "line_px": 0.07167370725261059,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-19 18:10:00 UTC",
+          "o": 0.07202,
+          "h": 0.07211,
+          "l": 0.07201,
+          "c": 0.07205,
+          "line_px": 0.07167372338672702,
+          "dist_pct": 0.4692,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-19 18:15:00 UTC",
+          "o": 0.07205,
+          "h": 0.07205,
+          "l": 0.0719,
+          "c": 0.07203,
+          "line_px": 0.07167373952084347,
+          "dist_pct": 0.3157,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07205,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0016",
+      "variant": "Watcher_A2",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-20 19:35:00 UTC",
+      "confirm_utc": "2026-07-20 19:40:00 UTC",
+      "entry_utc": "2026-07-20 19:45:00 UTC",
+      "entry_price": "0.0720500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-20 18:35:00 UTC",
+      "chart_review_end_utc": "2026-07-20 20:45:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-20 19:35:00 UTC",
+          "o": 0.07204,
+          "h": 0.07204,
+          "l": 0.07144,
+          "c": 0.07172,
+          "line_px": 0.07167864429224197,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-20 19:40:00 UTC",
+          "o": 0.07172,
+          "h": 0.07208,
+          "l": 0.07171,
+          "c": 0.07205,
+          "line_px": 0.0716786604263584,
+          "dist_pct": 0.0437,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-20 19:45:00 UTC",
+          "o": 0.07205,
+          "h": 0.07207,
+          "l": 0.07194,
+          "c": 0.07204,
+          "line_px": 0.07167867656047484,
+          "dist_pct": 0.3646,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07205,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-755b9ca8482c-0006",
+      "variant": "Watcher_A2",
+      "line_id": "d-755b9ca8482c",
+      "touch_utc": "2026-07-25 08:05:00 UTC",
+      "confirm_utc": "2026-07-25 08:10:00 UTC",
+      "entry_utc": "2026-07-25 08:15:00 UTC",
+      "entry_price": "0.0692700000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-25 07:05:00 UTC",
+      "chart_review_end_utc": "2026-07-25 09:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-25 08:05:00 UTC",
+          "o": 0.06924,
+          "h": 0.06927,
+          "l": 0.06912,
+          "c": 0.06924,
+          "line_px": 0.06920293624433012,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-25 08:10:00 UTC",
+          "o": 0.06924,
+          "h": 0.06927,
+          "l": 0.06919,
+          "c": 0.06927,
+          "line_px": 0.06920649378487641,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-25 08:15:00 UTC",
+          "o": 0.06927,
+          "h": 0.06932,
+          "l": 0.06926,
+          "c": 0.06932,
+          "line_px": 0.06921005132542271,
+          "dist_pct": 0.067,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.06927,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0003",
+      "variant": "Watcher_A2",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 15:10:00 UTC",
+      "confirm_utc": "2026-08-10 15:45:00 UTC",
+      "entry_utc": "2026-08-10 15:50:00 UTC",
+      "entry_price": "0.0695700000",
+      "timing_bars_touch_to_entry": 8,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-08-10 14:10:00 UTC",
+      "chart_review_end_utc": "2026-08-10 16:50:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 15:10:00 UTC",
+          "o": 0.06979,
+          "h": 0.06981,
+          "l": 0.06937,
+          "c": 0.06948,
+          "line_px": 0.0694873708903172,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 15:45:00 UTC",
+          "o": 0.06956,
+          "h": 0.06961,
+          "l": 0.06952,
+          "c": 0.06957,
+          "line_px": 0.06949680757032425,
+          "dist_pct": 0.0314,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 15:50:00 UTC",
+          "o": 0.06957,
+          "h": 0.06969,
+          "l": 0.06957,
+          "c": 0.06957,
+          "line_px": 0.06949815566746811,
+          "dist_pct": 0.1014,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.06957,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 8
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0008",
+      "variant": "Watcher_A2",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 22:00:00 UTC",
+      "confirm_utc": "2026-08-10 22:10:00 UTC",
+      "entry_utc": "2026-08-10 22:15:00 UTC",
+      "entry_price": "0.0697300000",
+      "timing_bars_touch_to_entry": 3,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-08-10 21:00:00 UTC",
+      "chart_review_end_utc": "2026-08-10 23:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 22:00:00 UTC",
+          "o": 0.06965,
+          "h": 0.06972,
+          "l": 0.06956,
+          "c": 0.06957,
+          "line_px": 0.0695979148561141,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 22:10:00 UTC",
+          "o": 0.06969,
+          "h": 0.06974,
+          "l": 0.06968,
+          "c": 0.06973,
+          "line_px": 0.06960061105040183,
+          "dist_pct": 0.1121,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 22:15:00 UTC",
+          "o": 0.06973,
+          "h": 0.06982,
+          "l": 0.06973,
+          "c": 0.06978,
+          "line_px": 0.06960195914754569,
+          "dist_pct": 0.182,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.06973,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 3
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0001",
+      "variant": "Watcher_A2",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 10:50:00 UTC",
+      "confirm_utc": "2026-09-02 10:55:00 UTC",
+      "entry_utc": "2026-09-02 11:00:00 UTC",
+      "entry_price": "0.0807500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-09-02 09:50:00 UTC",
+      "chart_review_end_utc": "2026-09-02 12:00:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 10:50:00 UTC",
+          "o": 0.08041,
+          "h": 0.08045,
+          "l": 0.07999,
+          "c": 0.08041,
+          "line_px": 0.0802550205147478,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 10:55:00 UTC",
+          "o": 0.08041,
+          "h": 0.08077,
+          "l": 0.08038,
+          "c": 0.08075,
+          "line_px": 0.08026038406068277,
+          "dist_pct": 0.1424,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 11:00:00 UTC",
+          "o": 0.08075,
+          "h": 0.08082,
+          "l": 0.08049,
+          "c": 0.08052,
+          "line_px": 0.08026574760661774,
+          "dist_pct": 0.2727,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.08075,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0002",
+      "variant": "Watcher_A2",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 22:20:00 UTC",
+      "confirm_utc": "2026-09-02 22:35:00 UTC",
+      "entry_utc": "2026-09-02 22:40:00 UTC",
+      "entry_price": "0.0811300000",
+      "timing_bars_touch_to_entry": 4,
+      "verdict": "PASS",
+      "verdict_reason": "A2 all code rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-09-02 21:20:00 UTC",
+      "chart_review_end_utc": "2026-09-02 23:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 22:20:00 UTC",
+          "o": 0.0811,
+          "h": 0.0811,
+          "l": 0.08095,
+          "c": 0.08098,
+          "line_px": 0.08099518985377355,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 22:35:00 UTC",
+          "o": 0.08104,
+          "h": 0.08118,
+          "l": 0.08103,
+          "c": 0.08113,
+          "line_px": 0.08101128049157845,
+          "dist_pct": 0.0165,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 22:40:00 UTC",
+          "o": 0.08113,
+          "h": 0.08119,
+          "l": 0.08113,
+          "c": 0.08115,
+          "line_px": 0.08101664403751342,
+          "dist_pct": 0.1333,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.08113,
+          "approach_from_above": true,
+          "approach_detail": "OK"
+        },
+        "bars_touch_to_entry": 4
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0002",
+      "variant": "Watcher_A3",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-08 14:45:00 UTC",
+      "confirm_utc": "2026-07-08 15:45:00 UTC",
+      "entry_utc": "2026-07-08 15:50:00 UTC",
+      "entry_price": "0.0718200000",
+      "timing_bars_touch_to_entry": 13,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-08 13:45:00 UTC",
+      "chart_review_end_utc": "2026-07-08 16:50:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-08 14:45:00 UTC",
+          "o": 0.07176,
+          "h": 0.07176,
+          "l": 0.07144,
+          "c": 0.07152,
+          "line_px": 0.07162194900706333,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-08 15:45:00 UTC",
+          "o": 0.07166,
+          "h": 0.07182,
+          "l": 0.07163,
+          "c": 0.07182,
+          "line_px": 0.07162214261646063,
+          "dist_pct": 0.0109,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-08 15:50:00 UTC",
+          "o": 0.07182,
+          "h": 0.07186,
+          "l": 0.07178,
+          "c": 0.07183,
+          "line_px": 0.07162215875057708,
+          "dist_pct": 0.2204,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07182,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.2233,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 13
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0003",
+      "variant": "Watcher_A3",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-14 03:15:00 UTC",
+      "confirm_utc": "2026-07-14 03:35:00 UTC",
+      "entry_utc": "2026-07-14 03:40:00 UTC",
+      "entry_price": "0.0718800000",
+      "timing_bars_touch_to_entry": 5,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-14 02:15:00 UTC",
+      "chart_review_end_utc": "2026-07-14 04:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-14 03:15:00 UTC",
+          "o": 0.07173,
+          "h": 0.07177,
+          "l": 0.07142,
+          "c": 0.07152,
+          "line_px": 0.07164760225220676,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-14 03:35:00 UTC",
+          "o": 0.07165,
+          "h": 0.0719,
+          "l": 0.07165,
+          "c": 0.07188,
+          "line_px": 0.07164766678867253,
+          "dist_pct": 0.0032,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-14 03:40:00 UTC",
+          "o": 0.07188,
+          "h": 0.07192,
+          "l": 0.07182,
+          "c": 0.07189,
+          "line_px": 0.07164768292278897,
+          "dist_pct": 0.2405,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07188,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.321,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 5
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0006",
+      "variant": "Watcher_A3",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-20 19:35:00 UTC",
+      "confirm_utc": "2026-07-20 19:40:00 UTC",
+      "entry_utc": "2026-07-20 19:45:00 UTC",
+      "entry_price": "0.0720500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-20 18:35:00 UTC",
+      "chart_review_end_utc": "2026-07-20 20:45:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-20 19:35:00 UTC",
+          "o": 0.07204,
+          "h": 0.07204,
+          "l": 0.07144,
+          "c": 0.07172,
+          "line_px": 0.07167864429224197,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-20 19:40:00 UTC",
+          "o": 0.07172,
+          "h": 0.07208,
+          "l": 0.07171,
+          "c": 0.07205,
+          "line_px": 0.0716786604263584,
+          "dist_pct": 0.0437,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-20 19:45:00 UTC",
+          "o": 0.07205,
+          "h": 0.07207,
+          "l": 0.07194,
+          "c": 0.07204,
+          "line_px": 0.07167867656047484,
+          "dist_pct": 0.3646,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.07205,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.4601,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-755b9ca8482c-0004",
+      "variant": "Watcher_A3",
+      "line_id": "d-755b9ca8482c",
+      "touch_utc": "2026-07-24 16:45:00 UTC",
+      "confirm_utc": "2026-07-24 17:15:00 UTC",
+      "entry_utc": "2026-07-24 17:20:00 UTC",
+      "entry_price": "0.0690100000",
+      "timing_bars_touch_to_entry": 7,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-24 15:45:00 UTC",
+      "chart_review_end_utc": "2026-07-24 18:20:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-24 16:45:00 UTC",
+          "o": 0.0687,
+          "h": 0.0687,
+          "l": 0.06849,
+          "c": 0.06864,
+          "line_px": 0.06854834878381127,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-24 17:15:00 UTC",
+          "o": 0.06884,
+          "h": 0.06903,
+          "l": 0.06882,
+          "c": 0.06901,
+          "line_px": 0.06856969402708907,
+          "dist_pct": 0.3599,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-24 17:20:00 UTC",
+          "o": 0.06901,
+          "h": 0.06909,
+          "l": 0.06898,
+          "c": 0.06908,
+          "line_px": 0.06857325156763536,
+          "dist_pct": 0.588,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.06901,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.2469,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 7
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0002",
+      "variant": "Watcher_A3",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 16:20:00 UTC",
+      "confirm_utc": "2026-08-10 16:35:00 UTC",
+      "entry_utc": "2026-08-10 16:40:00 UTC",
+      "entry_price": "0.0697500000",
+      "timing_bars_touch_to_entry": 4,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-08-10 15:20:00 UTC",
+      "chart_review_end_utc": "2026-08-10 17:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 16:20:00 UTC",
+          "o": 0.06959,
+          "h": 0.06972,
+          "l": 0.06947,
+          "c": 0.06972,
+          "line_px": 0.0695062442503313,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 16:35:00 UTC",
+          "o": 0.06956,
+          "h": 0.06975,
+          "l": 0.06956,
+          "c": 0.06975,
+          "line_px": 0.0695102885417629,
+          "dist_pct": 0.0696,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 16:40:00 UTC",
+          "o": 0.06975,
+          "h": 0.06979,
+          "l": 0.0696,
+          "c": 0.06962,
+          "line_px": 0.06951163663890676,
+          "dist_pct": 0.1252,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.06975,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.2731,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 4
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0001",
+      "variant": "Watcher_A3",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 10:50:00 UTC",
+      "confirm_utc": "2026-09-02 10:55:00 UTC",
+      "entry_utc": "2026-09-02 11:00:00 UTC",
+      "entry_price": "0.0807500000",
+      "timing_bars_touch_to_entry": 2,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-09-02 09:50:00 UTC",
+      "chart_review_end_utc": "2026-09-02 12:00:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 10:50:00 UTC",
+          "o": 0.08041,
+          "h": 0.08045,
+          "l": 0.07999,
+          "c": 0.08041,
+          "line_px": 0.0802550205147478,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 10:55:00 UTC",
+          "o": 0.08041,
+          "h": 0.08077,
+          "l": 0.08038,
+          "c": 0.08075,
+          "line_px": 0.08026038406068277,
+          "dist_pct": 0.1424,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 11:00:00 UTC",
+          "o": 0.08075,
+          "h": 0.08082,
+          "l": 0.08049,
+          "c": 0.08052,
+          "line_px": 0.08026574760661774,
+          "dist_pct": 0.2727,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.08075,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.4228,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 2
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0002",
+      "variant": "Watcher_A3",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 22:20:00 UTC",
+      "confirm_utc": "2026-09-02 23:05:00 UTC",
+      "entry_utc": "2026-09-02 23:10:00 UTC",
+      "entry_price": "0.0814000000",
+      "timing_bars_touch_to_entry": 10,
+      "verdict": "PASS",
+      "verdict_reason": "A3 rules",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-09-02 21:20:00 UTC",
+      "chart_review_end_utc": "2026-09-03 00:10:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 22:20:00 UTC",
+          "o": 0.0811,
+          "h": 0.0811,
+          "l": 0.08095,
+          "c": 0.08098,
+          "line_px": 0.08099518985377355,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 23:05:00 UTC",
+          "o": 0.08117,
+          "h": 0.08142,
+          "l": 0.08117,
+          "c": 0.0814,
+          "line_px": 0.08104346176718827,
+          "dist_pct": 0.1495,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 23:10:00 UTC",
+          "o": 0.0814,
+          "h": 0.08144,
+          "l": 0.08131,
+          "c": 0.08143,
+          "line_px": 0.08104882531312324,
+          "dist_pct": 0.3156,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid_003_or_physical": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "watcher_activated": true,
+          "confirm_bullish_spec": true,
+          "confirm_a2_code": true,
+          "close_above_line": true,
+          "close_above_prev": true,
+          "within_w12": true,
+          "entry_next_bar": true,
+          "entry_open": 0.0814,
+          "approach_from_above": true,
+          "approach_detail": "OK",
+          "confirm_a3_gain_pct": 0.2834,
+          "confirm_a3_code": true,
+          "gain_min_020": true
+        },
+        "bars_touch_to_entry": 10
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0002",
+      "variant": "Watcher_B",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-08 14:45:00 UTC",
+      "confirm_utc": "2026-07-08 14:55:00 UTC",
+      "entry_utc": "2026-07-08 15:00:00 UTC",
+      "entry_price": "0.0718300000",
+      "timing_bars_touch_to_entry": 3,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-08 13:45:00 UTC",
+      "chart_review_end_utc": "2026-07-08 16:00:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-08 14:45:00 UTC",
+          "o": 0.07176,
+          "h": 0.07176,
+          "l": 0.07144,
+          "c": 0.07152,
+          "line_px": 0.07162194900706333,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-08 14:55:00 UTC",
+          "o": 0.07181,
+          "h": 0.07184,
+          "l": 0.07174,
+          "c": 0.07183,
+          "line_px": 0.07162198127529622,
+          "dist_pct": 0.1648,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-08 15:00:00 UTC",
+          "o": 0.07183,
+          "h": 0.07189,
+          "l": 0.0717,
+          "c": 0.0717,
+          "line_px": 0.07162199740941266,
+          "dist_pct": 0.1089,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-07-08 14:50:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 2337,
+            "utc": "2026-07-08 14:45:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.07176,
+            "h": 0.07176,
+            "l": 0.07144,
+            "c": 0.07152,
+            "line_px": 0.07162194900706333
+          },
+          {
+            "bar_idx": 2338,
+            "utc": "2026-07-08 14:50:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.07152,
+            "h": 0.07184,
+            "l": 0.07143,
+            "c": 0.07181,
+            "line_px": 0.07162196514117977
+          },
+          {
+            "bar_idx": 2339,
+            "utc": "2026-07-08 14:55:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.07181,
+            "h": 0.07184,
+            "l": 0.07174,
+            "c": 0.07183,
+            "line_px": 0.07162198127529622
+          },
+          {
+            "bar_idx": 2339,
+            "utc": "2026-07-08 14:55:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.07181,
+            "h": 0.07184,
+            "l": 0.07174,
+            "c": 0.07183,
+            "line_px": 0.07162198127529622
+          }
+        ],
+        "bars_touch_to_entry": 3
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0003",
+      "variant": "Watcher_B",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-08 15:05:00 UTC",
+      "confirm_utc": "2026-07-08 15:40:00 UTC",
+      "entry_utc": "2026-07-08 15:45:00 UTC",
+      "entry_price": "0.0716600000",
+      "timing_bars_touch_to_entry": 8,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-08 14:05:00 UTC",
+      "chart_review_end_utc": "2026-07-08 16:45:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-08 15:05:00 UTC",
+          "o": 0.0717,
+          "h": 0.07182,
+          "l": 0.07159,
+          "c": 0.0716,
+          "line_px": 0.0716220135435291,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-08 15:40:00 UTC",
+          "o": 0.07168,
+          "h": 0.07175,
+          "l": 0.07164,
+          "c": 0.07166,
+          "line_px": 0.0716221264823442,
+          "dist_pct": 0.0249,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-08 15:45:00 UTC",
+          "o": 0.07166,
+          "h": 0.07182,
+          "l": 0.07163,
+          "c": 0.07182,
+          "line_px": 0.07162214261646063,
+          "dist_pct": 0.0109,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-07-08 15:35:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 2341,
+            "utc": "2026-07-08 15:05:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.0717,
+            "h": 0.07182,
+            "l": 0.07159,
+            "c": 0.0716,
+            "line_px": 0.0716220135435291
+          },
+          {
+            "bar_idx": 2347,
+            "utc": "2026-07-08 15:35:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.07157,
+            "h": 0.07174,
+            "l": 0.07157,
+            "c": 0.07168,
+            "line_px": 0.07162211034822775
+          },
+          {
+            "bar_idx": 2348,
+            "utc": "2026-07-08 15:40:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.07168,
+            "h": 0.07175,
+            "l": 0.07164,
+            "c": 0.07166,
+            "line_px": 0.0716221264823442
+          },
+          {
+            "bar_idx": 2348,
+            "utc": "2026-07-08 15:40:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.07168,
+            "h": 0.07175,
+            "l": 0.07164,
+            "c": 0.07166,
+            "line_px": 0.0716221264823442
+          }
+        ],
+        "bars_touch_to_entry": 8
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-e0ea2ce2fb44-0008",
+      "variant": "Watcher_B",
+      "line_id": "d-e0ea2ce2fb44",
+      "touch_utc": "2026-07-14 03:15:00 UTC",
+      "confirm_utc": "2026-07-14 03:35:00 UTC",
+      "entry_utc": "2026-07-14 03:40:00 UTC",
+      "entry_price": "0.0718800000",
+      "timing_bars_touch_to_entry": 5,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-07-14 02:15:00 UTC",
+      "chart_review_end_utc": "2026-07-14 04:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-07-14 03:15:00 UTC",
+          "o": 0.07173,
+          "h": 0.07177,
+          "l": 0.07142,
+          "c": 0.07152,
+          "line_px": 0.07164760225220676,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-07-14 03:35:00 UTC",
+          "o": 0.07165,
+          "h": 0.0719,
+          "l": 0.07165,
+          "c": 0.07188,
+          "line_px": 0.07164766678867253,
+          "dist_pct": 0.0032,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-07-14 03:40:00 UTC",
+          "o": 0.07188,
+          "h": 0.07192,
+          "l": 0.07182,
+          "c": 0.07189,
+          "line_px": 0.07164768292278897,
+          "dist_pct": 0.2405,
+          "class": "NO_TOUCH",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-07-14 03:30:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 3927,
+            "utc": "2026-07-14 03:15:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.07173,
+            "h": 0.07177,
+            "l": 0.07142,
+            "c": 0.07152,
+            "line_px": 0.07164760225220676
+          },
+          {
+            "bar_idx": 3930,
+            "utc": "2026-07-14 03:30:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.07163,
+            "h": 0.0717,
+            "l": 0.07162,
+            "c": 0.07165,
+            "line_px": 0.07164765065455608
+          },
+          {
+            "bar_idx": 3931,
+            "utc": "2026-07-14 03:35:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.07165,
+            "h": 0.0719,
+            "l": 0.07165,
+            "c": 0.07188,
+            "line_px": 0.07164766678867253
+          },
+          {
+            "bar_idx": 3931,
+            "utc": "2026-07-14 03:35:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.07165,
+            "h": 0.0719,
+            "l": 0.07165,
+            "c": 0.07188,
+            "line_px": 0.07164766678867253
+          }
+        ],
+        "bars_touch_to_entry": 5
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0002",
+      "variant": "Watcher_B",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 15:10:00 UTC",
+      "confirm_utc": "2026-08-10 15:30:00 UTC",
+      "entry_utc": "2026-08-10 15:35:00 UTC",
+      "entry_price": "0.0695900000",
+      "timing_bars_touch_to_entry": 5,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-08-10 14:10:00 UTC",
+      "chart_review_end_utc": "2026-08-10 16:35:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 15:10:00 UTC",
+          "o": 0.06979,
+          "h": 0.06981,
+          "l": 0.06937,
+          "c": 0.06948,
+          "line_px": 0.0694873708903172,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 15:30:00 UTC",
+          "o": 0.06969,
+          "h": 0.06972,
+          "l": 0.06959,
+          "c": 0.06959,
+          "line_px": 0.06949276327889266,
+          "dist_pct": 0.138,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 15:35:00 UTC",
+          "o": 0.06959,
+          "h": 0.06965,
+          "l": 0.06941,
+          "c": 0.06944,
+          "line_px": 0.06949411137603652,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-08-10 15:15:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 11846,
+            "utc": "2026-08-10 15:10:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.06979,
+            "h": 0.06981,
+            "l": 0.06937,
+            "c": 0.06948,
+            "line_px": 0.0694873708903172
+          },
+          {
+            "bar_idx": 11847,
+            "utc": "2026-08-10 15:15:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.06948,
+            "h": 0.0697,
+            "l": 0.06947,
+            "c": 0.06956,
+            "line_px": 0.06948871898746106
+          },
+          {
+            "bar_idx": 11848,
+            "utc": "2026-08-10 15:20:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "WATCHING_BELOW",
+            "reason": "reclaim_failed_close_below",
+            "o": 0.06956,
+            "h": 0.06959,
+            "l": 0.06935,
+            "c": 0.06945,
+            "line_px": 0.06949006708460494
+          },
+          {
+            "bar_idx": 11849,
+            "utc": "2026-08-10 15:25:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.06945,
+            "h": 0.06971,
+            "l": 0.0694,
+            "c": 0.06969,
+            "line_px": 0.0694914151817488
+          },
+          {
+            "bar_idx": 11850,
+            "utc": "2026-08-10 15:30:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.06969,
+            "h": 0.06972,
+            "l": 0.06959,
+            "c": 0.06959,
+            "line_px": 0.06949276327889266
+          },
+          {
+            "bar_idx": 11850,
+            "utc": "2026-08-10 15:30:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.06969,
+            "h": 0.06972,
+            "l": 0.06959,
+            "c": 0.06959,
+            "line_px": 0.06949276327889266
+          }
+        ],
+        "bars_touch_to_entry": 5
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-8037f795d49c-0004",
+      "variant": "Watcher_B",
+      "line_id": "d-8037f795d49c",
+      "touch_utc": "2026-08-10 22:00:00 UTC",
+      "confirm_utc": "2026-08-10 22:10:00 UTC",
+      "entry_utc": "2026-08-10 22:15:00 UTC",
+      "entry_price": "0.0697300000",
+      "timing_bars_touch_to_entry": 3,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-08-10 21:00:00 UTC",
+      "chart_review_end_utc": "2026-08-10 23:15:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-08-10 22:00:00 UTC",
+          "o": 0.06965,
+          "h": 0.06972,
+          "l": 0.06956,
+          "c": 0.06957,
+          "line_px": 0.0695979148561141,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-08-10 22:10:00 UTC",
+          "o": 0.06969,
+          "h": 0.06974,
+          "l": 0.06968,
+          "c": 0.06973,
+          "line_px": 0.06960061105040183,
+          "dist_pct": 0.1121,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-08-10 22:15:00 UTC",
+          "o": 0.06973,
+          "h": 0.06982,
+          "l": 0.06973,
+          "c": 0.06978,
+          "line_px": 0.06960195914754569,
+          "dist_pct": 0.182,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-08-10 22:05:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 11928,
+            "utc": "2026-08-10 22:00:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.06965,
+            "h": 0.06972,
+            "l": 0.06956,
+            "c": 0.06957,
+            "line_px": 0.0695979148561141
+          },
+          {
+            "bar_idx": 11929,
+            "utc": "2026-08-10 22:05:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.06957,
+            "h": 0.06969,
+            "l": 0.06947,
+            "c": 0.06969,
+            "line_px": 0.06959926295325795
+          },
+          {
+            "bar_idx": 11930,
+            "utc": "2026-08-10 22:10:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.06969,
+            "h": 0.06974,
+            "l": 0.06968,
+            "c": 0.06973,
+            "line_px": 0.06960061105040183
+          },
+          {
+            "bar_idx": 11930,
+            "utc": "2026-08-10 22:10:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.06969,
+            "h": 0.06974,
+            "l": 0.06968,
+            "c": 0.06973,
+            "line_px": 0.06960061105040183
+          }
+        ],
+        "bars_touch_to_entry": 3
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    },
+    {
+      "touch_event_id": "te-d-6df07d085e08-0001",
+      "variant": "Watcher_B",
+      "line_id": "d-6df07d085e08",
+      "touch_utc": "2026-09-02 22:20:00 UTC",
+      "confirm_utc": "2026-09-02 22:35:00 UTC",
+      "entry_utc": "2026-09-02 22:40:00 UTC",
+      "entry_price": "0.0811300000",
+      "timing_bars_touch_to_entry": 4,
+      "verdict": "PASS",
+      "verdict_reason": "B reclaim (Touch\u2192BELOW, 2\u00d7 close>line)",
+      "touch_dist_pct": 0.0,
+      "touch_class": "TOUCH",
+      "chart_review_start_utc": "2026-09-02 21:20:00 UTC",
+      "chart_review_end_utc": "2026-09-02 23:40:00 UTC",
+      "audit": {
+        "touch": {
+          "utc": "2026-09-02 22:20:00 UTC",
+          "o": 0.0811,
+          "h": 0.0811,
+          "l": 0.08095,
+          "c": 0.08098,
+          "line_px": 0.08099518985377355,
+          "dist_pct": 0.0,
+          "class": "TOUCH",
+          "touching": true,
+          "method": "interval"
+        },
+        "confirm": {
+          "utc": "2026-09-02 22:35:00 UTC",
+          "o": 0.08104,
+          "h": 0.08118,
+          "l": 0.08103,
+          "c": 0.08113,
+          "line_px": 0.08101128049157845,
+          "dist_pct": 0.0165,
+          "class": "NEAR_0_10",
+          "touching": false,
+          "method": "interval"
+        },
+        "entry": {
+          "utc": "2026-09-02 22:40:00 UTC",
+          "o": 0.08113,
+          "h": 0.08119,
+          "l": 0.08113,
+          "c": 0.08115,
+          "line_px": 0.08101664403751342,
+          "dist_pct": 0.1333,
+          "class": "NEAR_0_20",
+          "touching": false,
+          "method": "interval"
+        },
+        "checks": {
+          "touch_valid": true,
+          "touch_detail": "tol=0.0300% dist=0.0000% touching=True",
+          "approach_from_above": true,
+          "touch_started_watch_below": true,
+          "first_break_below_utc": "",
+          "first_reclaim_close_utc": "2026-09-02 22:30:00 UTC",
+          "reclaim_close_only_not_wick": true,
+          "two_consecutive_closes_above_line": true,
+          "entry_next_bar_after_reclaim_confirm": true,
+          "fsm_replay_entry_matches": true,
+          "within_w12": true,
+          "reclaim_path_ok": true
+        },
+        "transitions": [
+          {
+            "bar_idx": 18556,
+            "utc": "2026-09-02 22:20:00 UTC",
+            "from_state": "IDLE",
+            "to_state": "WATCHING_BELOW",
+            "reason": "touch:tol=0.0300% dist=0.0000% touching=True",
+            "o": 0.0811,
+            "h": 0.0811,
+            "l": 0.08095,
+            "c": 0.08098,
+            "line_px": 0.08099518985377355
+          },
+          {
+            "bar_idx": 18558,
+            "utc": "2026-09-02 22:30:00 UTC",
+            "from_state": "WATCHING_BELOW",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_1_of_2",
+            "o": 0.08089,
+            "h": 0.08105,
+            "l": 0.08089,
+            "c": 0.08104,
+            "line_px": 0.08100591694564349
+          },
+          {
+            "bar_idx": 18559,
+            "utc": "2026-09-02 22:35:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "RECLAIM_PENDING",
+            "reason": "reclaim_close_2_of_2",
+            "o": 0.08104,
+            "h": 0.08118,
+            "l": 0.08103,
+            "c": 0.08113,
+            "line_px": 0.08101128049157845
+          },
+          {
+            "bar_idx": 18559,
+            "utc": "2026-09-02 22:35:00 UTC",
+            "from_state": "RECLAIM_PENDING",
+            "to_state": "ENTRY_SCHEDULED",
+            "reason": "reclaim_confirm_2",
+            "o": 0.08104,
+            "h": 0.08118,
+            "l": 0.08103,
+            "c": 0.08113,
+            "line_px": 0.08101128049157845
+          }
+        ],
+        "bars_touch_to_entry": 4
+      },
+      "timing": {
+        "replay_terminal": "entry_filled",
+        "notes": [
+          "earliest entry in replay matches trade"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "PASS": 32
+  },
+  "snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/watcher_integration_v3av/l1_v3as_drawings_snapshot_9db7d9418813ad66.json"
+}

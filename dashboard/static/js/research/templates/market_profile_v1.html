@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Market Profile - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/research.css?v=mp-trp-1">
+    <link rel="stylesheet" href="/static/market_profile_v1/style.css?v={{ asset_v }}">
+    <link rel="stylesheet" href="/static/footprint_candles/footprint_candles.css?v={{ asset_v }}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'live-charts-market-profile' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content mp-shell">
+            <h1 class="visually-hidden">Market Profile</h1>
+
+            <div class="mp-bar mp-bar-mode" role="group" aria-label="Ansichtsmodus">
+                <span class="mp-label">ANSICHT</span>
+                <div class="mp-mode-toggle" id="mpModeToggle">
+                    <button type="button" class="mp-mode-btn is-active" id="mpModeStandard" data-mode="standard" aria-pressed="true" title="Ruhige Kernansicht: Market Profile + LLD">Standard</button>
+                    <button type="button" class="mp-mode-btn" id="mpModePro" data-mode="pro" aria-pressed="false" title="Alle Werkzeuge und Detail-Layer">Profi</button>
+                </div>
+                <span class="mp-mode-hint" id="mpModeHint">Kernansicht · keine Handelssignale</span>
+                <button type="button" class="mp-btn mp-primary" id="mpLoad">Laden</button>
+                <span class="mp-status" id="mpStatus">–</span>
+            </div>
+
+            <div class="mp-dq-bar" id="mpDataQuality" role="status" aria-live="polite">
+                <span class="mp-dq-label">Datenqualität</span>
+                <span class="mp-dq-pill mp-dq-unknown" id="mpDqStatus" title="Nur aus bereits geladenen Metadaten">Unbekannt</span>
+                <button type="button" class="mp-dq-toggle" id="mpDqToggle" aria-expanded="false" aria-controls="mpDqDetails">Details</button>
+                <div class="mp-dq-details" id="mpDqDetails" hidden></div>
+            </div>
+
+            <div class="mp-bar mp-bar-market" data-mp-group="markt">
+                <span class="mp-group-title">Markt</span>
+                <div class="mp-group">
+                    <label class="mp-label" for="mpSymbol">Symbol</label>
+                    <select id="mpSymbol" class="mp-select" aria-label="Handelssymbol">
+                        {% for s in symbols %}
+                        <option value="{{ s }}"{% if s == 'BTCUSDT' %} selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mp-group">
+                    <label class="mp-label" for="mpTimeframe">Kerzen</label>
+                    <select id="mpTimeframe" class="mp-select" title="Nur Candle-Auflösung — ändert das Market Profile nicht" aria-label="Kerzen-Timeframe">
+                        {% for tf in timeframes %}
+                        <option value="{{ tf }}"{% if tf == '15m' %} selected{% endif %}>{{ tf }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mp-group">
+                    <label class="mp-label" for="mpAnchor">Market Profile</label>
+                    <select id="mpAnchor" class="mp-select" title="Profil-Fenster (unabhängig von Kerzen): Perioden, Tag, Session, Composite" aria-label="Market-Profile-Timeframe">
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="30m">30m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="day" selected>Tag (UTC)</option>
+                        <option value="session">Session</option>
+                        <option value="composite">Composite</option>
+                    </select>
+                </div>
+                <div class="mp-group mp-sessions" id="mpSessionsGroup" hidden>
+                    <span class="mp-label">Sessions</span>
+                    {% for name in sessions %}
+                    <label class="mp-check"><input type="checkbox" class="mp-session" value="{{ name }}" checked> {{ name|upper }}</label>
+                    {% endfor %}
+                </div>
+                <div class="mp-group">
+                    <label class="mp-label" for="mpDays">Zeitraum</label>
+                    <select id="mpDays" class="mp-select" aria-label="Zeitraum">
+                        <option value="3">3 Tage</option>
+                        <option value="7">7 Tage</option>
+                        <option value="14">14 Tage</option>
+                        <option value="30" selected>30 Tage</option>
+                        <option value="custom">benutzerdefiniert</option>
+                    </select>
+                </div>
+                <div class="mp-group mp-custom-range" id="mpCustomRange" hidden>
+                    <label class="mp-label" for="mpStart">Von</label>
+                    <input type="date" id="mpStart" class="mp-input">
+                    <label class="mp-label" for="mpEnd">Bis</label>
+                    <input type="date" id="mpEnd" class="mp-input">
+                </div>
+            </div>
+
+            <div class="mp-bar mp-bar-toggles" data-mp-group="market-profile">
+                <span class="mp-group-title">Market Profile</span>
+                <div class="mp-group mp-core-toggles">
+                    <label class="mp-check" title="Volumen-Histogramm je Profilfenster"><input type="checkbox" id="mpShowHistogram" checked> Histogramm</label>
+                    <label class="mp-check" title="Point of Control"><input type="checkbox" id="mpShowPoc" checked> POC</label>
+                    <label class="mp-check" title="Value Area High / Low (VAH / VAL)"><input type="checkbox" id="mpShowValueArea" checked> VAH / VAL</label>
+                    <label class="mp-label mp-inline" for="mpWidth">Breite</label>
+                    <select id="mpWidth" class="mp-select mp-select-sm" aria-label="Profilbreite">
+                        <option value="0.18">schmal</option>
+                        <option value="0.30" selected>normal</option>
+                        <option value="0.50">breit</option>
+                    </select>
+                </div>
+                <details class="mp-advanced mp-pro-only" id="mpProfileDetails" data-pro-panel="1">
+                    <summary aria-expanded="false">Profil-Details</summary>
+                    <div class="mp-advanced-body">
+                        <label class="mp-check" title="Volumenlinie über dem Histogramm"><input type="checkbox" id="mpShowVolumeLine" checked> Volumenlinie</label>
+                        <label class="mp-check" title="Buy- und Sell-Volumen getrennt darstellen"><input type="checkbox" id="mpSplitBuySell" checked> Buy/Sell getrennt</label>
+                        <label class="mp-check" title="High Volume Node"><input type="checkbox" id="mpShowHvn"> HVN</label>
+                        <label class="mp-check" title="Low Volume Node"><input type="checkbox" id="mpShowLvn"> LVN</label>
+                        <label class="mp-check"><input type="checkbox" id="mpShowSinglePrints"> Single Prints</label>
+                        <label class="mp-check" title="Unangereicherte POC-Linien"><input type="checkbox" id="mpShowNakedPoc" checked> Naked POC</label>
+                        <label class="mp-check"><input type="checkbox" id="mpExtendLevels" checked> nach rechts verlängern</label>
+                        <label class="mp-check" title="Automatisches Shape-Verdikt (Hinweis beachten)"><input type="checkbox" id="mpShowShape" checked> Shape-Verdikt</label>
+                        <label class="mp-label mp-inline" for="mpValueAreaPct">Value Area %</label>
+                        <input type="number" id="mpValueAreaPct" class="mp-input mp-input-sm" value="70" min="30" max="95" step="1" aria-label="Value Area Prozent">
+                        <label class="mp-label mp-inline" for="mpTargetBins">Ziel-Bins</label>
+                        <input type="number" id="mpTargetBins" class="mp-input mp-input-sm" value="160" min="40" max="400" step="10" aria-label="Ziel-Bins">
+                        <label class="mp-check" title="Teure Deduplizierung — nur bei Bedarf"><input type="checkbox" id="mpFinal"> FINAL-Dedupe (ca. 60× langsamer)</label>
+                    </div>
+                </details>
+            </div>
+
+            <div class="mp-notice" id="mpShapeNotice">
+                <strong>Hinweis:</strong> {{ shape_notice }}
+            </div>
+
+            <div id="fpAvrPanel" class="fp-avr-panel" hidden>
+                <div class="fp-avr-panel-title">AVR · <span id="fpAvrPanelHint">Aktuelle Candle</span></div>
+                <div id="fpAvrPanelBody" class="fp-avr-panel-body"></div>
+            </div>
+
+            <div class="mp-chart-stack" id="mpChartStack">
+                <div class="trp-dock-bar mp-chart-dock">
+                    <span class="mp-group-title mp-dock-title">Kontext</span>
+                    <span class="trp-field-label">EMA</span>
+                    <button type="button" class="trp-text-btn" id="mpEmaSettings" title="EMA-Overlays (Standard empfiehlt EMA9 und EMA20)">EMA</button>
+                    <span class="trp-muted" id="mpEmaSummary">off</span>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind" title="Liquidity Location: berechnete Zonen aus Kerzen — keine echten Liquidationen">
+                        <input type="checkbox" id="mpShowLiquidity" aria-label="Liquidity Location (LLD)"> LLD
+                    </label>
+                    <button type="button" class="trp-text-btn" id="mpLldSettings" title="Liquidity-Location-Einstellungen" aria-label="LLD-Einstellungen">⚙</button>
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Open Interest unter dem Chart" data-pro-control="1">
+                        <input type="checkbox" id="mpShowOi" aria-label="Open Interest"> OI
+                    </label>
+                    <div class="trp-lld-legend" id="mpLldLegend" hidden>
+                        <span class="trp-muted">Vol Str</span>
+                        <div class="trp-vol-rows">
+                            <div class="trp-vol-row" id="mpVolSupport"></div>
+                            <div class="trp-vol-row" id="mpVolResistance"></div>
+                        </div>
+                        <span class="trp-muted" id="mpClusterCounts"></span>
+                    </div>
+                    <span class="trp-dock-sep mp-pro-only" aria-hidden="true" data-pro-control="1"></span>
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Orderbuch-Walls: sichtbare Limit-Liquidität, verschiebbar/löschbar" data-pro-control="1">
+                        <input type="checkbox" id="mpObpEnabled" aria-label="Orderbook Walls"> Walls
+                    </label>
+                    <span class="trp-muted research-obp-legend" id="mpObpLegend" hidden>Bid · Ask Walls</span>
+                    <label class="trp-check trp-dock-ind mp-pro-only" title="Orderbuch-Preislevel als Seitenpanel" data-pro-control="1">
+                        <input type="checkbox" id="mpOblEnabled" aria-label="Orderbook Levels"> Levels
+                    </label>
+                    <span id="mpOblControls" class="research-obl-controls" hidden>
+                        <select id="mpOblDepth" class="trp-select trp-width" title="Orderbook depth" aria-label="OB Levels Depth">
+                            <option value="200">OB200</option>
+                            <option value="1000" selected>OB1000</option>
+                            <option value="0">FULL</option>
+                        </select>
+                        <select id="mpOblMode" class="trp-select trp-width" title="Raw vs Aggregated" aria-label="OB Levels Mode">
+                            <option value="aggregated" selected>Aggregated</option>
+                            <option value="raw">Raw</option>
+                        </select>
+                        <select id="mpOblScale" class="trp-select trp-width" title="Balken-Skalierung" aria-label="OB Levels Scale">
+                            <option value="sqrt" selected>Sqrt</option>
+                            <option value="linear">Linear</option>
+                            <option value="log">Log</option>
+                        </select>
+                    </span>
+                    <span class="trp-dock-sep mp-pro-only" aria-hidden="true" data-pro-control="1"></span>
+                    <span class="mp-group-title mp-dock-title mp-pro-only" data-pro-control="1">Orderflow</span>
+                    <div class="mp-group fp-toggle-group mp-pro-only" data-pro-control="1">
+                        <label class="mp-check fp-toggle" title="Pilot: BTCUSDT + INJUSDT · Kerzen-TF muss 5m sein — ausgeführte Public Trades">
+                            <input type="checkbox" id="mpShowFootprint" aria-label="Footprint"> Footprint
+                        </label>
+                        <label class="mp-check fp-toggle" title="AVR-Zustände (keine Handelssignale)">
+                            <input type="checkbox" id="fpShowAvrPanel" checked aria-label="AVR-Anzeige"> AVR
+                        </label>
+                        <button type="button" class="mp-btn fp-avr-expand" id="fpAvrExpand" aria-expanded="false" title="AVR-Details ein-/ausklappen">Erweitert</button>
+                        <span class="fp-status" id="fpStatus"></span>
+                    </div>
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <span class="mp-group-title mp-dock-title">Werkzeuge</span>
+                    <div class="trp-tools" id="mpTools"></div>
+                    <button type="button" class="trp-tool-btn" id="mpWallBpTool" title="Wall-Breakpoint setzen" aria-label="Wall-Breakpoint setzen">BP</button>
+                    <button type="button" class="trp-tool-btn" id="mpWallXrayTool" title="Wall X-Ray (Major/Q95, ohne Breakpoint)" aria-label="Wall X-Ray">XRAY</button>
+                    <span class="wd-bp-label" id="wdBpLabel" title="Aktiver Wall-Breakpoint">BP –</span>
+                    <button type="button" class="trp-text-btn" id="wdClearBp" title="Breakpoint entfernen" aria-label="Breakpoint entfernen">BP⌫</button>
+                    <button type="button" class="trp-text-btn" id="xrStop" title="X-Ray Session beenden" aria-label="X-Ray stoppen" hidden>XRAY⏹</button>
+                    <input type="color" id="mpDrawColor" class="trp-color" value="#8b9bb4" title="Farbe" aria-label="Zeichenfarbe">
+                    <select id="mpDrawWidth" class="trp-select trp-width" title="Linienstärke" aria-label="Linienstärke">
+                        <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+                    </select>
+                    <button type="button" class="trp-tool-btn" id="mpDelete" title="Löschen" aria-label="Zeichnung löschen">⌫</button>
+                    <button type="button" class="trp-tool-btn" id="mpClear" title="Zeichnungen dieses Symbols löschen" aria-label="Alle Zeichnungen löschen">⊘</button>
+                    <button type="button" class="trp-text-btn" id="mpResetView" title="Chart zentrieren / Ansicht zurücksetzen">⟲ Zentrieren</button>
+                    <span class="trp-muted mp-shift-hint">Shift+Klick = messen</span>
+                    <button type="button" class="trp-text-btn trp-fs-dock" id="mpFullscreenBtn" title="Chart aufziehen oder zurücksetzen" aria-label="Vollbild">⛶</button>
+                </div>
+
+                <div class="mp-chart-wrap" id="mpChart">
+                    <div id="app" class="mp-trp-app">
+                        <div id="price-pane">
+                            <div id="price-main">
+                                <div id="overlay">
+                                    <div id="demo-badge" hidden>DEMO</div>
+                                    <div id="legend"></div>
+                                </div>
+                                <div id="empty" hidden></div>
+                                <div id="chart"></div>
+                                <div id="overlay-layer"></div>
+                                <canvas id="fpOverlay" hidden aria-hidden="true"></canvas>
+                                <canvas id="mpOverlay" class="mp-overlay"></canvas>
+                                <div id="mpTooltip" class="mp-tooltip" hidden></div>
+                                <canvas id="obp-overlay" aria-hidden="true"></canvas>
+                                <div id="obp-tooltip" hidden></div>
+                                <div id="obp-badge" hidden></div>
+                            </div>
+                            <aside id="ob-levels-panel" class="ob-levels-panel" hidden aria-label="Orderbook levels">
+                                <div id="ob-levels-header" class="ob-levels-header">
+                                    <span id="ob-levels-title">FULL</span>
+                                    <span id="ob-levels-meta" class="ob-levels-meta"></span>
+                                    <span id="ob-levels-fresh" class="ob-levels-fresh"></span>
+                                </div>
+                                <canvas id="ob-levels-canvas" aria-hidden="true"></canvas>
+                                <div id="ob-levels-tooltip" class="ob-levels-tooltip" hidden></div>
+                            </aside>
+                        </div>
+                        <div id="lower-split" title="Resize oscillator"></div>
+                        <div id="lower-pane">
+                            <div id="osc-legend"></div>
+                            <div id="oscillator"></div>
+                        </div>
+                    </div>
+                    <div id="wdPanel" class="wd-panel" hidden aria-label="Wall Decision">
+                        <div class="wd-panel-head" id="wdPanelHead">
+                            <strong>Wall Decision</strong>
+                            <span class="wd-state wd-tone-armed" id="wdPanelState">DISARMED</span>
+                            <span class="wd-panel-actions">
+                                <button type="button" class="wd-icon-btn" id="wdPanelMin" title="Minimieren" aria-expanded="true">–</button>
+                                <button type="button" class="wd-icon-btn" id="wdPanelClose" title="Schließen">×</button>
+                            </span>
+                        </div>
+                        <div class="wd-panel-body" id="wdPanelBody"></div>
+                    </div>
+                    <div id="mpEmpty" class="mp-empty">Chart wird geladen …</div>
+                </div>
+            </div>
+
+            <div class="mp-legend-stack" id="mpLegendStack">
+                <details class="mp-legend-panel" id="mpLegendPanel" open>
+                    <summary class="mp-legend-summary" aria-expanded="true">Legende · AVR vor Market Profile · keine Handelssignale</summary>
+                    <div class="mp-legend-body" id="mpLegendBody">
+                        <div class="fp-avr-legend" id="fpAvrLegend" aria-label="AVR Farblegende"></div>
+                        <div class="mp-legend" id="mpLegend" aria-label="Market-Profile- und Kontext-Legende"></div>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalEma" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>EMA Overlays</h2>
+            <div id="emaRows" class="trp-ema-rows"></div>
+            <button type="button" class="trp-text-btn" id="emaAdd">+ EMA hinzufügen</button>
+            <p class="trp-error" id="emaError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="ema">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalEma">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="emaApply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="trp-modal" id="modalLld" hidden>
+        <div class="trp-modal-card trp-modal-wide">
+            <h2>Liquidity Location Detector</h2>
+            <p class="trp-muted" id="lldLicense"></p>
+            <fieldset><legend>GENERAL</legend>
+                <label>Amount <input type="number" id="lldAmount" min="1" max="10000" value="300"></label>
+                <p class="trp-muted">Basis für 5m. 1h/4h laden mehr History und behalten mehr Pools (Höhe/Tiefe).</p>
+            </fieldset>
+            <fieldset><legend>LIQUIDITY SETTINGS</legend>
+                <label>Highest Length <input type="number" id="lldHigh" min="1" max="100" value="2"></label>
+                <label>Lowest Length <input type="number" id="lldLow" min="1" max="100" value="2"></label>
+            </fieldset>
+            <fieldset><legend>POOL VISIBILITY</legend>
+                <label class="trp-check"><input type="checkbox" id="lldBorders" checked> Show Individual Pool Borders</label>
+                <label>Normal Border Width <input type="number" id="lldBorderW" min="1" max="4" value="1"></label>
+                <label>Strong Pool Border Width <input type="number" id="lldStrongW" min="1" max="5" value="2"></label>
+                <label>Border Transparency <input type="number" id="lldBorderT" min="0" max="100" value="10"></label>
+            </fieldset>
+            <fieldset><legend>POOL CLUSTERS</legend>
+                <label class="trp-check"><input type="checkbox" id="lldClusters" checked> Enable Clusters</label>
+                <label>Cluster Gap <input type="number" id="lldGap" min="0" max="5" step="0.05" value="0.10"></label>
+                <label>Minimum Pools <input type="number" id="lldMinPools" min="1" max="20" value="3"></label>
+                <label class="trp-check"><input type="checkbox" id="lldShowSingle" checked> Show Single Pools</label>
+                <label class="trp-check"><input type="checkbox" id="lldClusterLabels" checked> Show Cluster Labels</label>
+                <label>Cluster Fill Transparency <input type="number" id="lldClusterFill" min="0" max="100" value="88"></label>
+                <label>Cluster Border Width <input type="number" id="lldClusterBorder" min="1" max="5" value="2"></label>
+            </fieldset>
+            <fieldset><legend>COLOR</legend>
+                <label>Support / Up Color <input type="color" id="lldSupport" value="#228bab"></label>
+                <label>Resistance / Down Color <input type="color" id="lldResist" value="#ec4079"></label>
+                <label>Fill Transparency <input type="number" id="lldFillT" min="0" max="100" value="30"></label>
+                <label>Support Border <input type="color" id="lldSupBorder" value="#00dcff"></label>
+                <label>Resistance Border <input type="color" id="lldResBorder" value="#ff468c"></label>
+            </fieldset>
+            <fieldset><legend>EMA</legend>
+                <label class="trp-check"><input type="checkbox" id="lldEmaFast"> Fast</label>
+                <input type="number" id="lldEmaFastLen" min="1" max="500" value="20">
+                <input type="color" id="lldEmaFastColor" value="#00ffff">
+                <label class="trp-check"><input type="checkbox" id="lldEmaSlow"> Slow</label>
+                <input type="number" id="lldEmaSlowLen" min="1" max="500" value="35">
+                <input type="color" id="lldEmaSlowColor" value="#d40047">
+            </fieldset>
+            <p class="trp-error" id="lldError" hidden></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-reset="lld">Reset Defaults</button>
+                <button type="button" class="trp-text-btn" data-close="modalLld">Cancel</button>
+                <button type="button" class="trp-text-btn trp-primary" id="lldApply">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
+    <script>
+    window.bridge = {
+      on_chart_ready: function () {
+        window.__mpChartReady = true;
+        if (window.__mpOnChartReady) window.__mpOnChartReady();
+      },
+      on_visible_range: function () {
+        if (window.__mpOnVisibleRange) window.__mpOnVisibleRange();
+      },
+      // chart.js always registers crosshair/click handlers; stubs must exist
+      // or setData/mousemove throws and the load path surfaces it as Netzwerkfehler.
+      on_crosshair_move: function () {},
+      on_crosshair_leave: function () {},
+      on_chart_click: function () {},
+      on_drawing_event: function (blob) {
+        if (window.__mpOnDrawingEvent) window.__mpOnDrawingEvent(blob);
+      },
+      on_tool_idle: function () {
+        if (window.__mpOnToolIdle) window.__mpOnToolIdle();
+      },
+      on_chart_key: function (key) {
+        if (window.__mpOnChartKey) window.__mpOnChartKey(key);
+      }
+    };
+    </script>
+    <script src="/static/research_trp/chart.js?v={{ asset_v }}"></script>
+    <script src="/static/footprint_candles/footprint_candles.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_decision_helpers.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_decision_avr_context.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_decision_ui.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_xray_helpers.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/wall_xray_ui.js?v={{ asset_v }}"></script>
+    <script src="/static/market_profile_v1/app.js?v={{ asset_v }}"></script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+{
+  "drawings_sha256": "d9a668c028ad13b529f454c7e904034572e13e9671a577f1c66cf46b69fd7743",
+  "v3g_ref_sha256": "e062a5a0b6802363cdf9048cba26b460344cef711ed93133c909ade466252ce8",
+  "drawings_changed_vs_v3g": true,
+  "drawing_count": 21,
+  "v3g_drawing_count": 24,
+  "line_extended_until_utc": "2026-09-09 17:30:00 UTC",
+  "september_line_activity": {
+    "lines": [
+      {
+        "drawing_id": "d-03350098db64",
+        "september_samples": [
+          {
+            "bar_utc": "2026-09-01 00:00:00 UTC",
+            "active": true,
+            "anchor_status": "BETWEEN_ANCHORS",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-09 17:30:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-15 12:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-0e5e7004dccd",
+        "september_samples": [
+          {
+            "bar_utc": "2026-09-01 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-09 17:30:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-15 12:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-1ff495203465",
+        "missing": true
+      },
+      {
+        "drawing_id": "d-22f8d9f720ce",
+        "september_samples": [
+          {
+            "bar_utc": "2026-09-01 00:00:00 UTC",
+            "active": true,
+            "anchor_status": "BETWEEN_ANCHORS",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-09 17:30:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-15 12:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-248d74050cc8",
+        "september_samples": [
+          {
+            "bar_utc": "2026-09-01 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-09 17:30:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-15 12:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-a6d9a05da2f1",
+        "september_samples": [
+          {
+            "bar_utc": "2026-09-01 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-09 17:30:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-15 12:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "extend_right": false
+          }
+        ]
+      }
+    ],
+    "active_in_september_count": 2
+  },
+  "candles": {
+    "loaded": 7488,
+    "expected": 7488,
+    "complete": true,
+    "gap_count": 0,
+    "first_gaps": []
+  },
+  "september_stats": {
+    "touch_events_allowlist": 0,
+    "pilot_rows_touch_in_sep": 99,
+    "c1_entries_in_sep": 0,
+    "executed_A": 0,
+    "executed_B": 0,
+    "executed_C": 0
+  }
+}

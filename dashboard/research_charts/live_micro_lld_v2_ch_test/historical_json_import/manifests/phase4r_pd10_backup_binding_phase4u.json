@@ -1,0 +1,25 @@
+{
+  "phase": "4U",
+  "scope_fingerprint": "91ffcf8fa48f124bfcf269a3c1fac98df836cecfa7320a132ad44c25aacd774c",
+  "manifest_v1": "phase4r_april_15mpd10_full_v1.json",
+  "manifest_v1_backup_recovery_id": "be78daa2-c816-4b68-b490-75941f2cf82e",
+  "manifest_v2": "phase4r_april_15mpd10_full_v2.json",
+  "operational_backup_recovery_id": "df88d380-ec06-4007-9658-b69ee50878df",
+  "backup_tag": "lmv2_phase4u_post_4t_20261011T114924Z",
+  "backup_status": "BACKUP_CREATED",
+  "restore_test_database": "signal_generator_lmv2_restore_phase4u_post_4t_20261011T114924Z",
+  "restore_status": "RESTORED",
+  "env_for_write_verification": "HISTORICAL_IMPORT_VERIFIED_BACKUP_RECOVERY_ID=df88d380-ec06-4007-9658-b69ee50878df",
+  "run_state_backup_provenance_example": {
+    "manifest_backup_recovery_id": "df88d380-ec06-4007-9658-b69ee50878df",
+    "verified_backup_recovery_id": "df88d380-ec06-4007-9658-b69ee50878df",
+    "backup_status": "BACKUP_CREATED",
+    "backup_name": "File('backups/lmv2_phase4u_post_4t_20261011T114924Z/lmv2_five_tables')",
+    "manifest_differs_from_verified": false
+  },
+  "prior_operational_backups": [
+    "923fc087-9e6b-47f1-bbaf-37d765b1182a",
+    "be78daa2-c816-4b68-b490-75941f2cf82e",
+    "c2ca53e1-fbce-44dd-ac18-879733481aeb"
+  ]
+}

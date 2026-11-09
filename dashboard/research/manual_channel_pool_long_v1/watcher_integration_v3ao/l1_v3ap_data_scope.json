@@ -1,0 +1,14 @@
+{
+  "run_id": "20261109T170918Z",
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "window_start_utc": "2026-08-26 16:35:00 UTC",
+  "window_end_utc": "2026-08-31 06:50:00 UTC",
+  "simulation_end_utc": "2026-10-19 13:05:00 UTC",
+  "n_drawings": 5,
+  "n_candles": 15510,
+  "lookahead_note": "RETROSPECTIVE_DRAWINGS: line anchors from frozen snapshot; pool SSOT at confirm-bar close only; no future pool injection in V3AO materialize.",
+  "equality_gate": "PASS",
+  "matrix_configs": 145
+}

@@ -1,0 +1,32 @@
+{
+  "n_trades": 32,
+  "avg_tp_dist_pct": 1.5087,
+  "buckets": {
+    "0.50-<1.00": {
+      "count": 21,
+      "gross_sum_pct": 12.3567,
+      "hit_rate": 90.48
+    },
+    "1.00-<2.00": {
+      "count": 7,
+      "gross_sum_pct": 10.2159,
+      "hit_rate": 100.0
+    },
+    "2.00-<3.00": {
+      "count": 0,
+      "gross_sum_pct": 0,
+      "hit_rate": null
+    },
+    "3.00-<5.00": {
+      "count": 0,
+      "gross_sum_pct": 0,
+      "hit_rate": null
+    },
+    ">=5.00": {
+      "count": 4,
+      "gross_sum_pct": -4.8,
+      "hit_rate": 0.0
+    }
+  },
+  "unique_tp_by_event": 27
+}

@@ -1,0 +1,39 @@
+{
+  "avg_seconds_per_imported_day": 99.144,
+  "current_day": "2026-01-15",
+  "current_phase": "done",
+  "downloaded_days": 0,
+  "elapsed_seconds": 99.144,
+  "error": null,
+  "eta_human": "0:00:00",
+  "eta_seconds": 0,
+  "failed_days": 0,
+  "from": "2026-01-15",
+  "imported_days": 1,
+  "last_results": [
+    {
+      "build_id": "10b89bee066ec772caa04acbdb6593980233b434c3dd044b684c57d49c79d0bd",
+      "coverage_status": "COMPLETE",
+      "day": "2026-01-15",
+      "path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/data/bybit_historical_orderbook/DOGEUSDT/2026-01-15/2026-01-15_DOGEUSDT_ob200.data",
+      "producer_id": "BYBIT_OB200_DAY_ZIP_IMPORTER_V3",
+      "rows_inserted": 86382,
+      "seconds_seen": 86382,
+      "seconds_skipped_existing": 0,
+      "source_fingerprint": "3ef771087bfd774873a6120787c3839c79bc4481f996835cc7e265a3e5d11600",
+      "source_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/data/bybit_historical_orderbook/DOGEUSDT/2026-01-15/2026-01-15_DOGEUSDT_ob200.data",
+      "symbol": "DOGEUSDT",
+      "table": "btc_doge_research.research_ob200_snapshots_1s"
+    }
+  ],
+  "planned_day_count": 1,
+  "planned_days": [
+    "2026-01-15"
+  ],
+  "remaining_days": 0,
+  "started_at": "2026-09-26T08:35:46.670612Z",
+  "status_file": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/run/ob200_batch_import/smoke_doge.json",
+  "symbol": "DOGEUSDT",
+  "to": "2026-01-15",
+  "updated_at": "2026-09-26T08:37:25.814974Z"
+}

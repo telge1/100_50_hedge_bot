@@ -1,0 +1,17 @@
+{
+  "manifest_id": "phase6xt_5m_pd1_gate_a_v1",
+  "description": "Isolated Gate A — one DOGEUSDT 5m PD1 close (dry-run / write-gated import).",
+  "catalog_root": "doge_multi_month_2026_history",
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_5mpd1_v1",
+  "import_batch_id": "phase6xt_5m_pd1_gate_a_v1",
+  "month": "2026-05",
+  "combo_folder": "5m_PD1",
+  "stems": ["20260501T000000Z"],
+  "manifest_context_catalog_id": "doge_apr_sep_2026_v1",
+  "requires_catalog_release_on_multi_month": true,
+  "notes": [
+    "JSON files under doge_multi_month_2026_history/production/results.",
+    "load_manifest_context currently reads doge_apr_sep catalog_manifest.json engine fields.",
+    "validate_bundle requires mixed-frozen manifest+provenance on catalog_root (release gap)."
+  ]
+}

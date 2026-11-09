@@ -1,0 +1,307 @@
+{
+  "pending_tp": "0.0949600000",
+  "tp_mode": "POOL_BOTTOM_NO_CLEAR_CHANNEL",
+  "tp_pool_id": "d2-exact:0.0949600000:0.0951860000:d2",
+  "tp_dist": "11.8361",
+  "gate_count": "73",
+  "dynamic_ch": "no",
+  "ch_at_entry": "",
+  "pick": {
+    "tp_price": 0.09496,
+    "tp_mode": "UPPER_D2_POOL_ONLY",
+    "tp_pool_id": "d2-exact:0.0949600000:0.0951860000:d2",
+    "tp_channel_line_id": null,
+    "tp_dist_pct": 11.83606171240137,
+    "gate_count": 73,
+    "gate_ok": true,
+    "block_reason": null
+  },
+  "ch_up": null,
+  "ch_id": null,
+  "qualified_n": 73,
+  "nearest": {
+    "lower_bound": 0.08536,
+    "upper_bound": 0.08538,
+    "pool_id": "d2-exact:0.0853600000:0.0853800000:d3",
+    "d2_depth": 3
+  },
+  "nearest_list_head": [
+    {
+      "lower_bound": 0.08536,
+      "upper_bound": 0.08538,
+      "d2_depth": 3,
+      "pool_id": "d2-exact:0.0853600000:0.0853800000:d3"
+    },
+    {
+      "lower_bound": 0.08538,
+      "upper_bound": 0.085428,
+      "d2_depth": 4,
+      "pool_id": "d2-exact:0.0853800000:0.0854280000:d4"
+    },
+    {
+      "lower_bound": 0.085428,
+      "upper_bound": 0.08545200000000001,
+      "d2_depth": 3,
+      "pool_id": "d2-exact:0.0854280000:0.0854520000:d3"
+    },
+    {
+      "lower_bound": 0.08545200000000001,
+      "upper_bound": 0.08546,
+      "d2_depth": 2,
+      "pool_id": "d2-exact:0.0854520000:0.0854600000:d2"
+    },
+    {
+      "lower_bound": 0.08604,
+      "upper_bound": 0.08606,
+      "d2_depth": 2,
+      "pool_id": "d2-exact:0.0860400000:0.0860600000:d2"
+    },
+    {
+      "lower_bound": 0.08606,
+      "upper_bound": 0.08612,
+      "d2_depth": 3,
+      "pool_id": "d2-exact:0.0860600000:0.0861200000:d3"
+    },
+    {
+      "lower_bound": 0.08612,
+      "upper_bound": 0.086164,
+      "d2_depth": 5,
+      "pool_id": "d2-exact:0.0861200000:0.0861640000:d5"
+    },
+    {
+      "lower_bound": 0.086164,
+      "upper_bound": 0.08617999999999999,
+      "d2_depth": 4,
+      "pool_id": "d2-exact:0.0861640000:0.0861800000:d4"
+    },
+    {
+      "lower_bound": 0.08617999999999999,
+      "upper_bound": 0.086186,
+      "d2_depth": 3,
+      "pool_id": "d2-exact:0.0861800000:0.0861860000:d3"
+    },
+    {
+      "lower_bound": 0.086186,
+      "upper_bound": 0.086276,
+      "d2_depth": 2,
+      "pool_id": "d2-exact:0.0861860000:0.0862760000:d2"
+    },
+    {
+      "lower_bound": 0.0865,
+      "upper_bound": 0.08655399999999999,
+      "d2_depth": 2,
+      "pool_id": "d2-exact:0.0865000000:0.0865540000:d2"
+    },
+    {
+      "lower_bound": 0.08702,
+      "upper_bound": 0.08703,
+      "d2_depth": 2,
+      "pool_id": "d2-exact:0.0870200000:0.0870300000:d2"
+    }
+  ],
+  "zone_e": {
+    "close": "2026-08-26 20:35:00 UTC",
+    "bands": [
+      {
+        "lo": 0.08932,
+        "hi": 0.089624,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08929,
+        "hi": 0.089514,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08938,
+        "hi": 0.08956,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08928,
+        "hi": 0.08941199999999999,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08937,
+        "hi": 0.089478,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000",
+        "at_entry": false
+      }
+    ]
+  },
+  "zone_08": {
+    "close": "2026-08-27 08:05:00 UTC",
+    "bands": [
+      {
+        "lo": 0.08932,
+        "hi": 0.089624,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08929,
+        "hi": 0.089514,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08938,
+        "hi": 0.08956,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08928,
+        "hi": 0.08941199999999999,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08937,
+        "hi": 0.089478,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000",
+        "at_entry": false
+      }
+    ]
+  },
+  "zone_09": {
+    "close": "2026-08-27 09:05:00 UTC",
+    "bands": [
+      {
+        "lo": 0.08932,
+        "hi": 0.089624,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08929,
+        "hi": 0.089514,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08938,
+        "hi": 0.08956,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08928,
+        "hi": 0.08941199999999999,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08937,
+        "hi": 0.089478,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000",
+        "at_entry": false
+      }
+    ]
+  },
+  "zone_pre": {
+    "close": "2026-08-27 13:50:00 UTC",
+    "bands": [
+      {
+        "lo": 0.08932,
+        "hi": 0.089624,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08929,
+        "hi": 0.089514,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08938,
+        "hi": 0.08956,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08928,
+        "hi": 0.08941199999999999,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100",
+        "at_entry": false
+      },
+      {
+        "lo": 0.08937,
+        "hi": 0.089478,
+        "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000",
+        "at_entry": false
+      }
+    ]
+  },
+  "qualified_in_violet_zone_at_entry": [
+    {
+      "lower_bound": 0.08929,
+      "upper_bound": 0.08932,
+      "pool_id": "d2-exact:0.0892900000:0.0893200000:d2",
+      "side": "upper",
+      "d2_depth": 2,
+      "width_pct": 0.033598387277413204
+    },
+    {
+      "lower_bound": 0.08932,
+      "upper_bound": 0.08937,
+      "pool_id": "d2-exact:0.0893200000:0.0893700000:d3",
+      "side": "upper",
+      "d2_depth": 3,
+      "width_pct": 0.0559785042543757
+    },
+    {
+      "lower_bound": 0.08937,
+      "upper_bound": 0.08938,
+      "pool_id": "d2-exact:0.0893700000:0.0893800000:d4",
+      "side": "upper",
+      "d2_depth": 4,
+      "width_pct": 0.011189437171305945
+    },
+    {
+      "lower_bound": 0.08938,
+      "upper_bound": 0.08941199999999999,
+      "pool_id": "d2-exact:0.0893800000:0.0894120000:d5",
+      "side": "upper",
+      "d2_depth": 5,
+      "width_pct": 0.03580219288430339
+    },
+    {
+      "lower_bound": 0.08941199999999999,
+      "upper_bound": 0.089478,
+      "pool_id": "d2-exact:0.0894120000:0.0894780000:d4",
+      "side": "upper",
+      "d2_depth": 4,
+      "width_pct": 0.07381559522212959
+    },
+    {
+      "lower_bound": 0.089478,
+      "upper_bound": 0.089514,
+      "pool_id": "d2-exact:0.0894780000:0.0895140000:d3",
+      "side": "upper",
+      "d2_depth": 3,
+      "width_pct": 0.04023335345000376
+    }
+  ],
+  "first_violet_approach": {
+    "utc": "2026-08-27 08:45:00 UTC",
+    "ohlc": [
+      0.08891,
+      0.08955,
+      0.08882,
+      0.08941
+    ]
+  },
+  "first_nearest_tp_wick": {
+    "utc": "2026-08-26 21:00:00 UTC",
+    "high": 0.08536,
+    "tp_bottom": 0.08536
+  },
+  "max_high_pre_support_exit": 0.08996
+}

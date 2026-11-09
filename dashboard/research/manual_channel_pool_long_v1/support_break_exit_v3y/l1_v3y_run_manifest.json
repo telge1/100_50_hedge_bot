@@ -1,0 +1,111 @@
+{
+  "run_id": "20261109T092557Z",
+  "drawings_sha256": "d05d218646aced84ffc0adbb8ca66a6a8f92048190e72dc9cea3140270fb594c",
+  "confirm_delta_pct": 0.2,
+  "test_a": {
+    "A": {
+      "executed_entries": 7,
+      "exit_changes_vs_v3u": 3,
+      "support_break_exits": 3,
+      "gross_v3u_pct": 24.7831,
+      "gross_v3y_resim_pct": 35.8595
+    },
+    "B": {
+      "executed_entries": 6,
+      "exit_changes_vs_v3u": 3,
+      "support_break_exits": 3,
+      "gross_v3u_pct": 25.9831,
+      "gross_v3y_resim_pct": 36.8684
+    },
+    "C": {
+      "executed_entries": 3,
+      "exit_changes_vs_v3u": 1,
+      "support_break_exits": 1,
+      "gross_v3u_pct": 2.0372,
+      "gross_v3y_resim_pct": 2.3505
+    }
+  },
+  "test_b": [
+    {
+      "variant": "A",
+      "trades_v3u": 7,
+      "trades_v3y": 11,
+      "gross_v3u_pct": 24.7831,
+      "gross_v3y_pct": 37.518,
+      "wins_v3u": 3,
+      "wins_v3y": 7,
+      "sl_v3u": 4,
+      "sl_v3y": 2,
+      "support_break_exits": 5,
+      "saved_from_sl": 3,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-1f70c9798935-0022",
+        "te-d-9b6e62dc884c-0001",
+        "te-d-9b6e62dc884c-0003",
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 3,
+      "longest_loss_streak_v3y": 2
+    },
+    {
+      "variant": "B",
+      "trades_v3u": 6,
+      "trades_v3y": 9,
+      "gross_v3u_pct": 25.9831,
+      "gross_v3y_pct": 39.7269,
+      "wins_v3u": 3,
+      "wins_v3y": 7,
+      "sl_v3u": 3,
+      "sl_v3y": 0,
+      "support_break_exits": 5,
+      "saved_from_sl": 3,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-1f70c9798935-0022",
+        "te-d-9b6e62dc884c-0003",
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 2,
+      "longest_loss_streak_v3y": 1
+    },
+    {
+      "variant": "C",
+      "trades_v3u": 3,
+      "trades_v3y": 4,
+      "gross_v3u_pct": 2.0372,
+      "gross_v3y_pct": 3.1944,
+      "wins_v3u": 2,
+      "wins_v3y": 3,
+      "sl_v3u": 1,
+      "sl_v3y": 0,
+      "support_break_exits": 2,
+      "saved_from_sl": 1,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 1,
+      "longest_loss_streak_v3y": 1
+    }
+  ],
+  "reference_trade_v3y_A": {
+    "entry_utc": "2026-08-26 15:10:00 UTC",
+    "exit_utc": "2026-08-28 02:15:00 UTC",
+    "exit_price": "0.0884900000",
+    "exit_kind": "SUPPORT_BREAK_EXIT",
+    "pnl_pct": "4.7963"
+  },
+  "expected_reference": {
+    "entry_utc": "2026-08-26 15:10:00 UTC",
+    "entry_price": 0.08444,
+    "support_id": "d-a6d9a05da2f1",
+    "confirm_utc": "2026-08-28 02:10:00 UTC",
+    "exit_utc": "2026-08-28 02:15:00 UTC",
+    "exit_price": 0.08849,
+    "pnl_pct": 4.7963
+  }
+}

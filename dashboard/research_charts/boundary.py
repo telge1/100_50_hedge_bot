@@ -81,7 +81,7 @@ FORBIDDEN_WEB_IMPORTS = (
 )
 
 SUPPORTED_LAYOUTS = ("1", "2H", "2V", "4")
-SUPPORTED_TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h", "4h")
+SUPPORTED_TIMEFRAMES = ("1m", "5m", "15m", "30m", "1h", "4h", "1d")
 PANE_COUNT = {"1": 1, "2H": 2, "2V": 2, "4": 4}
 
 INDICATOR_CONTRACTS = (

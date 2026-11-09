@@ -1,0 +1,775 @@
+{
+  "run_id": "20261109T121009Z",
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "drawings_snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/support_break_exit_v3ab/l1_v3ab_drawings_snapshot_b0718d82a94e8ad1.json",
+  "frozen_sha256_expected": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "scenarios": [
+    "BASELINE_V3AB",
+    "CAP3_D20_BLOCK",
+    "CAP3_D20_ALLOW",
+    "CAP3_D25_BLOCK",
+    "CAP3_D25_ALLOW",
+    "CAP5_D20_BLOCK",
+    "CAP5_D20_ALLOW",
+    "CAP5_D25_BLOCK",
+    "CAP5_D25_ALLOW",
+    "CAP6_D20_BLOCK",
+    "CAP6_D20_ALLOW",
+    "CAP6_D25_BLOCK",
+    "CAP6_D25_ALLOW"
+  ],
+  "confirm_delta_pct": 0.2,
+  "fees_slippage": "Gross PnL % only; fees and slippage not included.",
+  "hit_rate_meta": {
+    "observation_horizon": "From entry bar (inclusive) through pilot simulation_end (last loaded 5m bar). No extension beyond L1 pilot candle window.",
+    "simulation_end_utc": "2026-10-19 13:00:00 UTC",
+    "candle_bars": 15510
+  },
+  "reference_trade_checks": [
+    {
+      "cap": "CAP3",
+      "dominance": "D20",
+      "ok": false,
+      "tp_bottom": null,
+      "dist_pct": null,
+      "reason": "NO_QUALIFIED_TP",
+      "density_rank": null
+    },
+    {
+      "cap": "CAP3",
+      "dominance": "D25",
+      "ok": false,
+      "tp_bottom": null,
+      "dist_pct": null,
+      "reason": "NO_QUALIFIED_TP",
+      "density_rank": null
+    },
+    {
+      "cap": "CAP5",
+      "dominance": "D20",
+      "ok": false,
+      "tp_bottom": null,
+      "dist_pct": null,
+      "reason": "NO_QUALIFIED_TP",
+      "density_rank": null
+    },
+    {
+      "cap": "CAP5",
+      "dominance": "D25",
+      "ok": false,
+      "tp_bottom": null,
+      "dist_pct": null,
+      "reason": "NO_QUALIFIED_TP",
+      "density_rank": null
+    },
+    {
+      "cap": "CAP6",
+      "dominance": "D20",
+      "ok": true,
+      "tp_bottom": 0.08929,
+      "dist_pct": 5.158403014957007,
+      "reason": "",
+      "density_rank": 3
+    },
+    {
+      "cap": "CAP6",
+      "dominance": "D25",
+      "ok": true,
+      "tp_bottom": 0.08929,
+      "dist_pct": 5.158403014957007,
+      "reason": "",
+      "density_rank": 3
+    }
+  ],
+  "variant_stats": {
+    "BASELINE_V3AB": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP3_D20_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 2,
+        "losses": 1,
+        "gross_pct": 2.5062,
+        "avg_win_pct": 1.5929,
+        "avg_loss_pct": -0.6796,
+        "tp_hit_rate_pct": 66.67,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1
+        },
+        "blocked_entries": 14,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0009",
+          "te-d-ea081434c5d3-0003",
+          "te-d-ea081434c5d3-0005"
+        ],
+        "longest_loss_streak": 1
+      },
+      "B": {
+        "trades": 3,
+        "wins": 2,
+        "losses": 1,
+        "gross_pct": 2.5062,
+        "avg_win_pct": 1.5929,
+        "avg_loss_pct": -0.6796,
+        "tp_hit_rate_pct": 66.67,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1
+        },
+        "blocked_entries": 14,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0009",
+          "te-d-ea081434c5d3-0003",
+          "te-d-ea081434c5d3-0005"
+        ],
+        "longest_loss_streak": 1
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 14,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP3_D20_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP3_D25_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 2,
+        "losses": 1,
+        "gross_pct": 2.5062,
+        "avg_win_pct": 1.5929,
+        "avg_loss_pct": -0.6796,
+        "tp_hit_rate_pct": 66.67,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1
+        },
+        "blocked_entries": 13,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0009",
+          "te-d-ea081434c5d3-0003",
+          "te-d-ea081434c5d3-0005"
+        ],
+        "longest_loss_streak": 1
+      },
+      "B": {
+        "trades": 3,
+        "wins": 2,
+        "losses": 1,
+        "gross_pct": 2.5062,
+        "avg_win_pct": 1.5929,
+        "avg_loss_pct": -0.6796,
+        "tp_hit_rate_pct": 66.67,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1
+        },
+        "blocked_entries": 13,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0009",
+          "te-d-ea081434c5d3-0003",
+          "te-d-ea081434c5d3-0005"
+        ],
+        "longest_loss_streak": 1
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 13,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP3_D25_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP5_D20_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 1.6109,
+        "avg_win_pct": 3.0705,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 6,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0007"
+        ],
+        "longest_loss_streak": 2
+      },
+      "B": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 1.6109,
+        "avg_win_pct": 3.0705,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 6,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0007"
+        ],
+        "longest_loss_streak": 2
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 6,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP5_D20_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP5_D25_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 1.6109,
+        "avg_win_pct": 3.0705,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 5,
+        "new_entry_slots": [
+          "te-d-c0791ea0c65e-0007"
+        ],
+        "longest_loss_streak": 2
+      },
+      "B": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 1.6109,
+        "avg_win_pct": 3.0705,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 5,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0007"
+        ],
+        "longest_loss_streak": 2
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 5,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP5_D25_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "avg_win_pct": 2.8854,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP6_D20_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 3.6988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 4,
+        "new_entry_slots": [],
+        "longest_loss_streak": 2
+      },
+      "B": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 3.6988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 4,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003"
+        ],
+        "longest_loss_streak": 2
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 4,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP6_D20_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 2.4988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 25.0,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 2.4988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 25.0,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP6_D25_BLOCK": {
+      "A": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 3.6988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 3,
+        "new_entry_slots": [],
+        "longest_loss_streak": 2
+      },
+      "B": {
+        "trades": 3,
+        "wins": 1,
+        "losses": 2,
+        "gross_pct": 3.6988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.7298,
+        "tp_hit_rate_pct": 33.33,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 1
+        },
+        "blocked_entries": 3,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003"
+        ],
+        "longest_loss_streak": 2
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 3,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    },
+    "CAP6_D25_ALLOW": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 2.4988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 25.0,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 3
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 2.4988,
+        "avg_win_pct": 5.1584,
+        "avg_loss_pct": -0.8865,
+        "tp_hit_rate_pct": 25.0,
+        "exit_counts": {
+          "TP": 1,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "blocked_entries": 0,
+        "new_entry_slots": [
+          "te-d-1731fb4bb889-0002",
+          "te-d-8521dc37f7b9-0002",
+          "te-d-c0791ea0c65e-0003",
+          "te-d-e6e9b83d2be1-0004"
+        ],
+        "longest_loss_streak": 3
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "avg_win_pct": 0.0,
+        "avg_loss_pct": 0.0,
+        "tp_hit_rate_pct": 0.0,
+        "exit_counts": {},
+        "blocked_entries": 0,
+        "new_entry_slots": [],
+        "longest_loss_streak": 0
+      }
+    }
+  }
+}

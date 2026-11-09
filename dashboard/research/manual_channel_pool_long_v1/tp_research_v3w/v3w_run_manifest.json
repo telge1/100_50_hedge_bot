@@ -1,0 +1,53 @@
+{
+  "run_id": "20261108T133113Z",
+  "drawings_sha256": "d05d218646aced84ffc0adbb8ca66a6a8f92048190e72dc9cea3140270fb594c",
+  "drawings_snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/l1_v3u_drawings_snapshot_d05d218646aced84.json",
+  "window_mode": "DRAWINGS_AUTO_WINDOW",
+  "models_tested": [
+    "TP1_nearest_d2",
+    "TP4_far_d2_max",
+    "TP5_v3u_channel_pool",
+    "TP2a_w008_d3_o3",
+    "TP2b_w012_d4_o4",
+    "TP2c_w015_d5_o4",
+    "TP3a_max_depth",
+    "TP3b_max_origins",
+    "TP3c_depth_x_width",
+    "M1_50_50_nearest_2d2",
+    "M2_30_30_40_nearest_3d2",
+    "M3_50_50_substantial_2zones",
+    "M4_half_substantial_half_far",
+    "M5_half_nearest_be_rest_far"
+  ],
+  "tp2_grid": [
+    {
+      "code": "TP2a_w008_d3_o3",
+      "min_width_pct": 0.08,
+      "min_depth": 3,
+      "min_origins": 3
+    },
+    {
+      "code": "TP2b_w012_d4_o4",
+      "min_width_pct": 0.12,
+      "min_depth": 4,
+      "min_origins": 4
+    },
+    {
+      "code": "TP2c_w015_d5_o4",
+      "min_width_pct": 0.15,
+      "min_depth": 5,
+      "min_origins": 4
+    }
+  ],
+  "tp3_variants": [
+    "TP3a_max_depth",
+    "TP3b_max_origins",
+    "TP3c_depth_x_width"
+  ],
+  "unique_entry_events": 90,
+  "admitted_variant_A": 56,
+  "oos_status": "EXPLORATORY_OOS_NOT_VALIDATED",
+  "oos_holdout_start_utc": "2026-09-16 00:00:00 UTC",
+  "dyn_research": "NOT_RUN_IN_V3W_MVP",
+  "method_limitation": "RETROSPECTIVE_DRAWING"
+}

@@ -1,0 +1,25 @@
+{
+  "run_id": "20261109T174223Z",
+  "equality_gate": "PASS",
+  "drawings_ssot_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/user_data/drawings.json",
+  "drawings_sha256": "afff18cf062e72d8ff1ad855ee3b46b6633526bdc423c96ffb3a1791ee02923b",
+  "snapshot_copy": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/watcher_integration_v3as/l1_v3as_drawings_snapshot_afff18cf062e72d8.json",
+  "symbol": "DOGEUSDT",
+  "timeframe": "5m",
+  "window_start_utc": "2026-08-26 16:35:00 UTC",
+  "window_end_utc": "2026-08-31 06:50:00 UTC",
+  "simulation_end_utc": "2026-10-19 13:05:00 UTC",
+  "n_candles": 15510,
+  "causality_mode": "RETROSPECTIVE_EXPLORATORY_NOT_CAUSALLY_VALIDATED",
+  "inventory_summary": {
+    "total_drawings_in_json": 9,
+    "parsed_line_geometry": 5,
+    "trend_lines": 5,
+    "trend_lines_in_backtest": 5,
+    "vlines_unparsed_for_touch": 4,
+    "long_eligible_trends_sample": 5,
+    "long_support_lines_for_metrics": 5,
+    "lookahead_warning": "All manual chart lines are retrospective; anchors may post-date early touches.",
+    "multi_timeframe": "Single TF backtest (5m); line anchors are not re-sampled per TF"
+  }
+}

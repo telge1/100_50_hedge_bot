@@ -1,0 +1,360 @@
+{
+  "run_id": "20261109T105536Z",
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "drawings_snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/support_break_exit_v3ab/l1_v3ab_drawings_snapshot_b0718d82a94e8ad1.json",
+  "frozen_sha256_expected": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "scenarios": [
+    "BASELINE_V3AB_TP",
+    "FIRST_STRONG_UPPER_POOL/TP2a_w008_d3_o3",
+    "FIRST_STRONG_UPPER_POOL/TP2b_w012_d4_o4",
+    "FIRST_STRONG_UPPER_POOL/TP2c_w015_d5_o4"
+  ],
+  "tp2_grid": [
+    {
+      "code": "TP2a_w008_d3_o3",
+      "min_width_pct": 0.08,
+      "min_depth": 3,
+      "min_origins": 3
+    },
+    {
+      "code": "TP2b_w012_d4_o4",
+      "min_width_pct": 0.12,
+      "min_depth": 4,
+      "min_origins": 4
+    },
+    {
+      "code": "TP2c_w015_d5_o4",
+      "min_width_pct": 0.15,
+      "min_depth": 5,
+      "min_origins": 4
+    }
+  ],
+  "confirm_delta_pct": 0.2,
+  "variant_stats": {
+    "BASELINE_V3AB_TP": {
+      "A": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "entry_parity": {}
+      },
+      "B": {
+        "trades": 4,
+        "wins": 1,
+        "losses": 3,
+        "gross_pct": 0.2258,
+        "exit_counts": {
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 2
+        },
+        "entry_parity": {}
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "exit_counts": {},
+        "entry_parity": {}
+      }
+    },
+    "FIRST_STRONG_UPPER_POOL/TP2a_w008_d3_o3": {
+      "A": {
+        "trades": 7,
+        "wins": 4,
+        "losses": 3,
+        "gross_pct": 1.326,
+        "exit_counts": {
+          "TP": 4,
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 1
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-8521dc37f7b9-0008",
+            "te-d-c0791ea0c65e-0007",
+            "te-d-ea081434c5d3-0005"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0002"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "B": {
+        "trades": 7,
+        "wins": 4,
+        "losses": 3,
+        "gross_pct": 1.326,
+        "exit_counts": {
+          "TP": 4,
+          "SUPPORT_BREAK_EXIT": 2,
+          "SL": 1
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-8521dc37f7b9-0008",
+            "te-d-c0791ea0c65e-0007",
+            "te-d-ea081434c5d3-0005"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0004"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "exit_counts": {},
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [],
+          "shared": [],
+          "identical_entry_set": true
+        }
+      }
+    },
+    "FIRST_STRONG_UPPER_POOL/TP2b_w012_d4_o4": {
+      "A": {
+        "trades": 6,
+        "wins": 3,
+        "losses": 3,
+        "gross_pct": 2.9004,
+        "exit_counts": {
+          "TP": 3,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-8521dc37f7b9-0008",
+            "te-d-c0791ea0c65e-0007"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0002"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "B": {
+        "trades": 6,
+        "wins": 3,
+        "losses": 3,
+        "gross_pct": 2.9004,
+        "exit_counts": {
+          "TP": 3,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-8521dc37f7b9-0008",
+            "te-d-c0791ea0c65e-0007"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0004"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "exit_counts": {},
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [],
+          "shared": [],
+          "identical_entry_set": true
+        }
+      }
+    },
+    "FIRST_STRONG_UPPER_POOL/TP2c_w015_d5_o4": {
+      "A": {
+        "trades": 5,
+        "wins": 2,
+        "losses": 3,
+        "gross_pct": 1.7417,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-c0791ea0c65e-0007"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0002"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "B": {
+        "trades": 5,
+        "wins": 2,
+        "losses": 3,
+        "gross_pct": 1.7417,
+        "exit_counts": {
+          "TP": 2,
+          "SUPPORT_BREAK_EXIT": 1,
+          "SL": 2
+        },
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [
+            "te-d-c0791ea0c65e-0007"
+          ],
+          "shared": [
+            "te-d-1731fb4bb889-0002",
+            "te-d-8521dc37f7b9-0002",
+            "te-d-c0791ea0c65e-0003",
+            "te-d-e6e9b83d2be1-0004"
+          ],
+          "identical_entry_set": false
+        }
+      },
+      "C": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "gross_pct": 0,
+        "exit_counts": {},
+        "entry_parity": {
+          "baseline_only": [],
+          "other_only": [],
+          "shared": [],
+          "identical_entry_set": true
+        }
+      }
+    }
+  },
+  "reference_trade": [
+    {
+      "scenario": "BASELINE_V3AB_TP",
+      "variant": "V3E-B",
+      "touch_event_id": "te-d-c0791ea0c65e-0003",
+      "entry_utc": "2026-08-26 20:30:00 UTC",
+      "entry_price": "0.0849100000",
+      "support_drawing_id": "d-c0791ea0c65e",
+      "tp_mode": "POOL_BOTTOM_NO_CLEAR_CHANNEL",
+      "tp_price": "0.0949600000",
+      "sl_price": "0.0838910800",
+      "exit_utc": "2026-08-27 13:50:00 UTC",
+      "exit_price": "0.0873600000",
+      "exit_reason": "SUPPORT_BREAK_EXIT",
+      "pnl_pct": "2.8854",
+      "retrospective": "no",
+      "tp_research_model": "",
+      "zone_bottom": "",
+      "zone_top": "",
+      "zone_depth": "",
+      "zone_origins": "",
+      "zone_width_pct": "",
+      "dist_entry_pct": "",
+      "fallback_far_d2": "no"
+    },
+    {
+      "scenario": "FIRST_STRONG_UPPER_POOL/TP2a_w008_d3_o3",
+      "variant": "V3E-B",
+      "touch_event_id": "te-d-c0791ea0c65e-0003",
+      "entry_utc": "2026-08-26 20:30:00 UTC",
+      "entry_price": "0.0849100000",
+      "support_drawing_id": "d-c0791ea0c65e",
+      "tp_mode": "FIRST_STRONG_UPPER_POOL/TP2a_w008_d3_o3",
+      "tp_price": "0.0853600000",
+      "sl_price": "0.0838910800",
+      "exit_utc": "2026-08-26 21:00:00 UTC",
+      "exit_price": "0.0853600000",
+      "exit_reason": "TP",
+      "pnl_pct": "0.5300",
+      "retrospective": "no",
+      "tp_research_model": "TP2a_w008_d3_o3",
+      "zone_bottom": "0.08536",
+      "zone_top": "0.08546",
+      "zone_depth": "4",
+      "zone_origins": "4",
+      "zone_width_pct": "0.11715089034675373",
+      "dist_entry_pct": "0.5299729124955905",
+      "fallback_far_d2": "no"
+    },
+    {
+      "scenario": "FIRST_STRONG_UPPER_POOL/TP2b_w012_d4_o4",
+      "variant": "V3E-B",
+      "touch_event_id": "te-d-c0791ea0c65e-0003",
+      "entry_utc": "2026-08-26 20:30:00 UTC",
+      "entry_price": "0.0849100000",
+      "support_drawing_id": "d-c0791ea0c65e",
+      "tp_mode": "FIRST_STRONG_UPPER_POOL/TP2b_w012_d4_o4",
+      "tp_price": "0.0860400000",
+      "sl_price": "0.0838910800",
+      "exit_utc": "2026-08-26 21:15:00 UTC",
+      "exit_price": "0.0860400000",
+      "exit_reason": "TP",
+      "pnl_pct": "1.3308",
+      "retrospective": "no",
+      "tp_research_model": "TP2b_w012_d4_o4",
+      "zone_bottom": "0.08604",
+      "zone_top": "0.086276",
+      "zone_depth": "5",
+      "zone_origins": "5",
+      "zone_width_pct": "0.27429102742910283",
+      "dist_entry_pct": "1.3308208691555836",
+      "fallback_far_d2": "no"
+    },
+    {
+      "scenario": "FIRST_STRONG_UPPER_POOL/TP2c_w015_d5_o4",
+      "variant": "V3E-B",
+      "touch_event_id": "te-d-c0791ea0c65e-0003",
+      "entry_utc": "2026-08-26 20:30:00 UTC",
+      "entry_price": "0.0849100000",
+      "support_drawing_id": "d-c0791ea0c65e",
+      "tp_mode": "FIRST_STRONG_UPPER_POOL/TP2c_w015_d5_o4",
+      "tp_price": "0.0860400000",
+      "sl_price": "0.0838910800",
+      "exit_utc": "2026-08-26 21:15:00 UTC",
+      "exit_price": "0.0860400000",
+      "exit_reason": "TP",
+      "pnl_pct": "1.3308",
+      "retrospective": "no",
+      "tp_research_model": "TP2c_w015_d5_o4",
+      "zone_bottom": "0.08604",
+      "zone_top": "0.086276",
+      "zone_depth": "5",
+      "zone_origins": "5",
+      "zone_width_pct": "0.27429102742910283",
+      "dist_entry_pct": "1.3308208691555836",
+      "fallback_far_d2": "no"
+    }
+  ]
+}

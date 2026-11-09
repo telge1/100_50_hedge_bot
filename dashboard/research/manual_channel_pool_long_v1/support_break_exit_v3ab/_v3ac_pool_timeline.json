@@ -1,0 +1,315 @@
+{
+  "pool_decision_close": "2026-08-26 20:30:00 UTC",
+  "confirm_utc": "2026-08-26 20:25:00 UTC",
+  "entry_utc": "2026-08-26 20:30:00 UTC",
+  "violet_bottom_touches": {
+    "0.08929": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ],
+    "0.08932": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ],
+    "0.08937": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ],
+    "0.08938": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ],
+    "0.089412": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ],
+    "0.089478": [
+      "2026-08-27 08:45:00 UTC",
+      0.08955
+    ]
+  },
+  "micro_zone_at_entry": [
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600",
+      "lo": 0.08932,
+      "hi": 0.089624,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    },
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900",
+      "lo": 0.08956,
+      "hi": 0.089672,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    },
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200",
+      "lo": 0.08929,
+      "hi": 0.089514,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    },
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500",
+      "lo": 0.08938,
+      "hi": 0.08956,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    },
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100",
+      "lo": 0.08928,
+      "hi": 0.08941199999999999,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    },
+    {
+      "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000",
+      "lo": 0.08937,
+      "hi": 0.089478,
+      "origin": null,
+      "active_at_entry": true,
+      "active_from": null
+    }
+  ],
+  "timeline": [
+    {
+      "wall": "2026-08-26 20:25:00 UTC",
+      "decision_close": "2026-08-26 20:30:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    },
+    {
+      "wall": "2026-08-26 20:30:00 UTC",
+      "decision_close": "2026-08-26 20:35:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    },
+    {
+      "wall": "2026-08-27 08:00:00 UTC",
+      "decision_close": "2026-08-27 08:05:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    },
+    {
+      "wall": "2026-08-27 09:00:00 UTC",
+      "decision_close": "2026-08-27 09:05:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    },
+    {
+      "wall": "2026-08-27 08:45:00 UTC",
+      "decision_close": "2026-08-27 08:50:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    },
+    {
+      "wall": "2026-08-27 13:45:00 UTC",
+      "decision_close": "2026-08-27 13:50:00 UTC",
+      "n_active_micro": 6,
+      "bands": [
+        {
+          "lo": 0.08932,
+          "hi": 0.089624,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664600"
+        },
+        {
+          "lo": 0.08956,
+          "hi": 0.089672,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787664900"
+        },
+        {
+          "lo": 0.08929,
+          "hi": 0.089514,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668200"
+        },
+        {
+          "lo": 0.08938,
+          "hi": 0.08956,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787668500"
+        },
+        {
+          "lo": 0.08928,
+          "hi": 0.08941199999999999,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787672100"
+        },
+        {
+          "lo": 0.08937,
+          "hi": 0.089478,
+          "id": "lldv2:DOGEUSDT:5m:micro:upper:1787676000"
+        }
+      ]
+    }
+  ],
+  "touch_planned_tp": {
+    "utc": null,
+    "high": null
+  },
+  "touch_nearest_qualified": {
+    "utc": "2026-08-26 21:00:00 UTC",
+    "high": 0.08536
+  },
+  "pnl_if_exit_violet_08929": 5.158403014957007,
+  "pnl_if_exit_nearest_08536": 0.5299729124955905
+}

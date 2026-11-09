@@ -6,6 +6,7 @@ Ports MainWindow drawing/settings semantics without PySide. Host JS is the shell
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -365,6 +366,12 @@ TOOLS = (
 _lock = threading.RLock()
 _SESSION: Optional["ResearchWorkspace"] = None
 
+_logger = logging.getLogger(__name__)
+
+
+class DrawingPersistError(OSError):
+    """Raised when drawings.json could not be written."""
+
 
 def datetime_from_unix(unix: object) -> Optional[datetime]:
     try:
@@ -683,11 +690,12 @@ class ResearchWorkspace:
             USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
             self._trp["save_drawings"](
                 DRAWINGS_PATH,
-                self.drawings.get_drawings(),
+                self.drawings.get_drawings(include_hidden=True),
                 default_style=self._draw_style,
             )
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.exception("persist_drawings failed path=%s", DRAWINGS_PATH)
+            raise DrawingPersistError(str(exc)) from exc
 
     def persist_settings(self) -> None:
         trp = self._trp
@@ -1037,15 +1045,37 @@ class ResearchWorkspace:
         return self.snapshot()
 
     def delete_selected(self) -> dict[str, Any]:
-        if not self._selected_drawing_id:
-            return self.snapshot()
-        if self._selected_drawing_id not in self.drawings:
+        did = self._selected_drawing_id
+        if not did:
+            snap = self.snapshot()
+            snap["drawing_delete"] = {"success": False, "reason": "no_selection"}
+            return snap
+        if did not in self.drawings:
             self._selected_drawing_id = None
-            return self.snapshot()
-        self.drawings.remove_drawing(self._selected_drawing_id)
+            snap = self.snapshot()
+            snap["drawing_delete"] = {"success": False, "reason": "not_found", "deleted_id": did}
+            return snap
+        removed = self.drawings.remove_drawing(did)
         self._selected_drawing_id = None
-        self.persist_drawings()
-        return self.snapshot()
+        try:
+            self.persist_drawings()
+        except DrawingPersistError as exc:
+            try:
+                self.drawings.add_drawing(removed)
+            except ValueError:
+                self.drawings.update_drawing(removed)
+            snap = self.snapshot()
+            snap["success"] = False
+            snap["drawing_delete"] = {
+                "success": False,
+                "deleted_id": did,
+                "error": "persist_failed",
+                "message": str(exc),
+            }
+            return snap
+        snap = self.snapshot()
+        snap["drawing_delete"] = {"success": True, "deleted_id": did}
+        return snap
 
     def clear_drawings(self, symbol: str) -> dict[str, Any]:
         self.drawings.clear_drawings(symbol)

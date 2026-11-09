@@ -1,0 +1,12 @@
+# L1 V3AN research — example single-run config (schema touch_watcher/v1)
+touch_watcher:
+  schema_version: touch_watcher/v1
+  preset_id: NEAR_003+A2+W12
+  touch_tolerance_pct: 0.03
+  confirmation_mode: A2
+  confirmation_min_gain_pct: 0.20
+  watch_window_bars: 12
+  reclaim_confirmation_bars: 2
+  require_approach_from_above: true
+  approach_epsilon_pct: 0.05
+  sl_pct: 1.20

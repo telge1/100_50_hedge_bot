@@ -387,6 +387,25 @@ def test_symbol_change_loads_candles_without_not_found():
         assert "Not Found" not in candles.text
 
 
+def test_vline_timestamp_labels_on_time_axis():
+    js = TRP_JS.read_text(encoding="utf-8")
+    css = TRP_CSS.read_text(encoding="utf-8")
+    pane = PANE_HTML.read_text(encoding="utf-8")
+    assert "formatVlineTimestampUtc" in js
+    assert "syncVlineAxisTimestampLabel" in js
+    assert "shouldShowVlineTimestamp" in js
+    assert "clipVlineAxisLabelLayer" in js
+    assert " UTC" in js
+    assert "#vline-axis-labels" in css
+    assert "ov-vline-ts-label" in css
+    assert 'id="vline-axis-labels"' in pane
+    assert "vline-axis-ts-v2" in pane
+    host = HOST_JS.read_text(encoding="utf-8")
+    assert 'ASSET_V = "vline-axis-ts-v2"' in host
+    html = PAGE_HTML.read_text(encoding="utf-8")
+    assert "research_charts.js?v=vline-axis-ts-v2" in html
+
+
 def test_symbol_api_auth_preserved_and_static_pane_ok():
     mod = sys.modules.get("app")
     if mod is not None and not hasattr(mod, "sessions"):

@@ -10,8 +10,9 @@
   const PANE_IDS = ["pane-0", "pane-1", "pane-2", "pane-3"];
   const PANE_COUNT = { 1: 1, "2H": 2, "2V": 2, 4: 4 };
   const DEFAULT_TFS = { "pane-0": "1m", "pane-1": "5m", "pane-2": "15m", "pane-3": "1h" };
-  const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h"];
-  const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
+  const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"];
+  const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400 };
+  const TF_LABEL = { "1d": "1D" };
 
   /** Min/max unix seconds without Function.apply (safe for 100k+ candle arrays). */
   function minMaxUnixSeconds(times) {
@@ -31,7 +32,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "future-anchor-1";
+  const ASSET_V = "tf-1d-local-v1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
@@ -347,7 +348,19 @@
     const uiWeeks = $("lldHistoryWeeks") ? Number(($("lldHistoryWeeks") || {}).value || 0) : 0;
     const weeks = Math.max(1, Number(uiWeeks || (state.history && state.history.weeks) || 12) || 12);
     const step = TF_SEC[tf] || 60;
-    return Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
+    const bars = Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
+    if (tf === "1d") {
+      const preset = state.history && state.history.preset ? state.history.preset : "30d";
+      if (preset === "rolling") {
+        return 600;
+      }
+      return Math.max(90, Math.min(5000, bars));
+    }
+    return bars;
+  }
+
+  function paneSupportsResearchLld(pane) {
+    return !!(pane && pane.tf && pane.tf !== "1d");
   }
 
   function computeHistoryRangeUnix(override) {
@@ -2678,6 +2691,10 @@
     return pane.tf === "1m" || pane.tf === "5m" || pane.tf === "15m" || pane.tf === "30m" || pane.tf === "1h" || pane.tf === "4h";
   }
 
+  function timeframeToolbarLabel(tf) {
+    return TF_LABEL[tf] || tf;
+  }
+
   function paneForScannerCommon() {
     if (SC_HELPERS) {
       return SC_HELPERS.selectPaneForScannerCommon(
@@ -4463,7 +4480,7 @@
       TIMEFRAMES.forEach(function (tf) {
         const opt = document.createElement("option");
         opt.value = tf;
-        opt.textContent = tf;
+        opt.textContent = timeframeToolbarLabel(tf);
         tfSel.appendChild(opt);
       });
       tfSel.value = DEFAULT_TFS[pid];
@@ -4502,6 +4519,9 @@
       iframe.src = "/static/research_trp/pane.html?v=" + ASSET_V;
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
+        if (pane.tf === "1d") {
+          setStatus("1D: PD1-Density / LLD / Scanner deaktiviert — nur Chart & Zeichnungen.", "warn");
+        }
         if (isHistoricalReplay() && state.replayWindow && state.replayTargetTs != null) {
           const rw = state.replayWindow;
           const reqReplayGen = state.replayGen;
@@ -7721,6 +7741,7 @@
     const owner = registerPaneLoadOwner(pane, paneId, paneGen, gen);
     const ws = state.workspace || {};
     const range = resolvePaneLoadRange(opts || {});
+    const on1d = pane.tf === "1d";
     const reqBody = {
       symbol: state.symbol,
       timeframe: pane.tf,
@@ -7728,12 +7749,13 @@
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
       open_interest: ws.open_interest || { enabled: false },
-      liquidity: ws.liquidity || { enabled: false },
+      liquidity: on1d ? { enabled: false } : (ws.liquidity || { enabled: false }),
       allow_stale: !!(opts && opts.allowStale),
     };
     if (range.from != null) reqBody.from = range.from;
     if (range.to != null) reqBody.to = range.to;
     if (
+      !on1d &&
       state.liquidityLocationAsOf &&
       ws.liquidity &&
       ws.liquidity.enabled !== false &&
@@ -10831,8 +10853,28 @@
       }
     });
     $("trpDelete").addEventListener("click", async function () {
-      applyWorkspace(await sendJson("/api/research/drawings/delete", "POST", {}));
-      await refreshOverlaysVisible();
+      try {
+        const body = await sendJson("/api/research/drawings/delete", "POST", {});
+        const dd = body && body.drawing_delete;
+        if (dd && dd.success === false) {
+          const msg = (dd.message || dd.reason || "Zeichnung konnte nicht gelöscht werden");
+          setStatus("Löschen fehlgeschlagen: " + msg, "error");
+          if ($("lldError")) {
+            $("lldError").hidden = false;
+            $("lldError").textContent = msg;
+          }
+          return;
+        }
+        applyWorkspace(body);
+        await refreshOverlaysVisible();
+        if (dd && dd.deleted_id) setStatus("Gelöscht: " + dd.deleted_id);
+      } catch (err) {
+        setStatus("Löschen fehlgeschlagen: " + String(err.message || err), "error");
+        if ($("lldError")) {
+          $("lldError").hidden = false;
+          $("lldError").textContent = String(err.message || err);
+        }
+      }
     });
     const erToggle = $("trpExtendRight");
     if (erToggle) {

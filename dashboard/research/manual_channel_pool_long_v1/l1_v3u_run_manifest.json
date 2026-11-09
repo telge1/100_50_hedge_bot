@@ -1,0 +1,167 @@
+{
+  "run_id": "20261108T125450Z",
+  "drawing_refresh_protocol": "V3S_CANONICAL_ONLY",
+  "canonical_drawings_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/user_data/drawings.json",
+  "drawings_backup_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/l1_v3u_drawings_backup_20261108T125450Z.json",
+  "mode": "INDEPENDENT_SUPPORT",
+  "window_mode": "DRAWINGS_AUTO_WINDOW",
+  "drawings_sha256": "d05d218646aced84ffc0adbb8ca66a6a8f92048190e72dc9cea3140270fb594c",
+  "drawings_count": 21,
+  "drawing_ids_all": [
+    "d-036ba7cefe2e",
+    "d-0e5e7004dccd",
+    "d-1f70c9798935",
+    "d-248d74050cc8",
+    "d-289deb31eb84",
+    "d-2f6effea5ff3",
+    "d-3bd7446b7a5b",
+    "d-5c8ffbfb8a06",
+    "d-7f4519d5ce5b",
+    "d-988236deb817",
+    "d-9b6e62dc884c",
+    "d-a6d9a05da2f1",
+    "d-e1c6e07765fe",
+    "p17ag-entry-01-20260707T111000Z",
+    "p17ag-entry-02-20260708T092500Z",
+    "p17ag-entry-03-20260717T020000Z",
+    "p17ag-entry-04-20260729T194500Z",
+    "p17ag-pos-01-20260707T111000Z",
+    "p17ag-pos-02-20260708T092500Z",
+    "p17ag-pos-03-20260717T020000Z",
+    "p17ag-pos-04-20260729T194500Z"
+  ],
+  "support_line_count": 13,
+  "support_line_ids": [
+    "d-036ba7cefe2e",
+    "d-0e5e7004dccd",
+    "d-1f70c9798935",
+    "d-248d74050cc8",
+    "d-289deb31eb84",
+    "d-2f6effea5ff3",
+    "d-3bd7446b7a5b",
+    "d-5c8ffbfb8a06",
+    "d-7f4519d5ce5b",
+    "d-988236deb817",
+    "d-9b6e62dc884c",
+    "d-a6d9a05da2f1",
+    "d-e1c6e07765fe"
+  ],
+  "snapshot_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/l1_v3u_drawings_snapshot_d05d218646aced84.json",
+  "refresh_warnings": [
+    "stale_copy drawings.json: sha=387d8574373219cb\u2026 count=535 (canonical d05d218646aced84\u2026)",
+    "stale_copy drawings.json: sha=387d8574373219cb\u2026 count=535 (canonical d05d218646aced84\u2026)"
+  ],
+  "previous_reference_run": "l1_v3p",
+  "previous_drawings_sha256": "4a18f0e46d42e3b7a83c4b62d656aebd00dcbeaccc06bea13190050b4b6d9571",
+  "drawing_id_diff_vs_v3p_snapshot": {
+    "removed": [
+      "d-ac60572bfc69"
+    ],
+    "added": [
+      "p17ag-entry-01-20260707T111000Z",
+      "p17ag-entry-02-20260708T092500Z",
+      "p17ag-entry-03-20260717T020000Z",
+      "p17ag-entry-04-20260729T194500Z",
+      "p17ag-pos-01-20260707T111000Z",
+      "p17ag-pos-02-20260708T092500Z",
+      "p17ag-pos-03-20260717T020000Z",
+      "p17ag-pos-04-20260729T194500Z"
+    ],
+    "unchanged": [
+      "d-036ba7cefe2e",
+      "d-0e5e7004dccd",
+      "d-1f70c9798935",
+      "d-248d74050cc8",
+      "d-289deb31eb84",
+      "d-2f6effea5ff3",
+      "d-3bd7446b7a5b",
+      "d-5c8ffbfb8a06",
+      "d-7f4519d5ce5b",
+      "d-988236deb817",
+      "d-9b6e62dc884c",
+      "d-a6d9a05da2f1",
+      "d-e1c6e07765fe"
+    ]
+  },
+  "window_start_utc": "2026-03-29 16:00:00 UTC",
+  "window_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "simulation_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "candle_count": 58717,
+  "candle_gaps": 0,
+  "run_end_status": "DATA_END_REACHED",
+  "touch_events_total": 186,
+  "long_triggers_allowed": 172,
+  "c1_candidates": 90,
+  "executed_by_support_line_A": {
+    "d-a6d9a05da2f1": 1,
+    "d-9b6e62dc884c": 2,
+    "d-3bd7446b7a5b": 1,
+    "d-1f70c9798935": 3
+  },
+  "variant_stats": {
+    "A": {
+      "executed": 7,
+      "wins": 3,
+      "sl": 4,
+      "hit_rate": 42.86,
+      "wins_sum": 29.5831,
+      "losses_sum": -4.8,
+      "gross": 24.7831,
+      "pool_tp_exits": 3,
+      "channel_exits": 0,
+      "open": 0,
+      "support_lines_used": 4,
+      "rejects": {
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 11
+      }
+    },
+    "B": {
+      "executed": 6,
+      "wins": 3,
+      "sl": 3,
+      "hit_rate": 50.0,
+      "wins_sum": 29.5831,
+      "losses_sum": -3.6,
+      "gross": 25.9831,
+      "pool_tp_exits": 3,
+      "channel_exits": 0,
+      "open": 0,
+      "support_lines_used": 4,
+      "rejects": {
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "REJECTED_FIRST_D2_TOO_FAR": 6,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 11
+      }
+    },
+    "C": {
+      "executed": 3,
+      "wins": 2,
+      "sl": 1,
+      "hit_rate": 66.67,
+      "wins_sum": 3.2372,
+      "losses_sum": -1.2,
+      "gross": 2.0372,
+      "pool_tp_exits": 0,
+      "channel_exits": 2,
+      "open": 0,
+      "support_lines_used": 3,
+      "rejects": {
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "C_CHANNEL_QUARTER_UNAVAILABLE": 27,
+        "REJECTED_FIRST_D2_TOO_FAR": 6,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 11,
+        "REJECTED_NO_EARLY_D2_STAGGERING": 5
+      }
+    }
+  },
+  "tp_modes_used_A": {
+    "POOL_BOTTOM_NO_CLEAR_CHANNEL": 4,
+    "POOL_BOTTOM_NEAR_CHANNEL": 3
+  },
+  "upper_channel_ids_used_A": {
+    "": 4,
+    "d-0e5e7004dccd": 2,
+    "d-e1c6e07765fe": 1
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "run_id": "00000000-0000-4000-8000-000000004101",
+  "approved_month": "2026-04",
+  "combo_folder": "4h_PD10",
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_4hpd10_v1",
+  "stem_slice": {
+    "start_index": 150,
+    "end_index": 180
+  },
+  "max_snapshots": 30,
+  "max_batches": 1,
+  "batch_size": 50,
+  "import_batch_id": "phase4i_final_30_apr2026_4hpd10_v1",
+  "backup_recovery_id": "e134b0fa-9cba-4c0f-b8d9-60125001de50",
+  "scope_fingerprint": "ae57ae785ebcd679a7c26f35f3e7cc46f1cbcb6890175569f08798964ca4dac3"
+}

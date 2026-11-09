@@ -286,6 +286,7 @@
   };
 
   const DEFAULT_VISIBLE_BARS = 120;
+  const DEFAULT_VISIBLE_BARS_1D = 90;
   /** Empty bars right of last candle (pan + anchors in kerzenfreiem Bereich). */
   const DEFAULT_RIGHT_OFFSET = 96;
   const DEFAULT_BAR_SPACING = 7;
@@ -508,11 +509,131 @@
     return Math.max(0, chartSize().h - timeAxisHeight());
   }
 
+  function crosshairTimeFormatter(unixSec) {
+    if (
+      typeof ResearchChartTimeUtc !== "undefined" &&
+      ResearchChartTimeUtc.formatCrosshairTimeUtc
+    ) {
+      return ResearchChartTimeUtc.formatCrosshairTimeUtc(unixSec);
+    }
+    const n = Number(unixSec);
+    if (!Number.isFinite(n)) return "";
+    const d = new Date(n * 1000);
+    const pad = function (x) {
+      return String(x).padStart(2, "0");
+    };
+    return (
+      d.getUTCFullYear() +
+      "-" +
+      pad(d.getUTCMonth() + 1) +
+      "-" +
+      pad(d.getUTCDate()) +
+      " " +
+      pad(d.getUTCHours()) +
+      ":" +
+      pad(d.getUTCMinutes()) +
+      " UTC"
+    );
+  }
+
+  function applyCrosshairTimeLocalization(targetChart) {
+    const ch = targetChart || chart;
+    if (!ch) return;
+    try {
+      ch.applyOptions({
+        localization: {
+          timeFormatter: crosshairTimeFormatter,
+        },
+      });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function formatVlineTimestampUtc(unixSec) {
+    const n = Number(unixSec);
+    if (!Number.isFinite(n)) return "";
+    const d = new Date(n * 1000);
+    const pad = function (x) {
+      return String(x).padStart(2, "0");
+    };
+    return (
+      d.getUTCFullYear() +
+      "-" +
+      pad(d.getUTCMonth() + 1) +
+      "-" +
+      pad(d.getUTCDate()) +
+      " " +
+      pad(d.getUTCHours()) +
+      ":" +
+      pad(d.getUTCMinutes()) +
+      ":" +
+      pad(d.getUTCSeconds()) +
+      " UTC"
+    );
+  }
+
+  function vlineAxisLabelLayer() {
+    var host = document.getElementById("price-main") || $("chart");
+    if (!host) return null;
+    var layer = document.getElementById("vline-axis-labels");
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "vline-axis-labels";
+      layer.setAttribute("aria-hidden", "true");
+      host.appendChild(layer);
+    }
+    return layer;
+  }
+
+  function clipVlineAxisLabelLayer() {
+    const layer = vlineAxisLabelLayer();
+    if (!layer) return;
+    const ah = Math.max(18, timeAxisHeight());
+    const plotW = Math.max(0, plotRightX());
+    layer.style.left = "0px";
+    layer.style.bottom = "0px";
+    layer.style.top = "auto";
+    layer.style.width = plotW + "px";
+    layer.style.right = "auto";
+    layer.style.height = ah + "px";
+  }
+
   function clipOverlayLayerToPlot() {
     const layer = overlayLayer();
     if (!layer) return;
     layer.style.right = Math.max(0, priceAxisWidth()) + "px";
     layer.style.bottom = Math.max(0, timeAxisHeight()) + "px";
+    clipVlineAxisLabelLayer();
+  }
+
+  function syncVlineAxisTimestampLabel(rec, x, text) {
+    clipVlineAxisLabelLayer();
+    const layer = vlineAxisLabelLayer();
+    if (!layer || !rec || !rec.payload) return;
+    const show = text && x != null && Number.isFinite(Number(x));
+    if (!show) {
+      if (rec.vlineAxisLabel && rec.vlineAxisLabel.parentNode) {
+        rec.vlineAxisLabel.parentNode.removeChild(rec.vlineAxisLabel);
+      }
+      rec.vlineAxisLabel = null;
+      return;
+    }
+    let el = rec.vlineAxisLabel;
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "ov-vline-ts-label";
+      el.setAttribute("data-overlay-id", rec.payload.id || "");
+      layer.appendChild(el);
+      rec.vlineAxisLabel = el;
+    }
+    const color = (rec.payload.style && rec.payload.style.color) || "#9aa5bf";
+    el.textContent = text;
+    el.style.left = x + "px";
+    el.style.color = color;
+    el.style.borderColor = hexAlpha(color, 0.55);
+    el.style.background = hexAlpha("#0f1218", 0.92);
+    el.style.display = "block";
   }
 
   function toOhlc(candles) {
@@ -640,6 +761,9 @@
         mouseWheel: true,
         pinch: true,
         axisDoubleClickReset: { time: true, price: true },
+      },
+      localization: {
+        timeFormatter: crosshairTimeFormatter,
       },
       width: w,
       height: h,
@@ -1374,6 +1498,7 @@
       return;
     }
     applySeriesData(lastPayload);
+    applyTimeScaleForTimeframe(lastPayload);
     const tip = candles[candles.length - 1];
     if (tip && tip.close != null) ensureLivePriceLine(Number(tip.close));
     updateOscTimeBase();
@@ -2224,11 +2349,32 @@
     return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
   }
 
-  function computeDefaultLogicalRange(barCount) {
+  function defaultVisibleBarsForPayload(payload) {
+    const tf = payload && payload.timeframe ? String(payload.timeframe).toLowerCase() : "";
+    return tf === "1d" ? DEFAULT_VISIBLE_BARS_1D : DEFAULT_VISIBLE_BARS;
+  }
+
+  function applyTimeScaleForTimeframe(payload) {
+    if (!chart) return;
+    const tf = payload && payload.timeframe ? String(payload.timeframe).toLowerCase() : "";
+    const daily = tf === "1d";
+    try {
+      chart.timeScale().applyOptions({
+        timeVisible: !daily,
+        secondsVisible: false,
+      });
+      applyCrosshairTimeLocalization(chart);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function computeDefaultLogicalRange(barCount, payload) {
     const n = Number(barCount) || 0;
     if (n < 1) return null;
     const last = n - 1;
-    const visible = Math.min(DEFAULT_VISIBLE_BARS, n);
+    const visCap = defaultVisibleBarsForPayload(payload);
+    const visible = Math.min(visCap, n);
     return {
       from: Math.max(0, last - visible + 1),
       to: last + DEFAULT_RIGHT_OFFSET,
@@ -2450,7 +2596,8 @@
     if (!candles.length) return false;
     const barSec = estimateBarSec(candles);
     const lastT = Number(candles[candles.length - 1].time);
-    const fromIdx = Math.max(0, candles.length - DEFAULT_VISIBLE_BARS);
+    const visBars = defaultVisibleBarsForPayload(lastPayload);
+    const fromIdx = Math.max(0, candles.length - visBars);
     const fromT = Number(candles[fromIdx].time);
     let ok = false;
     try {
@@ -2461,7 +2608,7 @@
       });
       ok = true;
     } catch (err) {
-      const range = computeDefaultLogicalRange(candles.length);
+      const range = computeDefaultLogicalRange(candles.length, lastPayload);
       if (range) {
         try {
           programmaticNavDepth += 1;
@@ -2558,6 +2705,11 @@
       rec.el.parentNode.removeChild(rec.el);
     }
     rec.el = null;
+    if (rec.vlineAxisLabel && rec.vlineAxisLabel.parentNode) {
+      rec.vlineAxisLabel.parentNode.removeChild(rec.vlineAxisLabel);
+    }
+    rec.vlineAxisLabel = null;
+    rec.vlineTopLabel = null;
   }
 
   function ensureDom(rec, className) {
@@ -2601,33 +2753,55 @@
     if (rec.el) hideEl(rec.el);
   }
 
+  function shouldShowVlineTimestamp(p) {
+    if (!p || p.type !== "line" || p.kind !== "vertical" || p.timestamp == null) return false;
+    if (!isUserDrawing(p)) return false;
+    const dt = userDrawingType(p);
+    return !dt || dt === "vline";
+  }
+
   function renderVertical(rec) {
     const el = ensureDom(rec, "ov-vline");
     if (!el) return;
-    const x = xOf(rec.payload.timestamp);
+    const p = rec.payload;
+    const x = xOf(p.timestamp);
     if (x == null) {
       hideEl(el);
+      syncVlineAxisTimestampLabel(rec, null, "");
       return;
     }
-    const color = rec.payload.style.color;
+    const color = p.style.color;
     el.style.display = "block";
     el.style.left = x + "px";
     el.style.background = color;
-    el.style.opacity = String(rec.payload.style.opacity);
-    el.style.width = Math.max(1, rec.payload.style.width || 1) + "px";
-    const label = rec.payload.label_text;
-    if (label) {
+    el.style.opacity = String(p.style.opacity);
+    el.style.width = Math.max(1, p.style.width || 1) + "px";
+
+    if (shouldShowVlineTimestamp(p)) {
+      syncVlineAxisTimestampLabel(rec, x, formatVlineTimestampUtc(p.timestamp));
       el.textContent = "";
-      const tag = document.createElement("div");
-      tag.className = "ov-vline-label";
-      tag.textContent = label;
-      tag.style.color = color;
-      tag.style.background = hexAlpha(color, 0.15);
-      tag.style.left = "4px";
-      tag.style.top = "8px";
-      el.appendChild(tag);
     } else {
-      el.textContent = "";
+      syncVlineAxisTimestampLabel(rec, null, "");
+      const label = p.label_text;
+      if (label) {
+        el.textContent = "";
+        let tag = rec.vlineTopLabel;
+        if (!tag) {
+          tag = document.createElement("div");
+          tag.className = "ov-vline-label";
+          el.appendChild(tag);
+          rec.vlineTopLabel = tag;
+        }
+        tag.textContent = label;
+        tag.style.color = color;
+        tag.style.background = hexAlpha(color, 0.15);
+        tag.style.left = "4px";
+        tag.style.top = "8px";
+        tag.style.display = "block";
+      } else {
+        if (rec.vlineTopLabel) rec.vlineTopLabel.style.display = "none";
+        el.textContent = "";
+      }
     }
   }
 
@@ -4749,6 +4923,13 @@
       // Cull off-screen LLD/DOM overlays — full style pass on 2k+ nodes lags pans.
       if (overlayOutsideVisibleRange(rec.payload, visFrom, visTo)) {
         if (rec.el) hideEl(rec.el);
+        if (
+          rec.payload.type === "line" &&
+          rec.payload.kind === "vertical" &&
+          isUserDrawing(rec.payload)
+        ) {
+          syncVlineAxisTimestampLabel(rec, null, "");
+        }
         else if (rec.payload.type === "zone" || rec.payload.type === "label" || rec.payload.type === "marker") {
           // Avoid creating DOM for off-screen items until they enter the view.
           return;
@@ -6582,6 +6763,9 @@
         mouseWheel: true,
         pinch: true,
         axisDoubleClickReset: { time: true, price: true },
+      },
+      localization: {
+        timeFormatter: crosshairTimeFormatter,
       },
       width: w,
       height: h,

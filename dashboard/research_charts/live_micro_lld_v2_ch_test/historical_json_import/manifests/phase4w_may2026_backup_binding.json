@@ -1,0 +1,12 @@
+{
+  "phase": "4W",
+  "backup_tag": "lmv2_phase4w_post_april_complete_20261011T124247Z",
+  "operational_backup_recovery_id": "ebfdfb7d-ba12-4c2a-af6b-ff9c5ca57b02",
+  "monthly_plan": "phase4w_may2026_monthly_run_plan_v1.json",
+  "manifests": {
+    "15m_PD1": "phase4w_may2026_15m_pd1_full_v1.json",
+    "15m_PD5": "phase4w_may2026_15m_pd5_full_v1.json",
+    "15m_PD10": "phase4w_may2026_15m_pd10_full_v1.json",
+    "4h_PD10": "phase4w_may2026_4h_pd10_full_v1.json"
+  }
+}

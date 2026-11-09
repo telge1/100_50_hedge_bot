@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PD1 Landscape Viewer - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/live-charts/viewer/style.css">
+    <style>
+        .pd1-viewer-shell { padding: 0.5rem 1rem 1rem; }
+        .pd1-viewer-shell #canvas-wrap { height: calc(100vh - 280px); min-height: 420px; }
+        .pd1-viewer-missing { padding: 2rem; color: #ccc; }
+        .pd1-nav-row { display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; align-items: center; margin-bottom: 0.5rem; }
+        .pd1-nav-row label { font-size: 0.9rem; color: #ccc; }
+        .pd1-nav-row input[type="text"] { min-width: 11rem; }
+        #pd1NavStatus { font-size: 0.85rem; color: #9aa3b5; line-height: 1.4; margin-bottom: 0.35rem; }
+        #pd1NavStatus.pd1-status-error { color: #ef9a9a; }
+        #pd1NavStatus.pd1-status-loading { color: #ffcc80; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'live-charts-viewer' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content pd1-viewer-shell">
+            <h1 class="visually-hidden">PD1 Landscape Viewer</h1>
+            {% if not viewer_ready %}
+            <p class="pd1-viewer-missing">Viewer-Daten fehlen (PD1_VIEWER_ROOT). Bitte Replay-Phase unter pools+ob+delta_bot ausführen.</p>
+            {% else %}
+            <div class="pd1-nav-row" id="pd1GoToRow">
+                <label>GO TO UTC <input type="text" id="gotoUtc" placeholder="2026-09-15 01:45:00" autocomplete="off" /></label>
+                <button type="button" id="btnGoToUtc">Springen</button>
+                <span style="color:#888;font-size:0.85rem">Ziehen=Zeit-Pan · Shift+Ziehen=Y · Rad=Zoom · Shift+Rad=Y-Zoom · Alt+Rad=Zeit · Klick=As-of</span>
+            </div>
+            <div id="pd1NavStatus" aria-live="polite">Status: —</div>
+            <div id="toolbar">
+                <label>Modus
+                    <select id="mode">
+                        <option value="strength">A — Original-Strength</option>
+                        <option value="origin">B — Exact Origin-Density</option>
+                    </select>
+                </label>
+                <label id="binUnionWrap"><input type="checkbox" id="showBinUnion" /> Diagnose: Origins intersecting display bin</label>
+                <label>As-of <input type="datetime-local" id="asof" step="300" /></label>
+                <button type="button" id="btnAnch1">29.07 23:55</button>
+                <button type="button" id="btnAnch2">01.08 18:55</button>
+                <button type="button" id="btnAnch3">01.08 19:15</button>
+                <label><input type="checkbox" id="showEvents" /> Events</label>
+                <span id="hint"></span>
+            </div>
+            <div id="canvas-wrap"><canvas id="c"></canvas></div>
+            <div id="detail">Lade Daten…</div>
+            <script>window.PD1_VIEWER_BASE = "/live-charts/viewer/";</script>
+            <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
+            <script src="/live-charts/viewer/replay.js?v=phase6xt_axis_density_render_v1"></script>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

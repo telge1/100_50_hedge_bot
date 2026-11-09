@@ -1,0 +1,45 @@
+{
+  "v3as_drawing_count": 9,
+  "v3av_drawing_count": 6,
+  "v3av_trend_lines": 6,
+  "new_line_ids_vs_v3as": 6,
+  "overlap_trade_ids_with_v3as": {
+    "same_variant_entry_keys": 0,
+    "v3as_only_keys": 9,
+    "v3av_only_keys": 32
+  },
+  "by_variant": {
+    "V3AK": {
+      "v3av_trades": 9,
+      "v3as_trades": 3,
+      "v3av_candidates": 68,
+      "v3as_candidates": 25,
+      "v3av_gross_sum": 5.8314,
+      "v3as_gross_sum": 4.4023
+    },
+    "Watcher_A2": {
+      "v3av_trades": 10,
+      "v3as_trades": 2,
+      "v3av_candidates": 56,
+      "v3as_candidates": 36,
+      "v3av_gross_sum": 5.9128,
+      "v3as_gross_sum": 4.7822
+    },
+    "Watcher_A3": {
+      "v3av_trades": 7,
+      "v3as_trades": 3,
+      "v3av_candidates": 23,
+      "v3as_candidates": 14,
+      "v3av_gross_sum": 5.0532,
+      "v3as_gross_sum": 4.7857
+    },
+    "Watcher_B": {
+      "v3av_trades": 6,
+      "v3as_trades": 1,
+      "v3av_candidates": 30,
+      "v3as_candidates": 11,
+      "v3av_gross_sum": 0.9752,
+      "v3as_gross_sum": -1.2
+    }
+  }
+}

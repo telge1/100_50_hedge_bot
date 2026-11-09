@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Position Calculator - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+        
+        {% set nav_active = 'position-calculator' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="position-calculator-container">
+                <div class="calculator-header">
+                    <h1>🧮 Position Calculator</h1>
+                    <p class="calculator-description">Berechne den durchschnittlichen Entry-Preis für mehrere Positionen</p>
+                </div>
+                
+                <div class="calculator-controls">
+                    <div class="control-group">
+                        <label for="positionType" class="control-label">Position Type:</label>
+                        <select id="positionType" class="position-select">
+                            <option value="long">📈 Long</option>
+                            <option value="short">📉 Short</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="entries-table-container">
+                    <table class="entries-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Entry Price</th>
+                                <th>Size</th>
+                                <th>Average Price</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="entriesTableBody">
+                            <!-- Entries will be dynamically added here -->
+                        </tbody>
+                    </table>
+                    
+                    <div class="entries-actions">
+                        <button id="addEntryBtn" class="btn-add-entry" onclick="addEntry()">➕ Add Entry</button>
+                    </div>
+                </div>
+                
+                <div class="calculator-summary">
+                    <div class="summary-card">
+                        <div class="summary-label">Total Size:</div>
+                        <div class="summary-value" id="totalSize">0.00</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Average Entry Price:</div>
+                        <div class="summary-value" id="finalAveragePrice">0.00000</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Total Value (USDT):</div>
+                        <div class="summary-value" id="totalValue">0.00</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Cobertura -->
+            <div class="cobertura-container">
+                <div class="cobertura-header">
+                    <h2>Cobertura</h2>
+                    <p class="cobertura-description">
+                        Berechnet, wie weit die Gegenposition mit dem Gewinn der geschlossenen Seite reduziert werden kann (inkl. Gebühren 0,055&nbsp;%).
+                    </p>
+                </div>
+
+                <div class="cobertura-setup">
+                    <div class="setup-section">
+                        <h3>📈 Long Position</h3>
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label for="coberturaLongQty">Long-Menge (Coins)</label>
+                                <input type="number" step="any" min="0" id="coberturaLongQty" class="setup-input" placeholder="0.00000" oninput="calculateCobertura()">
+                            </div>
+                            <div class="setup-field">
+                                <label for="coberturaLongEntry">Long-Entry-Preis</label>
+                                <input type="number" step="any" min="0" id="coberturaLongEntry" class="setup-input" placeholder="0.00000" oninput="calculateCobertura()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-section">
+                        <h3>📉 Short Position</h3>
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label for="coberturaShortQty">Short-Menge (Coins)</label>
+                                <input type="number" step="any" min="0" id="coberturaShortQty" class="setup-input" placeholder="0.00000" oninput="calculateCobertura()">
+                            </div>
+                            <div class="setup-field">
+                                <label for="coberturaShortEntry">Short-Entry-Preis</label>
+                                <input type="number" step="any" min="0" id="coberturaShortEntry" class="setup-input" placeholder="0.00000" oninput="calculateCobertura()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="setup-section">
+                        <h3>Zielbewegung</h3>
+                        <div class="setup-fields">
+                            <div class="setup-field">
+                                <label for="coberturaCloseSide">Position schließen</label>
+                                <select id="coberturaCloseSide" class="setup-input setup-select" onchange="calculateCobertura()">
+                                    <option value="short">Short — Zielpreis unter Short-Entry</option>
+                                    <option value="long">Long — Zielpreis über Long-Entry</option>
+                                </select>
+                            </div>
+                            <div class="setup-field">
+                                <label for="coberturaMovePercent">Abstand vom Entry dieser Position (%)</label>
+                                <input type="number" step="0.01" min="0" id="coberturaMovePercent" class="setup-input" placeholder="0.00" oninput="calculateCobertura()">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="coberturaMessage" class="cobertura-message" hidden></div>
+
+                <div id="coberturaResults" class="cobertura-results" hidden>
+                    <div class="calculator-summary cobertura-summary">
+                        <div class="summary-card">
+                            <div class="summary-label">Zielpreis</div>
+                            <div class="summary-value" id="coberturaTargetPrice">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Zu schließende Coins</div>
+                            <div class="summary-value" id="coberturaCloseCoins">—</div>
+                            <div class="summary-subvalue" id="coberturaCloseUsd">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Verbleibende Coins</div>
+                            <div class="summary-value" id="coberturaRemainCoins">—</div>
+                            <div class="summary-subvalue" id="coberturaRemainUsd">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Verbleibender Anteil</div>
+                            <div class="summary-value" id="coberturaRemainPercent">—</div>
+                        </div>
+                        <div class="summary-card">
+                            <div class="summary-label">Unrealisierter PnL</div>
+                            <div class="summary-value" id="coberturaUnrealizedPnl">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/js/position_calculator.js"></script>
+    <script src="/static/js/cobertura.js"></script>
+</body>
+</html>

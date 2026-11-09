@@ -1,0 +1,44 @@
+{
+  "run_id": "20261109T170515Z",
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "integration": "V3AO watcher entry + V3AK downstream",
+  "baseline_v3ak_e3": {
+    "candidates": 22,
+    "executed": 3
+  },
+  "watcher_runs": [
+    {
+      "variant": "V3AO_DEFAULT_A2_W12",
+      "touch_tolerance_pct": 0.03,
+      "confirmation_mode": "A2",
+      "watch_window_bars": 12,
+      "entry_candidates": 31,
+      "trades_executed": 2,
+      "gross_pct_sum": 4.7822,
+      "v3ak_baseline_trades": 3,
+      "v3ak_baseline_gross_pct_sum": 4.4766
+    },
+    {
+      "variant": "V3AO_SCENARIO_A_A1",
+      "touch_tolerance_pct": 0.03,
+      "confirmation_mode": "A1",
+      "watch_window_bars": 12,
+      "entry_candidates": 31,
+      "trades_executed": 2,
+      "gross_pct_sum": 4.7822,
+      "v3ak_baseline_trades": 3,
+      "v3ak_baseline_gross_pct_sum": 4.4766
+    },
+    {
+      "variant": "V3AO_SCENARIO_B",
+      "touch_tolerance_pct": 0.03,
+      "confirmation_mode": "B_RECLAIM",
+      "watch_window_bars": 12,
+      "entry_candidates": 9,
+      "trades_executed": 1,
+      "gross_pct_sum": -1.2,
+      "v3ak_baseline_trades": 3,
+      "v3ak_baseline_gross_pct_sum": 4.4766
+    }
+  ]
+}

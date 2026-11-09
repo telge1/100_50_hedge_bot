@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "run_id": "00000000-0000-4000-8000-000000004b01",
+  "approved_month": "2026-04",
+  "combo_folder": "15m_PD1",
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_15mpd1_v1",
+  "stem_slice": {
+    "start_index": 0,
+    "end_index": 500
+  },
+  "max_snapshots": 500,
+  "max_batches": 10,
+  "batch_size": 50,
+  "import_batch_id": "phase4k_apr2026_15mpd1_v1",
+  "backup_recovery_id": "e134b0fa-9cba-4c0f-b8d9-60125001de50",
+  "scope_fingerprint": "08f19fd49cc8341617c84f7189d3781dd5eb27b5f6971219ada70ae983f4f4e0",
+  "batch_import_ids": [
+    "phase4k_apr2026_15mpd1_v1_batch01",
+    "phase4k_apr2026_15mpd1_v1_batch02",
+    "phase4k_apr2026_15mpd1_v1_batch03",
+    "phase4k_apr2026_15mpd1_v1_batch04",
+    "phase4k_apr2026_15mpd1_v1_batch05",
+    "phase4k_apr2026_15mpd1_v1_batch06",
+    "phase4k_apr2026_15mpd1_v1_batch07",
+    "phase4k_apr2026_15mpd1_v1_batch08",
+    "phase4k_apr2026_15mpd1_v1_batch09",
+    "phase4k_apr2026_15mpd1_v1_batch10"
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "run_id": "20261109T102115Z",
+  "canonical_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/user_data/drawings.json",
+  "drawing_health": {
+    "drawings_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research_charts/user_data/drawings.json",
+    "ram_count": 5,
+    "file_count": 5,
+    "ram_drawing_ids": [
+      "d-1731fb4bb889",
+      "d-8521dc37f7b9",
+      "d-c0791ea0c65e",
+      "d-e6e9b83d2be1",
+      "d-ea081434c5d3"
+    ],
+    "file_drawing_ids": [
+      "d-1731fb4bb889",
+      "d-8521dc37f7b9",
+      "d-c0791ea0c65e",
+      "d-e6e9b83d2be1",
+      "d-ea081434c5d3"
+    ],
+    "ram_sha256": "27974fb5f55522b77d1e1fdf6d4138e8dfcf92ea0f7c36b4d2daa8adc0ad693e",
+    "file_sha256": "27974fb5f55522b77d1e1fdf6d4138e8dfcf92ea0f7c36b4d2daa8adc0ad693e",
+    "ids_only_in_ram": [],
+    "ids_only_in_file": [],
+    "ids_with_content_diff": [],
+    "drift": false
+  },
+  "drawings_sha256": "b0718d82a94e8ad12d27d570c0cd7ce97cf8088a2db21c4c92830cd80fc600cb",
+  "drawings_snapshot": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/support_break_exit_v3ab/l1_v3ab_drawings_snapshot_b0718d82a94e8ad1.json",
+  "v3y_frozen_snapshot_sha256": "d05d218646aced84ffc0adbb8ca66a6a8f92048190e72dc9cea3140270fb594c",
+  "drawing_id_diff_vs_v3y_frozen": {
+    "removed_vs_v3y_snapshot": [
+      "d-036ba7cefe2e",
+      "d-0e5e7004dccd",
+      "d-1f70c9798935",
+      "d-248d74050cc8",
+      "d-289deb31eb84",
+      "d-2f6effea5ff3",
+      "d-3bd7446b7a5b",
+      "d-5c8ffbfb8a06",
+      "d-7f4519d5ce5b",
+      "d-988236deb817",
+      "d-9b6e62dc884c",
+      "d-a6d9a05da2f1",
+      "d-e1c6e07765fe",
+      "p17ag-entry-01-20260707T111000Z",
+      "p17ag-entry-02-20260708T092500Z",
+      "p17ag-entry-03-20260717T020000Z",
+      "p17ag-entry-04-20260729T194500Z",
+      "p17ag-pos-01-20260707T111000Z",
+      "p17ag-pos-02-20260708T092500Z",
+      "p17ag-pos-03-20260717T020000Z",
+      "p17ag-pos-04-20260729T194500Z"
+    ],
+    "added_vs_v3y_snapshot": [
+      "d-1731fb4bb889",
+      "d-8521dc37f7b9",
+      "d-c0791ea0c65e",
+      "d-e6e9b83d2be1",
+      "d-ea081434c5d3"
+    ],
+    "unchanged": []
+  },
+  "drawing_inventory": [
+    {
+      "drawing_id": "d-1731fb4bb889",
+      "drawing_type": "trend",
+      "start_ts": 1787943000,
+      "start_price": 0.08414394918832001,
+      "end_ts": 1787985300,
+      "end_price": 0.08534280492307726,
+      "extend_right": null,
+      "visible": true
+    },
+    {
+      "drawing_id": "d-8521dc37f7b9",
+      "drawing_type": "trend",
+      "start_ts": 1787993400,
+      "start_price": 0.08419823699517694,
+      "end_ts": 1788050400,
+      "end_price": 0.0852975650840298,
+      "extend_right": null,
+      "visible": true
+    },
+    {
+      "drawing_id": "d-c0791ea0c65e",
+      "drawing_type": "trend",
+      "start_ts": 1787762100,
+      "start_price": 0.08381461440974818,
+      "end_ts": 1787843400,
+      "end_price": 0.08815192810661791,
+      "extend_right": null,
+      "visible": true
+    },
+    {
+      "drawing_id": "d-e6e9b83d2be1",
+      "drawing_type": "trend",
+      "start_ts": 1788132300,
+      "start_price": 0.08117252426335579,
+      "end_ts": 1788158700,
+      "end_price": 0.08215314773323426,
+      "extend_right": null,
+      "visible": true
+    },
+    {
+      "drawing_id": "d-ea081434c5d3",
+      "drawing_type": "trend",
+      "start_ts": 1788081300,
+      "start_price": 0.08430877233576727,
+      "end_ts": 1788127500,
+      "end_price": 0.0858983768758056,
+      "extend_right": null,
+      "visible": true
+    }
+  ],
+  "confirm_delta_pct": 0.2,
+  "variants": {
+    "A": {
+      "trades_baseline": 3,
+      "trades_v3ab_y": 4,
+      "wins_baseline": 0,
+      "wins_v3ab_y": 1,
+      "losses_baseline": 3,
+      "losses_v3ab_y": 3,
+      "gross_baseline_pct": -3.6,
+      "gross_v3ab_y_pct": 0.2258,
+      "avg_baseline_pct": -1.2,
+      "avg_v3ab_y_pct": 0.0565,
+      "exit_counts_baseline": {
+        "SL": 3
+      },
+      "exit_counts_v3ab_y": {
+        "SUPPORT_BREAK_EXIT": 2,
+        "SL": 2
+      },
+      "longest_loss_streak_baseline": 3,
+      "longest_loss_streak_v3ab_y": 3,
+      "new_entries_v3ab_y": [
+        "te-d-8521dc37f7b9-0002"
+      ],
+      "dropped_vs_baseline": []
+    },
+    "B": {
+      "trades_baseline": 3,
+      "trades_v3ab_y": 4,
+      "wins_baseline": 0,
+      "wins_v3ab_y": 1,
+      "losses_baseline": 3,
+      "losses_v3ab_y": 3,
+      "gross_baseline_pct": -3.6,
+      "gross_v3ab_y_pct": 0.2258,
+      "avg_baseline_pct": -1.2,
+      "avg_v3ab_y_pct": 0.0565,
+      "exit_counts_baseline": {
+        "SL": 3
+      },
+      "exit_counts_v3ab_y": {
+        "SUPPORT_BREAK_EXIT": 2,
+        "SL": 2
+      },
+      "longest_loss_streak_baseline": 3,
+      "longest_loss_streak_v3ab_y": 3,
+      "new_entries_v3ab_y": [
+        "te-d-8521dc37f7b9-0002"
+      ],
+      "dropped_vs_baseline": []
+    },
+    "C": {
+      "trades_baseline": 0,
+      "trades_v3ab_y": 0,
+      "wins_baseline": 0,
+      "wins_v3ab_y": 0,
+      "losses_baseline": 0,
+      "losses_v3ab_y": 0,
+      "gross_baseline_pct": 0,
+      "gross_v3ab_y_pct": 0,
+      "avg_baseline_pct": 0,
+      "avg_v3ab_y_pct": 0,
+      "exit_counts_baseline": {},
+      "exit_counts_v3ab_y": {},
+      "longest_loss_streak_baseline": 0,
+      "longest_loss_streak_v3ab_y": 0,
+      "new_entries_v3ab_y": [],
+      "dropped_vs_baseline": []
+    }
+  },
+  "v3y_prior_manifest_test_b": [
+    {
+      "variant": "A",
+      "trades_v3u": 7,
+      "trades_v3y": 11,
+      "gross_v3u_pct": 24.7831,
+      "gross_v3y_pct": 37.518,
+      "wins_v3u": 3,
+      "wins_v3y": 7,
+      "sl_v3u": 4,
+      "sl_v3y": 2,
+      "support_break_exits": 5,
+      "saved_from_sl": 3,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-1f70c9798935-0022",
+        "te-d-9b6e62dc884c-0001",
+        "te-d-9b6e62dc884c-0003",
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 3,
+      "longest_loss_streak_v3y": 2
+    },
+    {
+      "variant": "B",
+      "trades_v3u": 6,
+      "trades_v3y": 9,
+      "gross_v3u_pct": 25.9831,
+      "gross_v3y_pct": 39.7269,
+      "wins_v3u": 3,
+      "wins_v3y": 7,
+      "sl_v3u": 3,
+      "sl_v3y": 0,
+      "support_break_exits": 5,
+      "saved_from_sl": 3,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-1f70c9798935-0022",
+        "te-d-9b6e62dc884c-0003",
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 2,
+      "longest_loss_streak_v3y": 1
+    },
+    {
+      "variant": "C",
+      "trades_v3u": 3,
+      "trades_v3y": 4,
+      "gross_v3u_pct": 2.0372,
+      "gross_v3y_pct": 3.1944,
+      "wins_v3u": 2,
+      "wins_v3y": 3,
+      "sl_v3u": 1,
+      "sl_v3y": 0,
+      "support_break_exits": 2,
+      "saved_from_sl": 1,
+      "early_closed_winners": 0,
+      "new_entries_v3y": [
+        "te-d-e1c6e07765fe-0003"
+      ],
+      "dropped_entries_v3y": [],
+      "longest_loss_streak_v3u": 1,
+      "longest_loss_streak_v3y": 1
+    }
+  ],
+  "stale_copy_warnings": [
+    "stale_copy drawings.json: sha=387d8574373219cb\u2026 count=535 (canonical b0718d82a94e8ad1\u2026)",
+    "stale_copy drawings.json: sha=387d8574373219cb\u2026 count=535 (canonical b0718d82a94e8ad1\u2026)"
+  ]
+}

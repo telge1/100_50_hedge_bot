@@ -1,0 +1,106 @@
+{
+  "run_id": "20261108T120839Z",
+  "mode": "INDEPENDENT_SUPPORT",
+  "window_mode": "DRAWINGS_AUTO_WINDOW",
+  "drawings_sha256": "76f70d9d43b85c273052e8f7b87cbbb5fab3930d43336dbecaa86c9866a21239",
+  "drawings_count": 14,
+  "support_line_count": 13,
+  "support_line_ids": [
+    "d-03350098db64",
+    "d-036ba7cefe2e",
+    "d-0e5e7004dccd",
+    "d-1f70c9798935",
+    "d-248d74050cc8",
+    "d-289deb31eb84",
+    "d-3bd7446b7a5b",
+    "d-5c8ffbfb8a06",
+    "d-7f4519d5ce5b",
+    "d-988236deb817",
+    "d-a6d9a05da2f1",
+    "d-ac60572bfc69",
+    "d-e1c6e07765fe"
+  ],
+  "snapshot_path": "/home/telgenbuescher/projects/spread_recovery_hedge_short_dev/dashboard/research/manual_channel_pool_long_v1/l1_v3p_drawings_snapshot_76f70d9d43b85c27.json",
+  "window_start_utc": "2026-03-29 16:00:00 UTC",
+  "window_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "simulation_end_utc_exclusive": "2026-10-19 13:05:00 UTC",
+  "candle_count": 58717,
+  "candle_gaps": 0,
+  "run_end_status": "DATA_END_REACHED",
+  "touch_events_total": 229,
+  "long_triggers_allowed": 204,
+  "c1_candidates": 111,
+  "executed_by_support_line_A": {
+    "d-a6d9a05da2f1": 1,
+    "d-03350098db64": 2,
+    "d-248d74050cc8": 1,
+    "d-e1c6e07765fe": 1,
+    "d-3bd7446b7a5b": 1,
+    "d-ac60572bfc69": 8,
+    "d-1f70c9798935": 3
+  },
+  "variant_stats": {
+    "A": {
+      "executed": 17,
+      "wins": 5,
+      "sl": 12,
+      "hit_rate": 29.41,
+      "wins_sum": 37.8112,
+      "losses_sum": -14.4,
+      "gross": 23.4112,
+      "pool_tp_exits": 3,
+      "channel_exits": 2,
+      "open": 0,
+      "rejects": {
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 12
+      }
+    },
+    "B": {
+      "executed": 16,
+      "wins": 5,
+      "sl": 11,
+      "hit_rate": 31.25,
+      "wins_sum": 37.8112,
+      "losses_sum": -13.2,
+      "gross": 24.6112,
+      "pool_tp_exits": 3,
+      "channel_exits": 2,
+      "open": 0,
+      "rejects": {
+        "REJECTED_FIRST_D2_TOO_FAR": 9,
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 12
+      }
+    },
+    "C": {
+      "executed": 4,
+      "wins": 3,
+      "sl": 1,
+      "hit_rate": 75.0,
+      "wins_sum": 11.1054,
+      "losses_sum": -1.2,
+      "gross": 9.9054,
+      "pool_tp_exits": 1,
+      "channel_exits": 2,
+      "open": 0,
+      "rejects": {
+        "REJECTED_FIRST_D2_TOO_FAR": 9,
+        "REJECTED_NO_EARLY_D2_STAGGERING": 7,
+        "UNRESOLVED_POOL_SNAPSHOT": 23,
+        "C_CHANNEL_QUARTER_UNAVAILABLE": 28,
+        "REJECTED_INSUFFICIENT_CHANNEL_ROOM": 12
+      }
+    }
+  },
+  "tp_modes_used_A": {
+    "POOL_BOTTOM_NEAR_CHANNEL": 6,
+    "POOL_BOTTOM_NO_CLEAR_CHANNEL": 11
+  },
+  "upper_channel_ids_used_A": {
+    "d-22f8d9f720ce": 4,
+    "d-0e5e7004dccd": 1,
+    "d-e1c6e07765fe": 1,
+    "": 11
+  }
+}

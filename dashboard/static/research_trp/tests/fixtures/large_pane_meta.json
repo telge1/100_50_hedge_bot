@@ -1,0 +1,11 @@
+{
+  "pane_bytes": 277146,
+  "candle_bytes": 247588,
+  "slim_bytes": 29228,
+  "savings_bytes": 247918,
+  "savings_pct": 89.45,
+  "candle_count_pane": 2879,
+  "candle_count_slim": 0,
+  "field_count_pane": 20,
+  "field_count_slim": 15
+}

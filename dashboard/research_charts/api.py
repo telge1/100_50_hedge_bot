@@ -2717,9 +2717,23 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     ):
         return get_workspace().handle_event(body)
 
+    @router.get("/api/research/drawings/health")
+    async def api_research_drawings_health(user: dict = Depends(require_auth)):
+        from .drawing_health import compute_drawing_health
+        from .workspace_session import DRAWINGS_PATH
+
+        return {
+            "success": True,
+            **compute_drawing_health(get_workspace().drawings, DRAWINGS_PATH),
+        }
+
     @router.post("/api/research/drawings/delete")
     async def api_research_drawings_delete(user: dict = Depends(require_auth)):
-        return get_workspace().delete_selected()
+        snap = get_workspace().delete_selected()
+        dd = snap.get("drawing_delete") or {}
+        if dd.get("success") is False and dd.get("error") == "persist_failed":
+            return JSONResponse(status_code=503, content=snap)
+        return snap
 
     @router.post("/api/research/drawings/clear")
     async def api_research_drawings_clear(

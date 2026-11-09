@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "run_id": "00000000-0000-4000-8000-000000005304",
+  "approved_month": "2026-07",
+  "combo_folder": "4h_PD10",
+  "pipeline_line_id": "historical_mixed_frozen_doge_apr_sep_2026_v1_4hpd10_v1",
+  "stem_slice": {
+    "start_index": 0,
+    "end_index": 186
+  },
+  "max_snapshots": 186,
+  "max_batches": 4,
+  "batch_size": 50,
+  "import_batch_id": "phase4z_jul2026_4h_pd10_v1",
+  "backup_recovery_id": "dc9dec02-1f4d-4989-880f-90cd1329f3bc",
+  "scope_fingerprint": "6d29eaca0c29db434be254092a21faa84266f72a82839912c15561f0f12449de",
+  "batch_import_ids": [
+    "phase4z_jul2026_4h_pd10_v1_batch01",
+    "phase4z_jul2026_4h_pd10_v1_batch02",
+    "phase4z_jul2026_4h_pd10_v1_batch03",
+    "phase4z_jul2026_4h_pd10_v1_batch04"
+  ]
+}

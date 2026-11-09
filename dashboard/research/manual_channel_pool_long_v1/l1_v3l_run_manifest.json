@@ -1,0 +1,41 @@
+{
+  "mode": "INDEPENDENT_SUPPORT",
+  "window_mode": "DRAWINGS_AUTO_WINDOW",
+  "drawings_sha256": "0380057b4660d3090d51eaeae22ea609aaae382aa9af699912be93c73c4a8b3f",
+  "v3j_line_mode": "DYNAMIC_SUPPORT",
+  "v3l_line_mode": "INDEPENDENT_SUPPORT",
+  "comparison": {
+    "A": {
+      "variant": "A",
+      "v3j_trades": 6,
+      "v3l_trades": 12,
+      "match": false
+    },
+    "B": {
+      "variant": "B",
+      "v3j_trades": 5,
+      "v3l_trades": 11,
+      "match": false
+    },
+    "C": {
+      "variant": "C",
+      "v3j_trades": 4,
+      "v3l_trades": 4,
+      "match": true
+    }
+  },
+  "sep_line": "d-1f70c9798935",
+  "sep_c1_pipeline_count": 10,
+  "sep_long_triggers": 26,
+  "sep_new_trades_A": 3,
+  "variant_gross": {
+    "A": 38.5805,
+    "B": 39.780499999999996,
+    "C": 9.029000000000002
+  },
+  "variant_trades": {
+    "A": 12,
+    "B": 11,
+    "C": 4
+  }
+}

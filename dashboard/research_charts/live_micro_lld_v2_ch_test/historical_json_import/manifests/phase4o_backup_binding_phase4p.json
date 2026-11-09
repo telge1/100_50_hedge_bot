@@ -1,0 +1,21 @@
+{
+  "phase": "4P",
+  "scope_fingerprint": "1c36f8810d14fe970f9e14ea5a0c449c1906ff4ce261817182a0cf7733a7f39b",
+  "manifest_v1": "phase4o_april_15mpd1_stems500_2880_v1.json",
+  "manifest_v1_backup_recovery_id": "923fc087-9e6b-47f1-bbaf-37d765b1182a",
+  "manifest_v2": "phase4o_april_15mpd1_stems500_2880_v2.json",
+  "operational_backup_recovery_id": "be78daa2-c816-4b68-b490-75941f2cf82e",
+  "backup_tag": "lmv2_phase4p_post_4n_20261011T102222Z",
+  "backup_status": "BACKUP_CREATED",
+  "restore_test_database": "signal_generator_lmv2_restore_phase4p_post_4n_20261011T102222Z",
+  "restore_status": "RESTORED",
+  "env_for_write_verification": "HISTORICAL_IMPORT_VERIFIED_BACKUP_RECOVERY_ID=be78daa2-c816-4b68-b490-75941f2cf82e",
+  "run_state_backup_provenance_example": {
+    "manifest_backup_recovery_id": "be78daa2-c816-4b68-b490-75941f2cf82e",
+    "verified_backup_recovery_id": "be78daa2-c816-4b68-b490-75941f2cf82e",
+    "backup_status": "BACKUP_CREATED",
+    "backup_name": "File('backups/lmv2_phase4p_post_4n_20261011T102222Z/lmv2_five_tables')",
+    "manifest_differs_from_verified": false
+  },
+  "note": "v1 manifest unchanged; use v2 or env override for post-4N rollback alignment"
+}

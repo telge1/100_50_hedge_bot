@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stoch-Profite - Multi-Symbol Hedge Bot</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/stoch.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">🔐 Multi-Symbol Hedge Bot Dashboard</div>
+            <div class="header-actions">
+                <button onclick="testAlert()" class="btn-alert" title="Test Alert">🔔 Test Alert</button>
+                <span class="user-info">👤 {{ user.username }}</span>
+                <a href="/logout" class="btn-logout">🚪 Logout</a>
+            </div>
+        </div>
+
+        {% set nav_active = 'stoch-profite' %}
+        {% include "partials/nav.html" %}
+
+        <div class="dashboard-content">
+            <div class="stoch-page-header">
+                <div>
+                    <h1>💰 Stoch-Profite</h1>
+                    <p>Ergebnisse der Wave-Fade / Stoch-Strategie (Entry, TP, SL, PnL). Alle Zeiten in <strong>UTC</strong>. Chart-Button öffnet Kerzen mit Entry-/TP-/SL-Linien.</p>
+                </div>
+            </div>
+
+            <div class="stoch-feed-banner" id="stochFeedBanner" style="display:none;"></div>
+
+            <div class="stoch-toolbar">
+                <label for="stochFilterSymbol">Symbol</label>
+                <select id="stochFilterSymbol"></select>
+                <label for="stochFilterDirection">Direction</label>
+                <select id="stochFilterDirection">
+                    <option value="">Alle</option>
+                    <option value="LONG">LONG</option>
+                    <option value="SHORT">SHORT</option>
+                </select>
+                <label for="stochFilterState">State</label>
+                <select id="stochFilterState"></select>
+                <label for="stochFilterBatch">Batch</label>
+                <select id="stochFilterBatch"></select>
+                <button type="button" class="stoch-btn" id="stochRefreshBtn">Refresh</button>
+                <span class="stoch-meta" id="stochMeta">–</span>
+            </div>
+
+            <div class="stoch-table-wrap">
+                <table class="stoch-table">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th><button type="button" data-sort="symbol">Symbol</button></th>
+                            <th><button type="button" data-sort="pnl">PnL</button></th>
+                            <th><button type="button" data-sort="pnl_percent">PnL %</button></th>
+                            <th><button type="button" data-sort="open_time">Open Time (UTC)</button></th>
+                            <th><button type="button" data-sort="close_time">Close Time (UTC)</button></th>
+                            <th>Open Price</th>
+                            <th>Close Price</th>
+                            <th><button type="button" data-sort="trade_state">Trade State</button></th>
+                            <th><button type="button" data-sort="batch_id">Batch ID</button></th>
+                            <th><button type="button" data-sort="trade_direction">Direction</button></th>
+                            <th>Strategy</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stochProfitsBody">
+                        <tr><td colspan="12" class="stoch-empty">Lade…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="stoch-pagination">
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochPrevBtn">Zurück</button>
+                <span id="stochPageLabel">Seite 1</span>
+                <button type="button" class="stoch-btn stoch-btn-ghost" id="stochNextBtn">Weiter</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="stoch-modal-backdrop" id="stochChartModal" role="dialog" aria-modal="true">
+        <div class="stoch-modal">
+            <div class="stoch-modal-header">
+                <div>
+                    <h2 id="stochChartTitle">Chart</h2>
+                    <p class="stoch-modal-sub" id="stochChartSub"></p>
+                </div>
+                <button type="button" class="stoch-modal-close" id="stochChartClose" aria-label="Schließen">×</button>
+            </div>
+            <div class="stoch-modal-body">
+                <div class="stoch-chart-host" id="stochChartHost"></div>
+                <div class="stoch-chart-legend">
+                    <span class="stoch-leg-entry">Entry (grau + Label)</span>
+                    <span class="stoch-leg-tp">TP (grün)</span>
+                    <span class="stoch-leg-sl">SL (rot)</span>
+                    <span class="stoch-leg-close">Close (gold)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="/static/js/stoch_chart_modal.js?v=4"></script>
+    <script src="/static/js/stoch_profite.js?v=3"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

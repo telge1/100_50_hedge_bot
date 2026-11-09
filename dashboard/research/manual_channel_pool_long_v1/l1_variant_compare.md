@@ -1,0 +1,147 @@
+# L1 V2 — Variant comparison (A–D)
+
+Retrospective research pilot — not a fully causal backtest.
+
+- Window: 2026-08-25 00:00:00 UTC .. 2026-08-29 00:00:00 UTC (exclusive)
+- Filters: `MIN_CHANNEL_ROOM_PCT`=1.50 %, `MIN_TRADE_PROFIT_PCT`=0.50 % (effective TP = min(pool, main upper))
+
+## Summary by variant
+
+| Var | Label | Executed | SL | Pool TP | Channel TP | Open | Σ gross PnL % |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **A** | Baseline | 3 | 2 | 0 | 1 | 0 | 4.1449 |
+| **B** | Channel room >= 1.50% | 2 | 1 | 0 | 1 | 0 | 5.3449 |
+| **C** | Channel room + min effective TP >= 0.50% | 2 | 1 | 0 | 1 | 0 | 5.3449 |
+| **D** | All filters incl. channel cycle | 2 | 1 | 0 | 1 | 0 | 5.3449 |
+
+## Per-variant detail
+
+| Var | touch events | long triggers | candidate rows | executed | blocked (new filters) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A | 45 | 42 | 45 | 3 | 0 |
+| B | 45 | 42 | 45 | 2 | 4 |
+| C | 45 | 42 | 45 | 2 | 4 |
+| D | 45 | 42 | 45 | 2 | 4 |
+
+### Reject breakdown (all candidate rows)
+
+**Variant A**
+- `GLOBAL_MAX_ONE_OPEN_LONG`: 25
+- `NO_C1_CONFIRM_AFTER_FIRST_TOUCH`: 14
+- `INACTIVE_LINE_BEFORE_CONTACT`: 1
+- `TREND_APPROACH_NOT_FROM_ABOVE`: 1
+- `UPPER_CHANNEL_NOT_A_LONG_TRIGGER`: 1
+
+**Variant B**
+- `GLOBAL_MAX_ONE_OPEN_LONG`: 22
+- `NO_C1_CONFIRM_AFTER_FIRST_TOUCH`: 14
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+- `INACTIVE_LINE_BEFORE_CONTACT`: 1
+- `TREND_APPROACH_NOT_FROM_ABOVE`: 1
+- `UPPER_CHANNEL_NOT_A_LONG_TRIGGER`: 1
+
+**Variant C**
+- `GLOBAL_MAX_ONE_OPEN_LONG`: 22
+- `NO_C1_CONFIRM_AFTER_FIRST_TOUCH`: 14
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+- `INACTIVE_LINE_BEFORE_CONTACT`: 1
+- `TREND_APPROACH_NOT_FROM_ABOVE`: 1
+- `UPPER_CHANNEL_NOT_A_LONG_TRIGGER`: 1
+
+**Variant D**
+- `GLOBAL_MAX_ONE_OPEN_LONG`: 22
+- `NO_C1_CONFIRM_AFTER_FIRST_TOUCH`: 14
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+- `INACTIVE_LINE_BEFORE_CONTACT`: 1
+- `TREND_APPROACH_NOT_FROM_ABOVE`: 1
+- `UPPER_CHANNEL_NOT_A_LONG_TRIGGER`: 1
+
+
+## Blocked rejects (variant entry filters)
+
+### Variant B
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+
+### Variant C
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+
+### Variant D
+- `REJECTED_INSUFFICIENT_CHANNEL_ROOM`: 4
+
+## Trades prevented vs baseline A
+
+- Variant **B** blocked `te-d-a6d9a05da2f1-0033` entry 2026-08-28 01:55:00 UTC (baseline SL -1.2000%): `REJECTED_INSUFFICIENT_CHANNEL_ROOM`
+- Variant **C** blocked `te-d-a6d9a05da2f1-0033` entry 2026-08-28 01:55:00 UTC (baseline SL -1.2000%): `REJECTED_INSUFFICIENT_CHANNEL_ROOM`
+- Variant **D** blocked `te-d-a6d9a05da2f1-0033` entry 2026-08-28 01:55:00 UTC (baseline SL -1.2000%): `REJECTED_INSUFFICIENT_CHANNEL_ROOM`
+
+## Reference diagnostics
+
+### A. 2026-08-28 01:55 UTC (`d-a6d9a05da2f1`, entry 0.08920)
+
+- **A**: exit=SL | reject=— | room%=0.8331 | pot%=0.8331 | pnl=-1.2000
+- **B**: exit=NO_TRADE | reject=REJECTED_INSUFFICIENT_CHANNEL_ROOM | room%=0.8331 | pot%=0.8331 | pnl=—
+- **C**: exit=NO_TRADE | reject=REJECTED_INSUFFICIENT_CHANNEL_ROOM | room%=0.8331 | pot%=0.8331 | pnl=—
+- **D**: exit=NO_TRADE | reject=REJECTED_INSUFFICIENT_CHANNEL_ROOM | room%=0.8331 | pot%=0.8331 | pnl=—
+
+In this window **variant D** did not add `TARGET_ALREADY_REACHED_BEFORE_ENTRY` beyond variant B/C: the 01:55 candidate is already rejected for insufficient channel room (0.8331 % < 1.50 %).
+
+### B. 2026-08-27 12:00–14:00 UTC
+
+- `te-d-a6d9a05da2f1-0012` line `d-a6d9a05da2f1` touch 2026-08-27 12:35:00 UTC | long_ok=yes | confirm=— | entry=— @ — | pool_gate=— | room%=— | pot%=— | **variant A**: exit=NO_TRADE reject=NO_C1_CONFIRM_AFTER_FIRST_TOUCH
+- `te-d-a6d9a05da2f1-0013` line `d-a6d9a05da2f1` touch 2026-08-27 13:45:00 UTC | long_ok=yes | confirm=2026-08-27 13:50:00 UTC | entry=2026-08-27 13:55:00 UTC @ 0.0877300000 | pool_gate=60 | room%=3.2909 | pot%=2.8041 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+- `te-d-a6d9a05da2f1-0014` line `d-a6d9a05da2f1` touch 2026-08-27 13:50:00 UTC | long_ok=yes | confirm=2026-08-27 13:55:00 UTC | entry=2026-08-27 14:00:00 UTC @ 0.0880800000 | pool_gate=60 | room%=2.8751 | pot%=2.3955 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+_Qualified entries in this window were not traded because the reference long from 26.08 15:10 was still open (GLOBAL_MAX_ONE_OPEN_LONG)._
+
+### B. 2026-08-27 17:00–19:00 UTC
+
+- `te-d-a6d9a05da2f1-0015` line `d-a6d9a05da2f1` touch 2026-08-27 18:15:00 UTC | long_ok=yes | confirm=2026-08-27 18:20:00 UTC | entry=2026-08-27 18:25:00 UTC @ 0.0881600000 | pool_gate=56 | room%=2.5004 | pot%=2.3026 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+- `te-d-a6d9a05da2f1-0016` line `d-a6d9a05da2f1` touch 2026-08-27 18:35:00 UTC | long_ok=yes | confirm=— | entry=— @ — | pool_gate=— | room%=— | pot%=— | **variant A**: exit=NO_TRADE reject=NO_C1_CONFIRM_AFTER_FIRST_TOUCH
+- `te-d-a6d9a05da2f1-0017` line `d-a6d9a05da2f1` touch 2026-08-27 18:40:00 UTC | long_ok=yes | confirm=2026-08-27 18:45:00 UTC | entry=2026-08-27 18:50:00 UTC @ 0.0882900000 | pool_gate=56 | room%=2.3230 | pot%=2.1520 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+- `te-d-a6d9a05da2f1-0018` line `d-a6d9a05da2f1` touch 2026-08-27 18:45:00 UTC | long_ok=yes | confirm=2026-08-27 18:50:00 UTC | entry=2026-08-27 18:55:00 UTC @ 0.0883800000 | pool_gate=56 | room%=2.2135 | pot%=2.0480 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+- `te-d-a6d9a05da2f1-0019` line `d-a6d9a05da2f1` touch 2026-08-27 18:50:00 UTC | long_ok=yes | confirm=2026-08-27 18:55:00 UTC | entry=2026-08-27 19:00:00 UTC @ 0.0886700000 | pool_gate=56 | room%=1.8739 | pot%=1.7142 | **variant A**: exit=NO_TRADE reject=GLOBAL_MAX_ONE_OPEN_LONG
+_Same: pool gate and channel room satisfied; trades blocked while the 26.08 long remained open._
+
+### C. 2026-08-26 15:10 UTC reference long
+
+- **A**: exit=CHANNEL_UPPER | pnl=6.5449 | reject=— | room%=8.8285
+- **B**: exit=CHANNEL_UPPER | pnl=6.5449 | reject=— | room%=8.8285
+- **C**: exit=CHANNEL_UPPER | pnl=6.5449 | reject=— | room%=8.8285
+- **D**: exit=CHANNEL_UPPER | pnl=6.5449 | reject=— | room%=8.8285
+
+## Channel cycle (variant D)
+
+- `upper_reached` after any completed bar with high ≥ main upper (`d-22f8d9f720ce`).
+- Reset when a new allowlist touch starts and prior bar close is ≥ 1.50 % below upper line.
+- Ambiguous cases: mark `UNRESOLVED_CHANNEL_CYCLE` in future if needed; current pilot uses the above deterministic rule only.
+
+## Executed trades (all variants)
+
+### Variant A
+
+| Entry UTC | line | Entry | SL | TP | upper@entry | room % | pot % | Exit | kind | PnL % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-25 21:15:00 UTC | `d-03350098db64` | 0.0858500000 | 0.0848198000 | 0.0924500000 | 0.0929010369 | 8.2132 | 7.6878 | 2026-08-26 14:40:00 UTC | SL | -1.2000 |
+| 2026-08-26 15:10:00 UTC | `d-a6d9a05da2f1` | 0.0844400000 | 0.0834267200 | 0.0915100000 | 0.0918947907 | 8.8285 | 8.3728 | 2026-08-28 01:30:00 UTC | CHANNEL_UPPER | 6.5449 |
+| 2026-08-28 01:55:00 UTC | `d-a6d9a05da2f1` | 0.0892000000 | 0.0881296000 | 0.0899431410 | 0.0899431410 | 0.8331 | 0.8331 | 2026-08-28 02:20:00 UTC | SL | -1.2000 |
+
+### Variant B
+
+| Entry UTC | line | Entry | SL | TP | upper@entry | room % | pot % | Exit | kind | PnL % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-25 21:15:00 UTC | `d-03350098db64` | 0.0858500000 | 0.0848198000 | 0.0924500000 | 0.0929010369 | 8.2132 | 7.6878 | 2026-08-26 14:40:00 UTC | SL | -1.2000 |
+| 2026-08-26 15:10:00 UTC | `d-a6d9a05da2f1` | 0.0844400000 | 0.0834267200 | 0.0915100000 | 0.0918947907 | 8.8285 | 8.3728 | 2026-08-28 01:30:00 UTC | CHANNEL_UPPER | 6.5449 |
+
+### Variant C
+
+| Entry UTC | line | Entry | SL | TP | upper@entry | room % | pot % | Exit | kind | PnL % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-25 21:15:00 UTC | `d-03350098db64` | 0.0858500000 | 0.0848198000 | 0.0924500000 | 0.0929010369 | 8.2132 | 7.6878 | 2026-08-26 14:40:00 UTC | SL | -1.2000 |
+| 2026-08-26 15:10:00 UTC | `d-a6d9a05da2f1` | 0.0844400000 | 0.0834267200 | 0.0915100000 | 0.0918947907 | 8.8285 | 8.3728 | 2026-08-28 01:30:00 UTC | CHANNEL_UPPER | 6.5449 |
+
+### Variant D
+
+| Entry UTC | line | Entry | SL | TP | upper@entry | room % | pot % | Exit | kind | PnL % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2026-08-25 21:15:00 UTC | `d-03350098db64` | 0.0858500000 | 0.0848198000 | 0.0924500000 | 0.0929010369 | 8.2132 | 7.6878 | 2026-08-26 14:40:00 UTC | SL | -1.2000 |
+| 2026-08-26 15:10:00 UTC | `d-a6d9a05da2f1` | 0.0844400000 | 0.0834267200 | 0.0915100000 | 0.0918947907 | 8.8285 | 8.3728 | 2026-08-28 01:30:00 UTC | CHANNEL_UPPER | 6.5449 |
+

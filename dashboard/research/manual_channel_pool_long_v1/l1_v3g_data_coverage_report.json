@@ -1,0 +1,200 @@
+{
+  "window_start_utc": "2026-08-25 00:00:00 UTC",
+  "window_end_utc_exclusive": "2026-09-20 00:00:00 UTC",
+  "expected_bars": 7488,
+  "git_head": "b83b1d5d7e75459b469a5be7d247646149ef4754",
+  "drawings": {
+    "sha256": "e062a5a0b6802363cdf9048cba26b460344cef711ed93133c909ade466252ce8",
+    "sha_matches_v3f": false,
+    "drawing_count": 24,
+    "allowlist_present": [
+      "d-03350098db64",
+      "d-0e5e7004dccd",
+      "d-248d74050cc8",
+      "d-a6d9a05da2f1"
+    ],
+    "allowlist_missing": [
+      "d-1ff495203465"
+    ]
+  },
+  "v3f_comparable": false,
+  "candles": {
+    "loaded": 7488,
+    "expected": 7488,
+    "complete": true,
+    "gap_count": 0,
+    "first_gaps": []
+  },
+  "line_geometry": {
+    "upper_main": "d-22f8d9f720ce",
+    "lines": [
+      {
+        "drawing_id": "d-03350098db64",
+        "missing": false,
+        "samples": [
+          {
+            "bar_utc": "2026-08-25 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "BEFORE_FIRST_ANCHOR",
+            "price": 0.0856860586375393,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-07 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.07413740071012184,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.06259182736014228,
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-0e5e7004dccd",
+        "missing": false,
+        "samples": [
+          {
+            "bar_utc": "2026-08-25 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "BEFORE_FIRST_ANCHOR",
+            "price": 0.08401371616956167,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-07 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.08827173251626906,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.09252861157228555,
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-1ff495203465",
+        "missing": true
+      },
+      {
+        "drawing_id": "d-22f8d9f720ce",
+        "missing": false,
+        "samples": [
+          {
+            "bar_utc": "2026-08-25 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "BEFORE_FIRST_ANCHOR",
+            "price": 0.09409449177147391,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-07 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.076571766686573,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.05905372181670548,
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-248d74050cc8",
+        "missing": false,
+        "samples": [
+          {
+            "bar_utc": "2026-08-25 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "BEFORE_FIRST_ANCHOR",
+            "price": 0.08266799349341786,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-07 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.08719210914169931,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.09171501642575845,
+            "extend_right": false
+          }
+        ]
+      },
+      {
+        "drawing_id": "d-a6d9a05da2f1",
+        "missing": false,
+        "samples": [
+          {
+            "bar_utc": "2026-08-25 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "BEFORE_FIRST_ANCHOR",
+            "price": 0.07778520760104071,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-07 00:00:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.12547186589286885,
+            "extend_right": false
+          },
+          {
+            "bar_utc": "2026-09-19 23:55:00 UTC",
+            "active": false,
+            "anchor_status": "AFTER_SECOND_ANCHOR",
+            "price": 0.17314578736357206,
+            "extend_right": false
+          }
+        ]
+      }
+    ]
+  },
+  "pool_d2": {
+    "unique_decision_closes_from_candidates": 34,
+    "probes_total": 60,
+    "pool_snapshots_ok": 60,
+    "pool_failures": [],
+    "d2_compute_failures": [],
+    "pool_coverage_complete_for_window": true,
+    "approx_last_ok_before_gap": null,
+    "first_pool_failure_utc": null
+  },
+  "backtest_claim": "full_26d",
+  "regression_z1": {
+    "A": {
+      "realized_gross_z1": 7.7204,
+      "v3f_ref": 7.7204,
+      "match": true
+    },
+    "B": {
+      "realized_gross_z1": 8.9204,
+      "v3f_ref": 8.9204,
+      "match": true
+    },
+    "C": {
+      "realized_gross_z1": 8.9204,
+      "v3f_ref": null,
+      "match": false
+    }
+  }
+}

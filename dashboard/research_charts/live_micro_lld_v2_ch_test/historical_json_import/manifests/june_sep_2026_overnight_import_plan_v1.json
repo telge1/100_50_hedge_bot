@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "overnight_run_id": "d304a3c5-9209-42e3-9a18-9f4d50af17db",
+  "backup_recovery_id": "dc9dec02-1f4d-4989-880f-90cd1329f3bc",
+  "symbol": "DOGEUSDT",
+  "approved_months": [
+    "2026-06",
+    "2026-07",
+    "2026-08",
+    "2026-09"
+  ],
+  "combo_order": [
+    "15m_PD1",
+    "15m_PD5",
+    "15m_PD10",
+    "4h_PD10"
+  ],
+  "manifest_registry": [
+    {
+      "month": "2026-06",
+      "combo_folder": "15m_PD1",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jun2026_15m_pd1_full_v1.json",
+      "scope_fingerprint": "47d6a382d896ba3f552d77fb0f30af726ddfca5945eb096e07aa134f383f0adf",
+      "run_id": "00000000-0000-4000-8000-000000005201",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-06",
+      "combo_folder": "15m_PD5",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jun2026_15m_pd5_full_v1.json",
+      "scope_fingerprint": "96776cd808cc6f7d1ff0bd0777a30b470141a6ec98dc15001a0004b6b541046f",
+      "run_id": "00000000-0000-4000-8000-000000005202",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-06",
+      "combo_folder": "15m_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jun2026_15m_pd10_full_v1.json",
+      "scope_fingerprint": "15d359a06ba9cdbf1ddcf2524b10225df6634a9b76dfc34dabe73ca2699bd5c9",
+      "run_id": "00000000-0000-4000-8000-000000005203",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-06",
+      "combo_folder": "4h_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jun2026_4h_pd10_full_v1.json",
+      "scope_fingerprint": "7c37ab8f6969ba65c3520de1cdda430e5a8bd417f29b78938e7a63a07fc424b5",
+      "run_id": "00000000-0000-4000-8000-000000005204",
+      "max_snapshots": 180,
+      "max_batches": 4
+    },
+    {
+      "month": "2026-07",
+      "combo_folder": "15m_PD1",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jul2026_15m_pd1_full_v1.json",
+      "scope_fingerprint": "9fcdf5d2ca7779d45db361f7cc6e467bb8200be3b2e349e4f767c7b1c89eefcf",
+      "run_id": "00000000-0000-4000-8000-000000005301",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-07",
+      "combo_folder": "15m_PD5",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jul2026_15m_pd5_full_v1.json",
+      "scope_fingerprint": "069f3a1b9833ca25452c05ae4f46366460767ef5456b4bd3ea369eda91e0d776",
+      "run_id": "00000000-0000-4000-8000-000000005302",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-07",
+      "combo_folder": "15m_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jul2026_15m_pd10_full_v1.json",
+      "scope_fingerprint": "f815b6e0851becec1f261a7575d1699926240eaed6066766d0cdda1420f61cd3",
+      "run_id": "00000000-0000-4000-8000-000000005303",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-07",
+      "combo_folder": "4h_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jul2026_4h_pd10_full_v1.json",
+      "scope_fingerprint": "6d29eaca0c29db434be254092a21faa84266f72a82839912c15561f0f12449de",
+      "run_id": "00000000-0000-4000-8000-000000005304",
+      "max_snapshots": 186,
+      "max_batches": 4
+    },
+    {
+      "month": "2026-08",
+      "combo_folder": "15m_PD1",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_aug2026_15m_pd1_full_v1.json",
+      "scope_fingerprint": "6d1fac53119300a0515d8591e90eae71b6df62729ee9cc63e0f87c21c169f810",
+      "run_id": "00000000-0000-4000-8000-000000005401",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-08",
+      "combo_folder": "15m_PD5",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_aug2026_15m_pd5_full_v1.json",
+      "scope_fingerprint": "886b0c482309c987ece824c0564544e91b4ccf8287f19a7a8a6648df2e488960",
+      "run_id": "00000000-0000-4000-8000-000000005402",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-08",
+      "combo_folder": "15m_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_aug2026_15m_pd10_full_v1.json",
+      "scope_fingerprint": "52990b81ac4f89cea7393f8eb702ffa61cd854e19039c28c1b26e4f5c9ca090d",
+      "run_id": "00000000-0000-4000-8000-000000005403",
+      "max_snapshots": 2976,
+      "max_batches": 60
+    },
+    {
+      "month": "2026-08",
+      "combo_folder": "4h_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_aug2026_4h_pd10_full_v1.json",
+      "scope_fingerprint": "dcd93b2c2ead712973689539fdae7ac64e09adcda3f5e6fbe0d4262eb25dca3d",
+      "run_id": "00000000-0000-4000-8000-000000005404",
+      "max_snapshots": 186,
+      "max_batches": 4
+    },
+    {
+      "month": "2026-09",
+      "combo_folder": "15m_PD1",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_sep2026_15m_pd1_full_v1.json",
+      "scope_fingerprint": "9f146646dce9d13e91be9a417444af424d53c8b117e193ddb0f02f9faae5280b",
+      "run_id": "00000000-0000-4000-8000-000000005501",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-09",
+      "combo_folder": "15m_PD5",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_sep2026_15m_pd5_full_v1.json",
+      "scope_fingerprint": "afa06e693146d4863905e4ba20b8c900181e61d273e4610d608388fe30610a77",
+      "run_id": "00000000-0000-4000-8000-000000005502",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-09",
+      "combo_folder": "15m_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_sep2026_15m_pd10_full_v1.json",
+      "scope_fingerprint": "b600099afdd9a27ccd6558792a518e4eeba05e8344749e4ec1e818e970a34e28",
+      "run_id": "00000000-0000-4000-8000-000000005503",
+      "max_snapshots": 2880,
+      "max_batches": 58
+    },
+    {
+      "month": "2026-09",
+      "combo_folder": "4h_PD10",
+      "manifest_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_sep2026_4h_pd10_full_v1.json",
+      "scope_fingerprint": "e418b51de9ab894f9b84680b05eaf09bd6ad0197ccc03384fb16b4c3ece0a8de",
+      "run_id": "00000000-0000-4000-8000-000000005504",
+      "max_snapshots": 180,
+      "max_batches": 4
+    }
+  ],
+  "months": [
+    {
+      "month": "2026-06",
+      "progress_subdir": "june",
+      "monthly_plan_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jun2026_monthly_run_plan_v1.json"
+    },
+    {
+      "month": "2026-07",
+      "progress_subdir": "july",
+      "monthly_plan_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_jul2026_monthly_run_plan_v1.json"
+    },
+    {
+      "month": "2026-08",
+      "progress_subdir": "august",
+      "monthly_plan_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_aug2026_monthly_run_plan_v1.json"
+    },
+    {
+      "month": "2026-09",
+      "progress_subdir": "september",
+      "monthly_plan_path": "/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short/dashboard/research_charts/live_micro_lld_v2_ch_test/historical_json_import/manifests/phase4z_sep2026_monthly_run_plan_v1.json"
+    }
+  ]
+}

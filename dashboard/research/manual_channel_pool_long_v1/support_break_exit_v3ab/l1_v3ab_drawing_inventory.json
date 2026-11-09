@@ -1,0 +1,52 @@
+[
+  {
+    "drawing_id": "d-1731fb4bb889",
+    "drawing_type": "trend",
+    "start_ts": 1787943000,
+    "start_price": 0.08414394918832001,
+    "end_ts": 1787985300,
+    "end_price": 0.08534280492307726,
+    "extend_right": null,
+    "visible": true
+  },
+  {
+    "drawing_id": "d-8521dc37f7b9",
+    "drawing_type": "trend",
+    "start_ts": 1787993400,
+    "start_price": 0.08419823699517694,
+    "end_ts": 1788050400,
+    "end_price": 0.0852975650840298,
+    "extend_right": null,
+    "visible": true
+  },
+  {
+    "drawing_id": "d-c0791ea0c65e",
+    "drawing_type": "trend",
+    "start_ts": 1787762100,
+    "start_price": 0.08381461440974818,
+    "end_ts": 1787843400,
+    "end_price": 0.08815192810661791,
+    "extend_right": null,
+    "visible": true
+  },
+  {
+    "drawing_id": "d-e6e9b83d2be1",
+    "drawing_type": "trend",
+    "start_ts": 1788132300,
+    "start_price": 0.08117252426335579,
+    "end_ts": 1788158700,
+    "end_price": 0.08215314773323426,
+    "extend_right": null,
+    "visible": true
+  },
+  {
+    "drawing_id": "d-ea081434c5d3",
+    "drawing_type": "trend",
+    "start_ts": 1788081300,
+    "start_price": 0.08430877233576727,
+    "end_ts": 1788127500,
+    "end_price": 0.0858983768758056,
+    "extend_right": null,
+    "visible": true
+  }
+]

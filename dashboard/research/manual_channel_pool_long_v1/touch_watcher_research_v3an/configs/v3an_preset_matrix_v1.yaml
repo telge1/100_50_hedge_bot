@@ -1,0 +1,16 @@
+# L1 V3AN — preset matrix v1 (45 rows = 3 touch × 5 confirm × 3 windows)
+# Loader: watcher_config.preset_matrix_v1() — this file documents schema + grid; no implicit defaults.
+schema_version: touch_watcher/v1
+matrix_id: v3an_preset_matrix_v1
+touch_tolerance_pct_grid: [0.20, 0.03, 0.0]
+touch_preset_ids: [LEGACY_020, NEAR_003, PHYSICAL_ONLY]
+confirmation_modes: [LEGACY_C1, A1, A2, A3, B_RECLAIM]
+watch_window_bars_grid: [6, 12, 24]
+shared_parameters:
+  schema_version: touch_watcher/v1
+  confirmation_min_gain_pct: 0.20
+  reclaim_confirmation_bars: 2
+  require_approach_from_above: true
+  approach_epsilon_pct: 0.05
+  sl_pct: 1.20
+research_touch_tolerance_extensions: [0.01, 0.02, 0.05]
