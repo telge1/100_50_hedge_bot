@@ -9,6 +9,11 @@ from typing import Any
 
 from .historical_window_v1 import LandscapeWindowError, build_landscape_window, landscape_window_from_state_err
 from .window_request_trace_v1 import log_window_build_complete, new_request_id
+from .on_demand_1hpd1_v1 import (
+    BUILDER_VERSION_V1 as ON_DEMAND_1H_BUILDER_VERSION,
+    build_landscape_window_on_demand_1hpd1_v1,
+    on_demand_1hpd1_cache_identity,
+)
 from .window_response_cache_v1 import (
     COMPUTE_MODE_FULL,
     WINDOW_BUILDER_VERSION_V1,
@@ -25,6 +30,11 @@ from .window_response_cache_v1 import (
 )
 
 
+def _is_on_demand_1hpd1(timeframe: str, pool_detail: int) -> bool:
+    tf = str(timeframe or "").strip()
+    return tf == "1h" and int(pool_detail) == 1
+
+
 def _key_parts(
     *,
     from_utc: str,
@@ -35,6 +45,27 @@ def _key_parts(
 ) -> WindowCacheKeyParts:
     from research_charts.historical_lmv2_pd_contract_v1 import resolve_viewer_historical_scope
 
+    tf = str(timeframe or "").strip()
+    pd = int(pool_detail)
+    if tf == "1h" and pd != 1:
+        raise LandscapeWindowError(
+            "INVALID_SCOPE",
+            "1h on-demand supports PD1 only",
+            {"timeframe": tf, "pool_detail": pd},
+        )
+    if _is_on_demand_1hpd1(timeframe, pool_detail):
+        ident = on_demand_1hpd1_cache_identity()
+        return WindowCacheKeyParts(
+            symbol=str(ident["symbol"]),
+            from_utc=str(from_utc),
+            to_utc=str(to_utc),
+            timeframe=str(ident["timeframe"]),
+            pool_detail=int(ident["pool_detail"]),
+            pipeline_line_id=str(ident["pipeline_line_id"]),
+            config_hash=str(ident["config_hash"]),
+            compute_mode=compute_mode,
+            builder_version=ON_DEMAND_1H_BUILDER_VERSION,
+        )
     hcfg = resolve_viewer_historical_scope(timeframe=timeframe, pool_detail=pool_detail)
     return WindowCacheKeyParts(
         symbol="DOGEUSDT",
@@ -57,12 +88,33 @@ def _build_uncached(
     pool_detail: int,
     compute_mode: str,
 ) -> dict[str, Any]:
+    tf = str(timeframe or "").strip()
+    pd = int(pool_detail)
+    if tf == "1h" and pd != 1:
+        raise LandscapeWindowError(
+            "INVALID_SCOPE",
+            "1h on-demand supports PD1 only",
+            {"timeframe": tf, "pool_detail": pd},
+        )
+    if tf == "1h" and pd == 1:
+        return build_landscape_window_on_demand_1hpd1_v1(
+            from_utc,
+            to_utc,
+            pool_detail=pd,
+            compute_mode=compute_mode,
+        )
+    if tf == "1h":
+        raise LandscapeWindowError(
+            "INVALID_SCOPE",
+            "unsupported 1h pool_detail",
+            {"timeframe": tf, "pool_detail": pd},
+        )
     try:
         return build_landscape_window(
             from_utc,
             to_utc,
-            timeframe=timeframe,
-            pool_detail=pool_detail,
+            timeframe=tf,
+            pool_detail=pd,
             compute_mode=compute_mode,
         )
     except LandscapeWindowError:

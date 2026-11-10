@@ -91,6 +91,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     async def pd1_viewer_capabilities(user: dict = Depends(require_auth)):
         from research_charts.historical_pool_state_v1 import HistoricalPoolStateError
 
+        from .module_hot_reload_v1 import ensure_pd1_landscape_modules_current
+
+        ensure_pd1_landscape_modules_current()
         from .historical_window_v1 import landscape_capabilities, landscape_window_from_state_err
 
         try:
@@ -101,7 +104,12 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
 
     @router.post("/live-charts/viewer/api/window")
     async def pd1_viewer_window(body: dict[str, Any], user: dict = Depends(require_auth)):
-        from .historical_window_v1 import LandscapeWindowError
+        from research_charts.historical_pool_state_v1 import HistoricalPoolStateError
+
+        from .module_hot_reload_v1 import ensure_pd1_landscape_modules_current
+
+        ensure_pd1_landscape_modules_current()
+        from .historical_window_v1 import LandscapeWindowError, landscape_window_from_state_err
         from .window_service_v1 import get_landscape_window_response
 
         try:
@@ -123,6 +131,9 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             )
         except LandscapeWindowError as exc:
             return _window_error(exc.code, exc.message, exc.details)
+        except HistoricalPoolStateError as exc:
+            err = landscape_window_from_state_err(exc)
+            return _window_error(err.code, err.message, err.details)
 
     @router.get("/live-charts/viewer/api/membership")
     async def pd1_viewer_membership(asof_utc: str, user: dict = Depends(require_auth)):

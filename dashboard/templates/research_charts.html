@@ -312,7 +312,12 @@
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
                     <label class="trp-check trp-dock-ind" id="researchExactOriginDensityWrap" title="Exact independent origin depth (ACTIVE only) — nicht parallel zu Historical LLD V2"><input type="checkbox" id="researchIndExactOriginDensity" autocomplete="off"> B – Exact Origin-Density</label>
-                    <span id="researchExactOriginPdWrap" class="trp-dock-ind" hidden title="Density pool detail — unabhängig von Historical LLD V2; Timeframe = Chart-Pane">
+                    <span id="researchExactOriginPoolTfWrap" class="trp-dock-ind" hidden title="PD1 Pool-Timeframe (unabhängig vom Kerzen-Chart)">
+                        <span class="trp-muted">Pool-TF:</span>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="5m" autocomplete="off" checked> 5m</label>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="1h" autocomplete="off"> 1h</label>
+                    </span>
+                    <span id="researchExactOriginPdWrap" class="trp-dock-ind" hidden title="Density pool detail — unabhängig von Chart-Kerzen-TF und Historical LLD V2">
                         <span class="trp-muted">Density PD:</span>
                         <label class="trp-check trp-dock-ind" id="researchExactOriginPd1Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="1" autocomplete="off" checked> PD1</label>
                         <label class="trp-check trp-dock-ind" id="researchExactOriginPd5Wrap"><input type="checkbox" name="researchExactOriginPoolDetail" value="5" autocomplete="off" disabled> PD5</label>
@@ -671,8 +676,8 @@
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
     <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-bt-d34-density-cache-v1"></script>
-    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=phase6xt-bt-d34-density-cache-v1"></script>
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=phase6xt-bt-d36-density-supersede-v1"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=pd1-1h-fixed-tile-v2"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-1h-fixed-tile-v2"></script>
     <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 long-v3-phase3g-sept-sl-cap-v1 -->
     <script src="/static/js/research/research_charts.js?v=tf-1d-local-v1"></script>
     <script src="/static/js/dashboard.js"></script>

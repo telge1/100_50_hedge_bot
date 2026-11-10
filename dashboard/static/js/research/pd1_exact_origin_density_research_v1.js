@@ -17,7 +17,7 @@
   const EOD_FIXED_TILE_48H_FLAG_KEY = "phase6xt_eod_fixed_tile_48h_v1";
   const MIN_ORIGINS_STORAGE_KEY = "phase6xt_eod_density_min_origins_v1";
   const MIN_ORIGINS_SLIDER_MAX = 10;
-  const VERSION = "phase6xt-bt-d36-density-supersede-v1";
+  const VERSION = "pd1-1h-fixed-tile-v2";
   /** Viewer API release matrix (no silent fallbacks). */
   const RELEASED_VIEWER_SCOPES = [
     { timeframe: "15m", pool_detail: 1 },
@@ -26,10 +26,12 @@
     { timeframe: "5m", pool_detail: 1 },
     { timeframe: "5m", pool_detail: 5 },
     { timeframe: "5m", pool_detail: 10 },
+    { timeframe: "1h", pool_detail: 1 },
     { timeframe: "4h", pool_detail: 10 },
   ];
   const POOL_DETAIL_VALUES = [1, 5, 10];
   const MAX_CONCURRENT_WINDOW_FETCH = 2;
+  const MAX_CONCURRENT_WINDOW_FETCH_1H = 3;
 
   let deps = null;
   let caps = null;
@@ -84,16 +86,21 @@
       });
   }
 
-  /** Active released scopes for pane chart timeframe (multi-PD; pane.tf × checked PDs). */
+  function selectedPoolTimeframe() {
+    const el = document.querySelector('input[name="researchExactOriginPoolTimeframe"]:checked');
+    return el ? String(el.value) : "5m";
+  }
+
+  /** Active released scopes (pool TF × checked PDs; unabhängig vom Chart-Candle-TF). */
   function activeScopesForPane(pane) {
-    const tf = paneChartTimeframe(pane);
-    if (!tf) return [];
+    const poolTf = selectedPoolTimeframe();
+    if (!poolTf) return [];
     return selectedPoolDetails()
       .filter(function (pd) {
-        return isScopeReleased(tf, pd);
+        return isScopeReleased(poolTf, pd);
       })
       .map(function (pd) {
-        return { timeframe: tf, pool_detail: pd };
+        return { timeframe: poolTf, pool_detail: pd };
       });
   }
 
@@ -104,11 +111,13 @@
 
   function membershipTfSecForPane(pane) {
     const AD = window.PD1ExactDensityTrpAdapter;
-    const tf = paneChartTimeframe(pane);
+    const sc = primaryScopeForPane(pane);
+    const tf = sc ? sc.timeframe : selectedPoolTimeframe();
     if (AD && AD.membershipSlotMinutesForTimeframe) {
       return AD.membershipSlotMinutesForTimeframe(tf) * 60;
     }
     if (tf === "5m") return 300;
+    if (tf === "1h") return 3600;
     if (tf === "4h") return 14400;
     return 900;
   }
@@ -160,11 +169,22 @@
     return found;
   }
 
+  function hasPoolTimeframeSelector() {
+    return !!document.querySelector('input[name="researchExactOriginPoolTimeframe"]');
+  }
+
   function syncPoolDetailUi(optPane) {
     const pane = optPane || referencePaneForPdUi();
-    const tf = pane ? paneChartTimeframe(pane) : "15m";
+    const poolTf = selectedPoolTimeframe();
+    const chartTf = pane ? paneChartTimeframe(pane) : "";
     const unavailable =
-      "Exact Origin Density: für " + tf + " noch nicht freigegeben (keine Publish-Line).";
+      "Exact Origin Density: Pool-TF " + poolTf + " noch nicht freigegeben.";
+    const hint = deps && deps.$("researchExactOriginDensityHint");
+    if (hint && isEnabled() && !hasPoolTimeframeSelector() && chartTf === "1h") {
+      hint.hidden = false;
+      hint.textContent =
+        "B – Exact Origin: Seite neu laden (Strg+Shift+R) — Pool-TF 5m/1h fehlt in geladener UI.";
+    }
     POOL_DETAIL_VALUES.forEach(function (pd) {
       const el = document.querySelector(
         'input[name="researchExactOriginPoolDetail"][value="' + String(pd) + '"]'
@@ -176,21 +196,23 @@
             ? deps && deps.$("researchExactOriginPd5Wrap")
             : deps && deps.$("researchExactOriginPd10Wrap");
       if (!el) return;
-      const released = isScopeReleased(tf, pd);
+      const released = isScopeReleased(poolTf, pd);
       if (pd === 1) {
-        el.disabled = !released;
-        if (!released && el.checked) el.checked = false;
-        if (wrap) wrap.title = released ? "" : unavailable;
+        // PD1: allow when released for independent pool TF (default 5m even on 1h chart).
+        const pd1Ok = released || (poolTf === "5m" && isScopeReleased("5m", 1));
+        el.disabled = !pd1Ok;
+        if (!pd1Ok && el.checked) el.checked = false;
+        if (wrap) wrap.title = pd1Ok ? "" : unavailable;
       } else {
         el.disabled = !released;
         if (!released && el.checked) el.checked = false;
         if (wrap) {
-          wrap.title = released ? "" : "PD" + pd + ": für " + tf + " noch nicht freigegeben";
+          wrap.title = released ? "" : "PD" + pd + ": für Pool-TF " + poolTf + " noch nicht freigegeben";
           wrap.classList.toggle("trp-muted", !released);
         }
       }
     });
-    if (tf === "4h" && isScopeReleased("4h", 10)) {
+    if (poolTf === "4h" && isScopeReleased("4h", 10)) {
       const pd10El = document.querySelector(
         'input[name="researchExactOriginPoolDetail"][value="10"]'
       );
@@ -212,6 +234,17 @@
     } catch (e) {
       return false;
     }
+  }
+
+  /** 1h on-demand: stable UTC 72h tiles (same span as API max chunk; better cache on pan). 5m unchanged. */
+  function exactOriginWindowPlannerForScope(sc) {
+    if (sc && String(sc.timeframe) === "1h") {
+      return { mode: "fixed48h", tileHours: 72 };
+    }
+    if (isFixedTile48hEnabled()) {
+      return { mode: "fixed48h", tileHours: 48 };
+    }
+    return { mode: "sliding", tileHours: null };
   }
 
   /** Sole canvas flag source — localStorage only (no host/deps callback; avoids recursion).
@@ -242,6 +275,46 @@
     pane.exactOriginWindowStore = { chunks: {}, order: [], replayGen: null };
     pane.exactOriginWindowStores = {};
     pane.exactOriginSegmentCache = null;
+    pane.exactOriginSweepCache = null;
+  }
+
+  function maxConcurrentWindowFetch(scopes) {
+    if (!scopes || !scopes.length) return MAX_CONCURRENT_WINDOW_FETCH;
+    for (let i = 0; i < scopes.length; i += 1) {
+      if (scopes[i].timeframe === "1h") return MAX_CONCURRENT_WINDOW_FETCH_1H;
+    }
+    return MAX_CONCURRENT_WINDOW_FETCH;
+  }
+
+  function chunkStoreEpoch(AD, store, planned) {
+    if (!store || !planned || !planned.length) return null;
+    const parts = [];
+    for (let i = 0; i < planned.length; i += 1) {
+      const w = planned[i];
+      const ck = AD.exactOriginCacheKeyForWindow(w);
+      const ent = store.chunks[ck];
+      if (!ent || ent.status !== "ok" || !ent.pools) return null;
+      parts.push(ck + ":" + ent.pools.length + ":" + ent.at);
+    }
+    return parts.join("|");
+  }
+
+  function exactOriginSweepCacheKey(scopeKey, slotMin, win, ext, epoch) {
+    return (
+      String(epoch) +
+      "\x1f" +
+      scopeKey +
+      "\x1f" +
+      slotMin +
+      "\x1f" +
+      win.sweepT0Ms +
+      "\x1f" +
+      win.sweepT1Ms +
+      "\x1f" +
+      ext.yMin.toFixed(12) +
+      "\x1f" +
+      ext.yMax.toFixed(12)
+    );
   }
 
   function clearCanvasOnPane(pane) {
@@ -515,7 +588,8 @@
     reqReplayGen,
     pane,
     scope,
-    retryErrors
+    retryErrors,
+    maxConcurrent
   ) {
     const missing = [];
     for (let i = 0; i < planned.length; i += 1) {
@@ -563,7 +637,8 @@
       }
     }
     const workers = [];
-    const n = Math.min(MAX_CONCURRENT_WINDOW_FETCH, missing.length);
+    const conc = maxConcurrent == null ? MAX_CONCURRENT_WINDOW_FETCH : maxConcurrent;
+    const n = Math.min(conc, missing.length);
     for (let i = 0; i < n; i += 1) workers.push(worker());
     await Promise.all(workers);
     return {
@@ -648,9 +723,9 @@
       if (hintOff && paneChartTimeframe(pane)) {
         hintOff.hidden = false;
         hintOff.textContent =
-          "B – Exact Origin: kein freigegebenes PD für Chart " +
-          paneChartTimeframe(pane) +
-          " (PD aktivieren oder Pane-TF wechseln)";
+          "B – Exact Origin: kein freigegebenes PD für Pool-TF " +
+          selectedPoolTimeframe() +
+          " (PD aktivieren oder Pool-TF wechseln)";
       }
       return;
     }
@@ -713,19 +788,20 @@
       if (store.replayGen !== replayGenNow) {
         const sk = exactOriginScopeKeyForScope(sc);
         pane.exactOriginWindowStores[sk] = { chunks: {}, order: [], replayGen: replayGenNow };
+        pane.exactOriginSweepCache = null;
       }
     });
     const loadSpan = AD.computeDensityLoadSpanMs(hitFromMs, hitToMs, loMs, hiMs);
-    const fixedTile48h = isFixedTile48hEnabled();
-    const windowPlanner = fixedTile48h ? "fixed48h" : "sliding";
     const scopePlans = scopes.map(function (sc) {
       const scopeKey = exactOriginScopeKeyForScope(sc);
+      const windowPlanner = exactOriginWindowPlannerForScope(sc);
       return {
         scope: sc,
         scopeKey: scopeKey,
         store: windowStoreForScope(pane, sc),
         planned: AD.planExactOriginLoadWindows(loadSpan.fromMs, loadSpan.toMs, loMs, hiMs, {
-          mode: windowPlanner,
+          mode: windowPlanner.mode,
+          tileHours: windowPlanner.tileHours,
           scopeKey: scopeKey,
         }),
       };
@@ -759,6 +835,7 @@
     }
 
     const fetchStats = { fetched: 0, failed: 0, cacheHits: 0 };
+    const maxFetch = maxConcurrentWindowFetch(scopes);
     for (let si = 0; si < scopePlans.length; si += 1) {
       const sp = scopePlans[si];
       const one = await fetchPlannedWindows(
@@ -769,7 +846,8 @@
         reqReplayGen,
         pane,
         sp.scope,
-        !!(opts && (opts.viewport || opts.force))
+        !!(opts && (opts.viewport || opts.force)),
+        maxFetch
       );
       fetchStats.fetched += one.fetched;
       fetchStats.failed += one.failed;
@@ -813,22 +891,54 @@
     let zones = [];
     let mergedSegments = [];
     let rawZoneCount = 0;
-    scopePlans.forEach(function (sp) {
-      const pools = gatherPoolsFromStore(AD, sp.store, loadSpan.fromMs, loadSpan.toMs);
-      const z = AD.poolsToExactOriginZones(pools, loadSpan.fromMs, loadSpan.toMs, ext.yMin, ext.yMax, {
-        sweepT0Ms: win.sweepT0Ms,
-        sweepT1Ms: win.sweepT1Ms,
-        slotMinutes: slotMin,
-      });
-      rawZoneCount += z.length;
-      if (canvasOn) {
-        const vpBounds = AD.computeViewportCullBounds(win.hit.from, win.hit.to, ext.yMin, ext.yMax);
-        const culled = AD.cullZonesToViewport(z, vpBounds);
-        mergedSegments = mergedSegments.concat(AD.mergeExactOriginSegments(culled));
-      } else {
-        zones = zones.concat(z);
+    let sweepCacheHit = false;
+    const vpBounds = AD.computeViewportCullBounds(win.hit.from, win.hit.to, ext.yMin, ext.yMax);
+  if (canvasOn && scopePlans.length === 1 && !(opts && opts.force)) {
+      const sp0 = scopePlans[0];
+      const epoch = chunkStoreEpoch(AD, sp0.store, sp0.planned);
+      const sk0 = sp0.scopeKey;
+      const sweepKey =
+        epoch != null ? exactOriginSweepCacheKey(sk0, slotMin, win, ext, epoch) : null;
+      if (
+        sweepKey &&
+        pane.exactOriginSweepCache &&
+        pane.exactOriginSweepCache.key === sweepKey &&
+        pane.exactOriginSweepCache.zones
+      ) {
+        sweepCacheHit = true;
+        rawZoneCount = pane.exactOriginSweepCache.rawZoneCount || pane.exactOriginSweepCache.zones.length;
+        mergedSegments = AD.mergeExactOriginSegments(
+          AD.cullZonesToViewport(pane.exactOriginSweepCache.zones, vpBounds)
+        );
       }
-    });
+    }
+    if (!sweepCacheHit) {
+      scopePlans.forEach(function (sp) {
+        const pools = gatherPoolsFromStore(AD, sp.store, loadSpan.fromMs, loadSpan.toMs);
+        const z = AD.poolsToExactOriginZones(pools, loadSpan.fromMs, loadSpan.toMs, ext.yMin, ext.yMax, {
+          sweepT0Ms: win.sweepT0Ms,
+          sweepT1Ms: win.sweepT1Ms,
+          slotMinutes: slotMin,
+        });
+        rawZoneCount += z.length;
+        if (canvasOn) {
+          const culled = AD.cullZonesToViewport(z, vpBounds);
+          mergedSegments = mergedSegments.concat(AD.mergeExactOriginSegments(culled));
+          if (scopePlans.length === 1 && !(opts && opts.force)) {
+            const epoch = chunkStoreEpoch(AD, sp.store, sp.planned);
+            if (epoch != null) {
+              pane.exactOriginSweepCache = {
+                key: exactOriginSweepCacheKey(sp.scopeKey, slotMin, win, ext, epoch),
+                zones: z,
+                rawZoneCount: rawZoneCount,
+              };
+            }
+          }
+        } else {
+          zones = zones.concat(z);
+        }
+      });
+    }
     const tAdapter1 = typeof performance !== "undefined" ? performance.now() : 0;
 
     let culledCount = rawZoneCount;
@@ -915,6 +1025,7 @@
       cullMs: canvasOn ? cullMs : null,
       mergeMs: canvasOn ? mergeMs : null,
       canvasPath: canvasOn,
+      sweepCacheHit: sweepCacheHit,
       version: VERSION,
       windowPlanner: windowPlanner,
       fixedTile48h: fixedTile48h,
@@ -1089,10 +1200,12 @@
     const hint = deps && deps.$("researchExactOriginDensityHint");
     const depthWrap = deps && deps.$("researchExactOriginMinDepthWrap");
     const pdWrap = deps && deps.$("researchExactOriginPdWrap");
+    const poolTfWrap = deps && deps.$("researchExactOriginPoolTfWrap");
     if (wrap) wrap.classList.toggle("exact-origin-active", on);
     if (on) ensureMinDepthInPaneToolbar();
     if (depthWrap) depthWrap.hidden = !on;
     if (pdWrap) pdWrap.hidden = !on;
+    if (poolTfWrap) poolTfWrap.hidden = !on;
     if (on) syncPoolDetailUi(referencePaneForPdUi());
     if (!on && hint) hint.hidden = true;
   }
@@ -1173,6 +1286,21 @@
         }
       });
     });
+    Array.prototype.slice
+      .call(document.querySelectorAll('input[name="researchExactOriginPoolTimeframe"]'))
+      .forEach(function (el) {
+        el.addEventListener("change", async function () {
+          if (!isEnabled()) return;
+          invalidateScopeCaches();
+          stripAllPanes();
+          syncPoolDetailUi(referencePaneForPdUi());
+          try {
+            await refreshAll({ force: true });
+          } catch (err) {
+            deps.setStatus("Exact Origin Pool-TF: " + (err.message || err), "error");
+          }
+        });
+      });
     updateUiChrome();
   }
 
@@ -1203,6 +1331,7 @@
     isEnabled: isEnabled,
     isCanvasPathEnabled: isCanvasPathEnabled,
     isFixedTile48hEnabled: isFixedTile48hEnabled,
+    exactOriginWindowPlannerForScope: exactOriginWindowPlannerForScope,
     exactOriginCanvasFlagKey: exactOriginCanvasFlagKey,
     exactOriginFixedTile48hFlagKey: exactOriginFixedTile48hFlagKey,
     VERSION: VERSION,

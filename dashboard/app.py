@@ -585,6 +585,7 @@ CIRCUIT_BREAKER_RESET_TIMEOUT = 60  # Nach 60 Sekunden versucht es wieder (half-
 # Request-Limits (verhindert zu viele gleichzeitige Requests)
 active_requests = {}  # {endpoint: count}
 MAX_CONCURRENT_REQUESTS = 3  # Max 3 gleichzeitige Requests pro Endpoint
+MAX_CONCURRENT_PD1_VIEWER_WINDOW = 8  # 1h density may issue several /window chunk fetches in parallel
 # User-Initiiertes (Update/Config/Laden) – höheres Limit, Klicks sollen sofort reagieren
 CONFIG_ENDPOINTS = frozenset({
     "POST /api/hedge/update-config",
@@ -2606,7 +2607,12 @@ async def timeout_and_error_handler(request: Request, call_next):
                 endpoint in CONFIG_ENDPOINTS
                 or (request.url.path.startswith("/api/bots/") and "/config" in request.url.path)
             )
-            limit = MAX_CONCURRENT_CONFIG if is_user_action else MAX_CONCURRENT_REQUESTS
+            if request.url.path == "/live-charts/viewer/api/window":
+                limit = MAX_CONCURRENT_PD1_VIEWER_WINDOW
+            elif is_user_action:
+                limit = MAX_CONCURRENT_CONFIG
+            else:
+                limit = MAX_CONCURRENT_REQUESTS
             if active_requests[endpoint] >= limit:
                 logger.warning(f"⚠️ Request-Limit erreicht für {endpoint} ({active_requests[endpoint]}/{limit})")
                 if request.url.path.startswith('/api/'):

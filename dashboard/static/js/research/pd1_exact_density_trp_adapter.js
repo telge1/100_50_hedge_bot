@@ -17,6 +17,7 @@
   function membershipSlotMinutesForTimeframe(tf) {
     const s = String(tf);
     if (s === "5m") return 5;
+    if (s === "1h") return 60;
     if (s === "4h") return 240;
     return 15;
   }
@@ -24,6 +25,19 @@
   function causalDecisionCloseMs(t, slotMinutes) {
     const sm = slotMinutes == null ? 15 : slotMinutes;
     const d = new Date(t);
+    if (sm >= 60) {
+      const totalMin = d.getUTCHours() * 60 + d.getUTCMinutes();
+      const aligned = Math.floor(totalMin / sm) * sm;
+      return Date.UTC(
+        d.getUTCFullYear(),
+        d.getUTCMonth(),
+        d.getUTCDate(),
+        Math.floor(aligned / 60),
+        aligned % 60,
+        0,
+        0
+      );
+    }
     const slot = Math.floor(d.getUTCMinutes() / sm) * sm;
     return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCHours(), slot, 0, 0);
   }
@@ -37,8 +51,43 @@
     return false;
   }
 
-  function computeExactBandsForSide(pools, t, side, yMin, yMax) {
-    const active = (pools || []).filter((pl) => poolActiveAt(pl, t) && pl.side === side);
+  function buildPoolActiveLookup(pools) {
+    return (pools || []).map(function (pl) {
+      const ranges = (pl.segments || []).map(function (seg) {
+        return [parseIso(seg[0]), parseIso(seg[1])];
+      });
+      ranges.sort(function (a, b) {
+        return a[0] - b[0];
+      });
+      return { pool: pl, ranges: ranges };
+    });
+  }
+
+  function poolActiveAtLookup(entry, t) {
+    const ranges = entry.ranges || [];
+    for (let i = 0; i < ranges.length; i += 1) {
+      const a = ranges[i][0];
+      const b = ranges[i][1];
+      if (t < a) return false;
+      if (t >= a && t <= b) return true;
+    }
+    return false;
+  }
+
+  function computeExactBandsForSide(pools, t, side, yMin, yMax, lookup) {
+    const active = [];
+    if (lookup && lookup.length) {
+      for (let i = 0; i < lookup.length; i += 1) {
+        const row = lookup[i];
+        const pl = row.pool;
+        if (pl.side !== side) continue;
+        if (poolActiveAtLookup(row, t)) active.push(pl);
+      }
+    } else {
+      (pools || []).forEach(function (pl) {
+        if (poolActiveAt(pl, t) && pl.side === side) active.push(pl);
+      });
+    }
     if (!active.length) return [];
     const events = [];
     for (const pl of active) {
@@ -119,13 +168,14 @@
       }
     }
     if (run) runs.push(run);
+    const activeLookup = buildPoolActiveLookup(pools);
     runs.forEach((col, ci) => {
       const tDraw = col.t0;
       const tEndMs = col.tEnd + STEP_MS;
       const t0s = Math.floor(col.t0 / 1000);
       const t1s = Math.floor(tEndMs / 1000);
       ["lower", "upper"].forEach((side) => {
-        const bands = computeExactBandsForSide(pools, tDraw, side, yMin, yMax);
+        const bands = computeExactBandsForSide(pools, tDraw, side, yMin, yMax, activeLookup);
         bands.forEach((b, bi) => {
           const bucket = densityBucket(b.depth);
           if (bucket < 0) return;
@@ -364,7 +414,8 @@
   function planExactOriginLoadWindows(loadFromMs, loadToMs, loMs, hiMs, opt) {
     const mode = opt && opt.mode ? opt.mode : "sliding";
     if (mode === "fixed48h") {
-      return planExactOriginFixedTiles(loadFromMs, loadToMs, loMs, hiMs, EOD_FIXED_TILE_HOURS, opt);
+      const tileHours = opt && opt.tileHours != null ? opt.tileHours : EOD_FIXED_TILE_HOURS;
+      return planExactOriginFixedTiles(loadFromMs, loadToMs, loMs, hiMs, tileHours, opt);
     }
     return planExactOriginApiWindows(loadFromMs, loadToMs, loMs, hiMs, opt);
   }

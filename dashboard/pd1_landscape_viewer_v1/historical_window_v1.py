@@ -180,6 +180,12 @@ def landscape_capabilities() -> dict[str, Any]:
                 "membership_slot_minutes": membership_slot_minutes(tf),
             }
         )
+    try:
+        from .on_demand_1hpd1_v1 import on_demand_1hpd1_capabilities_scope
+
+        supported.append(on_demand_1hpd1_capabilities_scope())
+    except Exception:
+        logger.warning("[landscape_capabilities] on_demand_1hpd1 scope unavailable", exc_info=True)
     return {
         "version": "pd1_landscape_historical_window_v1",
         "symbol": SYMBOL,
