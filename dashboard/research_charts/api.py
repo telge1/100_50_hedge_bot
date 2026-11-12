@@ -2715,7 +2715,73 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         user: dict = Depends(require_auth),
         body: dict[str, Any] = Body(default_factory=dict),
     ):
-        return get_workspace().handle_event(body)
+        snap = get_workspace().handle_event(body)
+        if body.get("type") == "drag":
+            from .manual_long_box_orders_v1 import (
+                drawing_drag_triggers_entry_sync,
+                sync_pass,
+            )
+
+            if drawing_drag_triggers_entry_sync(body):
+                try:
+                    sync_pass(
+                        drag_mode=str(body.get("mode") or ""),
+                        overlay_id=str(body.get("overlay_id") or "") or None,
+                    )
+                except Exception:
+                    pass
+        return snap
+
+    @router.post("/api/research/manual-long-box/prepare")
+    async def api_mlb_prepare(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.prepare_place, body)
+
+    @router.post("/api/research/manual-long-box/confirm")
+    async def api_mlb_confirm(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.confirm_place, body)
+
+    @router.post("/api/research/manual-long-box/cancel/prepare")
+    async def api_mlb_cancel_prepare(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.prepare_cancel, body)
+
+    @router.post("/api/research/manual-long-box/cancel/confirm")
+    async def api_mlb_cancel_confirm(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.confirm_cancel, body)
+
+    @router.post("/api/research/manual-long-box/status")
+    async def api_mlb_status(
+        user: dict = Depends(require_auth),
+        body: dict[str, Any] = Body(default_factory=dict),
+    ):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.status_bulk, body)
+
+    @router.get("/api/research/manual-long-box/sizing-config")
+    async def api_mlb_sizing_config(user: dict = Depends(require_auth)):
+        from . import manual_long_box_orders_v1 as mlb
+
+        return await asyncio.to_thread(mlb.sizing_config)
 
     @router.get("/api/research/drawings/health")
     async def api_research_drawings_health(user: dict = Depends(require_auth)):

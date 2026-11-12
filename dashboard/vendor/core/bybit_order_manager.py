@@ -1883,13 +1883,32 @@ class BybitOrderManager:
             logger.error(f"Fehler beim Öffnen der Long-Position: {e}", exc_info=True)
             return None
 
-    def open_long_limit(self, symbol, price, size, order_link_id=None):
+    def open_long_limit(
+        self,
+        symbol,
+        price,
+        size,
+        order_link_id=None,
+        *,
+        stop_loss=None,
+        take_profit=None,
+        time_in_force="GTC",
+        tpsl_mode=None,
+        tp_order_type=None,
+        sl_order_type=None,
+        sl_trigger_by=None,
+        tp_trigger_by=None,
+        position_idx=1,
+        category="linear",
+        skip_leverage_adjustment=False,
+        skip_qty_rounding=False,
+    ):
         """Öffnet eine neue Long-Limit-Order im Hedge-Mode."""
         try:
-            if not self.ensure_hedge_mode(symbol, category="linear"):
+            if not self.ensure_hedge_mode(symbol, category=category):
                 logger.error(f"[OPEN-LONG-LIMIT] ❌ Hedge-Mode konnte nicht gesetzt werden – abbrechen für {symbol}")
                 return None
-            if not self.ensure_max_leverage(symbol, category="linear"):
+            if not skip_leverage_adjustment and not self.ensure_max_leverage(symbol, category=category):
                 logger.error(f"[OPEN-LONG-LIMIT] ❌ Max-Leverage konnte nicht gesetzt werden – abbrechen für {symbol}")
                 return None
 
@@ -1897,33 +1916,67 @@ class BybitOrderManager:
             tick_size = self.get_symbol_tick_size(symbol)
             raw_size = float(size)
             raw_price = float(price)
-            if qty_step:
-                rounded_size = round(raw_size / qty_step) * qty_step
-                if rounded_size < min_qty:
-                    rounded_size = min_qty
-                decimals = len(str(qty_step).split('.')[-1]) if '.' in str(qty_step) else 0
-                size = round(rounded_size, decimals)
+            if not skip_qty_rounding:
+                if qty_step:
+                    rounded_size = round(raw_size / qty_step) * qty_step
+                    if rounded_size < min_qty:
+                        rounded_size = min_qty
+                    decimals = len(str(qty_step).split('.')[-1]) if '.' in str(qty_step) else 0
+                    size = round(rounded_size, decimals)
+                else:
+                    size = round(raw_size, 2)
             else:
-                size = round(raw_size, 2)
+                size = float(raw_size)
             if tick_size:
-                price_decimals = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
+
+                def _tick_decimals(ts):
+                    if not ts:
+                        return 6
+                    s = f"{float(ts):.18f}".rstrip("0")
+                    if s.endswith("."):
+                        s = s[:-1]
+                    if "." in s:
+                        return len(s.split(".", 1)[1])
+                    return 0
+
+                price_decimals = _tick_decimals(tick_size)
                 price = round(round(raw_price / tick_size) * tick_size, price_decimals)
+
+                def _round_px(px):
+                    return round(round(float(px) / tick_size) * tick_size, price_decimals)
             else:
                 price = round(raw_price, 6)
 
+                def _round_px(px):
+                    return round(float(px), 6)
+
             request_body = {
-                "category": "linear",
+                "category": category,
                 "symbol": symbol,
                 "side": "Buy",
                 "orderType": "Limit",
                 "qty": str(float(size)),
                 "price": str(float(price)),
-                "positionIdx": 1,
-                "timeInForce": "GTC",
+                "positionIdx": int(position_idx),
+                "timeInForce": str(time_in_force),
                 "reduceOnly": False,
             }
             if order_link_id:
                 request_body["orderLinkId"] = str(order_link_id)
+            if stop_loss is not None:
+                request_body["stopLoss"] = str(_round_px(stop_loss))
+            if take_profit is not None:
+                request_body["takeProfit"] = str(_round_px(take_profit))
+            if stop_loss is not None and take_profit is not None and tpsl_mode:
+                request_body["tpslMode"] = str(tpsl_mode)
+            if tp_order_type and take_profit is not None:
+                request_body["tpOrderType"] = str(tp_order_type)
+            if sl_order_type and stop_loss is not None:
+                request_body["slOrderType"] = str(sl_order_type)
+            if stop_loss is not None and sl_trigger_by:
+                request_body["slTriggerBy"] = str(sl_trigger_by)
+            if take_profit is not None and tp_trigger_by:
+                request_body["tpTriggerBy"] = str(tp_trigger_by)
 
             request_body_json = json.dumps(request_body)
             timestamp = str(int(time.time() * 1000))
@@ -2269,13 +2322,32 @@ class BybitOrderManager:
             logger.error(f"   Symbol: {symbol}, Size: {size}")
             return None
 
-    def open_short_limit(self, symbol, price, size, order_link_id=None):
+    def open_short_limit(
+        self,
+        symbol,
+        price,
+        size,
+        order_link_id=None,
+        *,
+        stop_loss=None,
+        take_profit=None,
+        time_in_force="GTC",
+        tpsl_mode=None,
+        tp_order_type=None,
+        sl_order_type=None,
+        sl_trigger_by=None,
+        tp_trigger_by=None,
+        position_idx=2,
+        category="linear",
+        skip_leverage_adjustment=False,
+        skip_qty_rounding=False,
+    ):
         """Öffnet eine neue Short-Limit-Order im Hedge-Mode."""
         try:
-            if not self.ensure_hedge_mode(symbol, category="linear"):
+            if not self.ensure_hedge_mode(symbol, category=category):
                 logger.error(f"[OPEN-SHORT-LIMIT] ❌ Hedge-Mode konnte nicht gesetzt werden – abbrechen für {symbol}")
                 return None
-            if not self.ensure_max_leverage(symbol, category="linear"):
+            if not skip_leverage_adjustment and not self.ensure_max_leverage(symbol, category=category):
                 logger.error(f"[OPEN-SHORT-LIMIT] ❌ Max-Leverage konnte nicht gesetzt werden – abbrechen für {symbol}")
                 return None
 
@@ -2283,33 +2355,67 @@ class BybitOrderManager:
             tick_size = self.get_symbol_tick_size(symbol)
             raw_size = float(size)
             raw_price = float(price)
-            if qty_step:
-                rounded_size = round(raw_size / qty_step) * qty_step
-                if rounded_size < min_qty:
-                    rounded_size = min_qty
-                decimals = len(str(qty_step).split('.')[-1]) if '.' in str(qty_step) else 0
-                size = round(rounded_size, decimals)
+            if not skip_qty_rounding:
+                if qty_step:
+                    rounded_size = round(raw_size / qty_step) * qty_step
+                    if rounded_size < min_qty:
+                        rounded_size = min_qty
+                    decimals = len(str(qty_step).split('.')[-1]) if '.' in str(qty_step) else 0
+                    size = round(rounded_size, decimals)
+                else:
+                    size = round(raw_size, 2)
             else:
-                size = round(raw_size, 2)
+                size = float(raw_size)
             if tick_size:
-                price_decimals = len(str(tick_size).split('.')[-1]) if '.' in str(tick_size) else 0
+
+                def _tick_decimals(ts):
+                    if not ts:
+                        return 6
+                    s = f"{float(ts):.18f}".rstrip("0")
+                    if s.endswith("."):
+                        s = s[:-1]
+                    if "." in s:
+                        return len(s.split(".", 1)[1])
+                    return 0
+
+                price_decimals = _tick_decimals(tick_size)
                 price = round(round(raw_price / tick_size) * tick_size, price_decimals)
+
+                def _round_px(px):
+                    return round(round(float(px) / tick_size) * tick_size, price_decimals)
             else:
                 price = round(raw_price, 6)
 
+                def _round_px(px):
+                    return round(float(px), 6)
+
             request_body = {
-                "category": "linear",
+                "category": category,
                 "symbol": symbol,
                 "side": "Sell",
                 "orderType": "Limit",
                 "qty": str(float(size)),
                 "price": str(float(price)),
-                "positionIdx": 2,
-                "timeInForce": "GTC",
+                "positionIdx": int(position_idx),
+                "timeInForce": str(time_in_force),
                 "reduceOnly": False,
             }
             if order_link_id:
                 request_body["orderLinkId"] = str(order_link_id)
+            if stop_loss is not None:
+                request_body["stopLoss"] = str(_round_px(stop_loss))
+            if take_profit is not None:
+                request_body["takeProfit"] = str(_round_px(take_profit))
+            if stop_loss is not None and take_profit is not None and tpsl_mode:
+                request_body["tpslMode"] = str(tpsl_mode)
+            if tp_order_type and take_profit is not None:
+                request_body["tpOrderType"] = str(tp_order_type)
+            if sl_order_type and stop_loss is not None:
+                request_body["slOrderType"] = str(sl_order_type)
+            if stop_loss is not None and sl_trigger_by:
+                request_body["slTriggerBy"] = str(sl_trigger_by)
+            if take_profit is not None and tp_trigger_by:
+                request_body["tpTriggerBy"] = str(tp_trigger_by)
 
             request_body_json = json.dumps(request_body)
             timestamp = str(int(time.time() * 1000))
@@ -2631,6 +2737,107 @@ class BybitOrderManager:
             return None
         except Exception as e:
             logger.error(f"[CANCEL-ORDER-DIRECT] ❌ Fehler beim Canceln der Order {order_id}: {e}", exc_info=True)
+            return None
+
+    def amend_order_direct(
+        self,
+        symbol,
+        *,
+        order_id=None,
+        order_link_id=None,
+        price=None,
+        take_profit=None,
+        stop_loss=None,
+        sl_trigger_by=None,
+        tp_trigger_by=None,
+        qty=None,
+        timeout=5,
+        category="linear",
+    ):
+        """
+        Amend open order via POST /v5/order/amend.
+        Only non-None fields are sent (never send takeProfit/stopLoss=0 unless explicitly passed).
+        """
+        url = f"{self.base_url}/v5/order/amend"
+        recv_window = "20000"
+        if not order_id and not order_link_id:
+            logger.error("[AMEND-ORDER-DIRECT] ❌ orderId oder orderLinkId erforderlich")
+            return None
+        try:
+            tick_size = self.get_symbol_tick_size(symbol)
+
+            def _tick_decimals(ts):
+                if not ts:
+                    return 6
+                s = f"{float(ts):.18f}".rstrip("0")
+                if s.endswith("."):
+                    s = s[:-1]
+                if "." in s:
+                    return len(s.split(".", 1)[1])
+                return 0
+
+            def _round_px(px):
+                if tick_size:
+                    dec = _tick_decimals(tick_size)
+                    return round(round(float(px) / tick_size) * tick_size, dec)
+                return round(float(px), 6)
+
+            body = {"category": category, "symbol": symbol}
+            if order_id:
+                body["orderId"] = str(order_id)
+            else:
+                body["orderLinkId"] = str(order_link_id)
+            if price is not None:
+                body["price"] = str(_round_px(price))
+            if take_profit is not None:
+                body["takeProfit"] = str(_round_px(take_profit))
+            if stop_loss is not None:
+                body["stopLoss"] = str(_round_px(stop_loss))
+            if stop_loss is not None and sl_trigger_by:
+                body["slTriggerBy"] = str(sl_trigger_by)
+            if take_profit is not None and tp_trigger_by:
+                body["tpTriggerBy"] = str(tp_trigger_by)
+            if qty is not None:
+                qty_step, min_qty = self.get_symbol_info(symbol)
+                raw_q = float(qty)
+                if qty_step:
+                    rounded = round(raw_q / qty_step) * qty_step
+                    if rounded < min_qty:
+                        rounded = min_qty
+                    dec = len(str(qty_step).split(".")[-1]) if "." in str(qty_step) else 0
+                    raw_q = round(rounded, dec)
+                body["qty"] = str(raw_q)
+
+            body_json = json.dumps(body)
+            timestamp = str(int(time.time() * 1000))
+            signature_payload = f"{timestamp}{self.api_key}{recv_window}{body_json}".encode("utf-8")
+            signature = hmac.new(
+                self.secret_key.encode("utf-8"),
+                signature_payload,
+                hashlib.sha256,
+            ).hexdigest()
+            headers = {
+                "X-BAPI-API-KEY": self.api_key,
+                "X-BAPI-TIMESTAMP": timestamp,
+                "X-BAPI-RECV-WINDOW": recv_window,
+                "X-BAPI-SIGN": signature,
+                "Content-Type": "application/json",
+            }
+            response = requests.post(url, headers=headers, data=body_json, timeout=timeout)
+            if response.status_code != 200:
+                logger.error(f"[AMEND-ORDER-DIRECT] HTTP {response.status_code}: {response.text[:300]}")
+                return None
+            data = response.json()
+            if data.get("retCode") == 0:
+                logger.info(f"[AMEND-ORDER-DIRECT] ✅ amend ack: {data.get('result')}")
+                return data.get("result") or {}
+            logger.error(f"[AMEND-ORDER-DIRECT] retCode={data.get('retCode')} {data.get('retMsg')}")
+            return None
+        except requests.exceptions.Timeout:
+            logger.error(f"[AMEND-ORDER-DIRECT] ⏱️ Timeout nach {timeout}s")
+            return None
+        except Exception as exc:
+            logger.error(f"[AMEND-ORDER-DIRECT] ❌ {exc}", exc_info=True)
             return None
 
     def cancel_all_orders_direct(self, symbol=None, base_coin=None, settle_coin=None, order_filter=None, timeout=5):

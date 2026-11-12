@@ -1730,6 +1730,336 @@
     return api(pane);
   }
 
+  var mlbOrderPending = null;
+  var mlbStatusTimer = null;
+  var mlbSizingCache = null;
+
+  function longPositionDrawingIds() {
+    var ids = [];
+    PANE_IDS.forEach(function (pid) {
+      var pane = state.panes[pid];
+      if (!pane || !pane.overlayPayloads) return;
+      Object.keys(pane.overlayPayloads).forEach(function (oid) {
+        var p = pane.overlayPayloads[oid];
+        if (!p || p.type !== "position" || p.side !== "long") return;
+        var did = p.metadata && p.metadata.drawing_id;
+        if (did && ids.indexOf(did) < 0) ids.push(String(did));
+      });
+    });
+    return ids;
+  }
+
+  function pushMlbStatusesToPanes(statuses) {
+    PANE_IDS.forEach(function (pid) {
+      var pane = state.panes[pid];
+      var chart = pane && api(pane);
+      if (chart && chart.setPositionOrderStatuses) chart.setPositionOrderStatuses(statuses);
+    });
+  }
+
+  function pushMlbSizingToPanes(cfg) {
+    PANE_IDS.forEach(function (pid) {
+      var pane = state.panes[pid];
+      var chart = pane && api(pane);
+      if (chart && chart.setMlbSizingConfig) chart.setMlbSizingConfig(cfg);
+    });
+  }
+
+  async function refreshMlbSizingConfig() {
+    try {
+      var body = await sendJson("/api/research/manual-long-box/sizing-config", "GET");
+      if (body && body.ok) {
+        mlbSizingCache = body;
+        pushMlbSizingToPanes(body);
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  async function refreshMlbOrderStatuses() {
+    var ids = longPositionDrawingIds();
+    if (!ids.length) return;
+    try {
+      var body = await sendJson("/api/research/manual-long-box/status", "POST", { drawing_ids: ids });
+      if (body && body.statuses) pushMlbStatusesToPanes(body.statuses);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function scheduleMlbStatusPoll() {
+    if (mlbStatusTimer) clearInterval(mlbStatusTimer);
+    mlbStatusTimer = setInterval(function () {
+      refreshMlbOrderStatuses().catch(function () {});
+    }, 4000);
+    refreshMlbOrderStatuses().catch(function () {});
+  }
+
+  function showMlbOrderModal(title, text, hint, onConfirm, confirmLabel) {
+    var modal = document.getElementById("modalMlbOrder");
+    var btn = document.getElementById("mlbOrderConfirm");
+    if (!modal || !btn) {
+      alert(title + "\n\n" + text + (hint ? "\n\n" + hint : ""));
+      if (typeof onConfirm === "function") onConfirm();
+      return;
+    }
+    document.getElementById("mlbOrderTitle").textContent = title;
+    document.getElementById("mlbOrderBody").textContent = text;
+    document.getElementById("mlbOrderHint").textContent = hint || "";
+    btn.textContent = confirmLabel || "Order bestätigen";
+    btn.disabled = !onConfirm;
+    mlbOrderPending = onConfirm || null;
+    modal.hidden = false;
+  }
+
+  function formatMlbAmendDialog(prep) {
+    var cur = prep.current_bybit || {};
+    var neu = prep.proposed_box || prep.normalized_targets || {};
+    var ch = prep.changes || {};
+    var tick = prep.tick_size != null ? Number(prep.tick_size) : null;
+    var fmt = function (v) {
+      if (v == null || v === "") return "—";
+      var n = Number(v);
+      if (!Number.isFinite(n)) return String(v);
+      if (tick && tick > 0) {
+        var dec = 0;
+        var ts = String(tick);
+        if (ts.indexOf(".") >= 0) {
+          dec = ts.split(".")[1].replace(/0+$/, "").length;
+        }
+        return n.toFixed(dec);
+      }
+      return String(n);
+    };
+    var row = function (label, keyCur, keyNew, changeKey) {
+      var changed = !!ch[changeKey];
+      return (
+        label +
+        " | Bisher Bybit: " +
+        fmt(cur[keyCur]) +
+        " | Neu aus Box: " +
+        fmt(neu[keyNew]) +
+        (changed ? " | GEÄNDERT" : " | unverändert")
+      );
+    };
+    return [
+      (prep.symbol || "DOGEUSDT") + " LONG LIMIT",
+      "Orderstatus: " + (prep.order_status || "OFFEN"),
+      "Order-ID: " + (prep.order_id || "—"),
+      "",
+      row("Entry", "entry_price", "entry_price", "entry_price"),
+      row("Stop-Loss", "stop_loss", "stop_loss", "stop_loss"),
+      row("Take-Profit", "take_profit", "take_profit", "take_profit"),
+      "",
+      (tick ? "Bybit-Tick: " + tick : "") +
+        (prep.tick_source ? " (" + prep.tick_source + ")" : "") +
+        (tick ? " — Dialog nur normalisierte Zielpreise" : ""),
+      "Menge: " + fmt(cur.qty) + " DOGE (unverändert — nur geänderte Felder werden gesendet)",
+    ].join("\n");
+  }
+
+  function hideMlbOrderModal() {
+    var modal = document.getElementById("modalMlbOrder");
+    if (modal) modal.hidden = true;
+    mlbOrderPending = null;
+    setMlbModalBusy(false);
+  }
+
+  function mlbDialogAudit(stage, detail) {
+    try {
+      var payload = { stage: stage, t: Date.now() };
+      if (detail && typeof detail === "object") {
+        Object.keys(detail).forEach(function (k) {
+          if (k !== "prepare_token") payload[k] = detail[k];
+        });
+      }
+      console.info("[mlb-dialog]", payload);
+    } catch (e) { /* ignore */ }
+  }
+
+  function setMlbModalBusy(busy, hintText) {
+    var btn = document.getElementById("mlbOrderConfirm");
+    var cancelBtn = document.querySelector('[data-close="modalMlbOrder"]');
+    var hint = document.getElementById("mlbOrderHint");
+    if (btn) btn.disabled = !!busy;
+    if (cancelBtn) cancelBtn.disabled = !!busy;
+    if (hint && hintText != null && hintText !== "") hint.textContent = hintText;
+  }
+
+  async function handlePositionOrder(msg) {
+    if (!msg || !msg.drawing_id) {
+      alert("Order: fehlende drawing_id — Zeichnung speichern und erneut versuchen.");
+      return;
+    }
+    var did = String(msg.drawing_id);
+    if (msg.action === "prepare_place") {
+      var prep;
+      try {
+        prep = await sendJson("/api/research/manual-long-box/prepare", "POST", {
+          drawing_id: did,
+        });
+      } catch (err) {
+        alert("Prepare fehlgeschlagen: " + (err && err.message ? err.message : "Netzwerk/API"));
+        return;
+      }
+      if (!prep || !prep.ok) {
+        var errMsg = (prep && prep.error) || "Vorbereitung fehlgeschlagen";
+        if (prep && prep.error === "no_changes") {
+          errMsg = "Keine Änderungen gegenüber der offenen Bybit-Order.";
+        }
+        alert(errMsg);
+        return;
+      }
+      if (prep.operation === "amend") {
+        var canAmend = !!(prep.can_amend && prep.prepare_token);
+        mlbDialogAudit("open", {
+          operation: "amend",
+          drawing_id: did,
+          order_id: prep.order_id,
+          changes: prep.changes,
+        });
+        showMlbOrderModal(
+          "Bestehende Order ändern",
+          formatMlbAmendDialog(prep),
+          "Nur geänderte Felder werden per AMEND an Bybit gesendet. Keine neue Order.",
+          canAmend
+            ? async function () {
+                mlbDialogAudit("confirm_clicked", { drawing_id: did, operation: "amend" });
+                setMlbModalBusy(true, "Änderung wird an Bybit gesendet und per REST geprüft …");
+                var row = {};
+                row[did] = { lamp: "loading", lamp_tooltip: "AMEND_PENDING" };
+                pushMlbStatusesToPanes(row);
+                var conf;
+                try {
+                  conf = await sendJson("/api/research/manual-long-box/confirm", "POST", {
+                    drawing_id: did,
+                    prepare_token: prep.prepare_token,
+                  });
+                } catch (err) {
+                  mlbDialogAudit("visible_error", { drawing_id: did, error: "network" });
+                  setMlbModalBusy(false, err && err.message ? String(err.message) : "Netzwerkfehler");
+                  alert("Änderung fehlgeschlagen: Netzwerk/API");
+                  return;
+                }
+                mlbDialogAudit("request_finished", {
+                  drawing_id: did,
+                  ok: !!(conf && conf.ok),
+                  verified: conf && conf.verified,
+                });
+                await refreshMlbOrderStatuses();
+                if (conf && conf.ok && conf.verified !== false) {
+                  mlbDialogAudit("verified_success", { drawing_id: did, action: conf.action });
+                  hideMlbOrderModal();
+                  if (conf.message) {
+                    try { console.info("[mlb-order]", conf.message); } catch (e) { /* ignore */ }
+                  }
+                } else {
+                  var errText = (conf && conf.error) || "Änderung fehlgeschlagen";
+                  if (errText.indexOf("mismatch") >= 0 || errText.indexOf("missing_in_rest") >= 0) {
+                    errText = "AMEND nicht verifiziert — " + errText;
+                  } else if (errText === "amend_verify_failed") {
+                    errText = "AMEND nicht verifiziert — Exchange-Werte stimmen noch nicht mit Tick-Rundung überein.";
+                  }
+                  mlbDialogAudit("visible_error", { drawing_id: did, error: errText });
+                  setMlbModalBusy(false, errText);
+                  alert(errText);
+                }
+              }
+            : null,
+          "Änderung bestätigen"
+        );
+        return;
+      }
+      var sideLabel = (prep.side || "long") === "short" ? "SHORT" : "LONG";
+      var lines = [
+        (prep.symbol || "DOGEUSDT") + " " + sideLabel + " LIMIT · Bybit " + (prep.environment || "mainnet"),
+        "Entry: " + prep.entry_price,
+        "Stop-Loss: " + prep.stop_loss,
+        "Take-Profit: " + prep.take_profit,
+        "Nominalwert (max): " + (prep.notional_cap_usdt != null ? prep.notional_cap_usdt : 10) + " USDT",
+        "Tatsächlicher Nominalwert: " + prep.notional_usd + " USDT",
+        "Menge: " + prep.qty_doge + " DOGE",
+        "Hebel: " + (prep.leverage != null ? prep.leverage + "×" : "— (nicht ermittelbar)") +
+          (prep.required_leverage != null ? " (erforderlich: " + prep.required_leverage + "×)" : ""),
+        "Verfügbare Margin: " +
+          (prep.available_margin_usdt != null ? prep.available_margin_usdt + " USDT" : "—"),
+        "Order gültig: " + (prep.order_valid ? "ja" : "nein"),
+      ];
+      if (prep.blockers && typeof prep.blockers === "object") {
+        Object.keys(prep.blockers).forEach(function (k) {
+          lines.push("Blocker (" + k + "): " + prep.blockers[k]);
+        });
+      }
+      var hintParts = ["Nach „Order bestätigen“ wird die Limit-Order gesendet (nur bei Live-ARMED)."];
+      if (!prep.writes_allowed) {
+        hintParts.push("Live nicht armed oder Credentials fehlen (MANUAL_LONG_BOX_LIVE_ARMED).");
+      }
+      if (!prep.can_place) {
+        hintParts.push("Order derzeit nicht platzierbar — Blocker beheben oder Live armen.");
+      }
+      var canConfirm = !!(prep.can_place && prep.prepare_token);
+      showMlbOrderModal(
+        "Order bestätigen",
+        lines.join("\n"),
+        hintParts.join(" "),
+        canConfirm
+          ? async function () {
+              setMlbModalBusy(true, "Order wird an Bybit gesendet …");
+              var row = {};
+              row[did] = { lamp: "loading", lamp_tooltip: "CREATE_PENDING" };
+              pushMlbStatusesToPanes(row);
+              var conf;
+              try {
+                conf = await sendJson("/api/research/manual-long-box/confirm", "POST", {
+                  drawing_id: did,
+                  prepare_token: prep.prepare_token,
+                });
+              } catch (err) {
+                setMlbModalBusy(false, "Netzwerkfehler");
+                alert("Order fehlgeschlagen: Netzwerk/API");
+                return;
+              }
+              await refreshMlbOrderStatuses();
+              if (conf && conf.ok) {
+                hideMlbOrderModal();
+              } else {
+                setMlbModalBusy(false, (conf && conf.error) || "Order fehlgeschlagen");
+                alert((conf && conf.error) || "Order fehlgeschlagen");
+              }
+            }
+          : null,
+        "Order bestätigen"
+      );
+      return;
+    }
+    if (msg.action === "prepare_cancel") {
+      var cprep = await sendJson("/api/research/manual-long-box/cancel/prepare", "POST", { drawing_id: did });
+      if (!cprep || !cprep.ok) {
+        alert((cprep && cprep.message) || (cprep && cprep.error) || "Cancel nicht möglich");
+        return;
+      }
+      showMlbOrderModal(
+        "Limit stornieren",
+        "Drawing: " + did + "\nOrder-ID: " + (cprep.order_id || "—"),
+        "Nur offene Limit-Orders werden storniert.",
+        async function () {
+          hideMlbOrderModal();
+          var row = {};
+          row[did] = { lamp: "loading", lamp_tooltip: "CANCEL_PENDING" };
+          pushMlbStatusesToPanes(row);
+          var cconf = await sendJson("/api/research/manual-long-box/cancel/confirm", "POST", {
+            drawing_id: did,
+            prepare_token: cprep.prepare_token,
+          });
+          await refreshMlbOrderStatuses();
+          if (!cconf || !cconf.ok) alert((cconf && cconf.error) || "Cancel fehlgeschlagen");
+        },
+        "Stornierung bestätigen"
+      );
+    }
+  }
+
   function attachBridge(pane) {
     const win = pane.iframe && pane.iframe.contentWindow;
     if (!win) return;
@@ -1754,6 +2084,7 @@
         pane.phase = "INTERACTION_READY";
         chart.resize();
         if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
+        if (mlbSizingCache && chart.setMlbSizingConfig) chart.setMlbSizingConfig(mlbSizingCache);
       },
       on_crosshair_move: function (unix) { handleHover(pane.id, unix); },
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
@@ -1774,9 +2105,16 @@
         }
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
+      on_position_order: function (msg) {
+        handlePositionOrder(msg).catch(function (err) {
+          try { console.warn("[mlb-order]", err); } catch (e) { /* ignore */ }
+        });
+      },
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
     };
+    refreshMlbSizingConfig().catch(function () {});
+    scheduleMlbStatusPoll();
   }
 
   function toolMode() {
@@ -1837,6 +2175,21 @@
         ext,
         p.style && p.style.width != null ? p.style.width : "",
         (p.style && p.style.color) || "",
+        p.visible === false ? "0" : "1",
+      ].join("|");
+    }
+    if (p.type === "position") {
+      const meta = p.metadata || {};
+      return [
+        p.type || "",
+        p.side || "",
+        p.start_timestamp != null ? p.start_timestamp : "",
+        p.end_timestamp != null ? p.end_timestamp : "",
+        p.entry_price != null ? p.entry_price : "",
+        p.stop_price != null ? p.stop_price : "",
+        p.target_price != null ? p.target_price : "",
+        meta.selected ? "1" : "0",
+        meta.locked ? "1" : "0",
         p.visible === false ? "0" : "1",
       ].join("|");
     }
@@ -11078,6 +11431,12 @@
   };
 
   document.addEventListener("DOMContentLoaded", function () {
+    var mlbConfirmBtn = document.getElementById("mlbOrderConfirm");
+    if (mlbConfirmBtn) {
+      mlbConfirmBtn.addEventListener("click", function () {
+        if (typeof mlbOrderPending === "function") mlbOrderPending();
+      });
+    }
     boot().catch(function (err) {
       if (err && err.name === "AbortError") return;
       setStatus(String(err.message || err), "error");

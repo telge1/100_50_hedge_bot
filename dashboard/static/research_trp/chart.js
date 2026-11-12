@@ -859,6 +859,17 @@
         const pt = pointFromParam(param);
         const hit = pt.x != null && pt.y != null ? hitTestXY(pt.x, pt.y) : null;
         if (hit) {
+          const rec = overlayRegistry.get(hit);
+          if (
+            rec &&
+            rec.payload &&
+            rec.payload.type === "position" &&
+            rec.payload.metadata &&
+            rec.payload.metadata.locked
+          ) {
+            emitDrawing({ type: "toggle_lock", overlay_id: hit, locked: false });
+            return;
+          }
           emitDrawing({ type: "edit", overlay_id: hit });
           return;
         }
@@ -1020,6 +1031,7 @@
     if (lastEmaOverlays && lastEmaOverlays.series && lastEmaOverlays.series.length) {
       setEmaOverlays(lastEmaOverlays);
     }
+    initPositionOrderLegend();
   }
 
   function resize() {
@@ -2670,9 +2682,11 @@
     rec.handles = [];
   }
 
-  function syncHandles(rec, points) {
+  function syncHandles(rec, points, opts) {
     const layer = overlayLayer();
     if (!layer) return;
+    opts = opts || {};
+    const extraClasses = opts.classes || [];
     if (!rec.handles) rec.handles = [];
     while (rec.handles.length > points.length) {
       const extra = rec.handles.pop();
@@ -2685,9 +2699,19 @@
       rec.handles.push(h);
     }
     points.forEach(function (pt, i) {
+      const extra = extraClasses[i] ? " " + extraClasses[i] : "";
+      rec.handles[i].className = "ov-handle" + extra;
       rec.handles[i].style.left = pt.x + "px";
       rec.handles[i].style.top = pt.y + "px";
       rec.handles[i].style.display = "block";
+      if (extraClasses[i] === "ov-handle-lock-hint") {
+        rec.handles[i].setAttribute(
+          "title",
+          "Klicken zum Sperren der Box (ohne Ziehen)"
+        );
+      } else {
+        rec.handles[i].removeAttribute("title");
+      }
     });
   }
 
@@ -3112,10 +3136,95 @@
 
   var DEFAULT_POS_RR = 2.0;
   var DEFAULT_POS_STOP_PCT = 0.005;
+  /** Research drawing-tool default (P&amp;L sketch); not the MLB live order size. */
   var DEFAULT_POS_NOTIONAL = 100.0;
 
   function posFinitePositive(n) {
     return typeof n === "number" && isFinite(n) && n > 0;
+  }
+
+  function isResearchManualPosition(p) {
+    var meta = (p && p.metadata) || {};
+    var did = meta.drawing_id != null ? String(meta.drawing_id) : "";
+    if (did.indexOf("d-") === 0) return true;
+    if (meta.manual === true) return true;
+    var src = String(meta.source || "").toLowerCase();
+    if (src === "drawing" && did.indexOf("d-") === 0) return true;
+    return src === "user" || src === "manual" || src === "research_manual";
+  }
+
+  function ensureMlbSizingBootstrap() {
+    if (POSITION_ORDER_UI_ONLY) return;
+    if (window.__mlbSizing && window.__mlbSizing.notional_cap_usdt > 0) return;
+    window.__mlbSizing = {
+      symbol: "DOGEUSDT",
+      notional_cap_usdt: 10,
+      qty_step: 1,
+      min_order_qty: 1,
+      source: "bootstrap_until_sizing_config_api",
+    };
+  }
+  ensureMlbSizingBootstrap();
+
+  function floorQtyToStep(qtyRaw, qtyStep) {
+    if (!(qtyStep > 0) || !isFinite(qtyRaw)) return qtyRaw;
+    var steps = Math.floor(qtyRaw / qtyStep + 1e-12);
+    return steps * qtyStep;
+  }
+
+  /** Mirror pools order_sizing: floor(cap/entry) to qty step, notional = qty * entry. */
+  function mlbPlannedOrderNotional(entryPrice, symbol) {
+    var cfg = window.__mlbSizing;
+    if (!cfg || !(entryPrice > 0)) return null;
+    if (
+      symbol &&
+      cfg.symbol &&
+      String(symbol).toUpperCase() !== String(cfg.symbol).toUpperCase()
+    ) {
+      return null;
+    }
+    var cap = Number(cfg.notional_cap_usdt);
+    var step = Number(cfg.qty_step);
+    if (!(cap > 0) || !(step > 0)) return null;
+    var qty = floorQtyToStep(cap / entryPrice, step);
+    if (!(qty > 0)) return null;
+    var notional = qty * entryPrice;
+    if (notional > cap + 1e-8) return null;
+    return notional;
+  }
+
+  function resolvePositionDisplayNotional(p, entry) {
+    ensureMlbSizingBootstrap();
+    var stored = Number(p && p.position_notional);
+    var meta = (p && p.metadata) || {};
+    if (
+      posFinitePositive(Number(meta.mlb_order_notional_usdt)) &&
+      isResearchManualPosition(p)
+    ) {
+      return Number(meta.mlb_order_notional_usdt);
+    }
+    if (
+      !POSITION_ORDER_UI_ONLY &&
+      window.__mlbSizing &&
+      isResearchManualPosition(p) &&
+      posFinitePositive(entry)
+    ) {
+      var sym =
+        (p && p.symbol) ||
+        (p.metadata && p.metadata.symbol) ||
+        window.__mlbSizing.symbol;
+      var planned = mlbPlannedOrderNotional(entry, sym);
+      if (planned != null && planned > 0) return planned;
+    }
+    return posFinitePositive(stored) ? stored : DEFAULT_POS_NOTIONAL;
+  }
+
+  function positionNotionalForPreview(statsSide, entry) {
+    if (!POSITION_ORDER_UI_ONLY && window.__mlbSizing && posFinitePositive(entry)) {
+      var planned = mlbPlannedOrderNotional(entry, window.__mlbSizing.symbol);
+      if (planned != null && planned > 0) return planned;
+    }
+    return DEFAULT_POS_NOTIONAL;
   }
 
   function normalizePositionPrices(side, entry, stop, target) {
@@ -3248,13 +3357,164 @@
     };
   }
 
+  var POSITION_ORDER_UI_ONLY = false;
+  var POSITION_LAMP_LIVE_STATE = "inactive";
+
+  function positionLampStateForRender(drawingId) {
+    if (window.__mlbPosLampPreview && window.__mlbPosLampPreview.state) {
+      return String(window.__mlbPosLampPreview.state);
+    }
+    if (drawingId && window.__mlbPosOrderStatus && window.__mlbPosOrderStatus[drawingId]) {
+      var row = window.__mlbPosOrderStatus[drawingId];
+      var lamp = row.lamp || "inactive";
+      if (lamp === "pending" || lamp === "filled" || lamp === "warning" || lamp === "loading") {
+        return lamp;
+      }
+    }
+    return POSITION_LAMP_LIVE_STATE;
+  }
+
+  function bindPositionOrderButtons(controls, rec) {
+    if (!controls || !rec || !rec.payload || POSITION_ORDER_UI_ONLY) return;
+    var p = rec.payload;
+    var side = p.side === "short" ? "short" : "long";
+    var setzen = controls.querySelector(".pos-btn-setzen");
+    var cancel = controls.querySelector(".pos-btn-cancel");
+    if (!setzen || !cancel) return;
+    var did = p.metadata && p.metadata.drawing_id ? String(p.metadata.drawing_id) : "";
+    if (side !== "long" && side !== "short") {
+      setzen.disabled = true;
+      setzen.setAttribute("aria-disabled", "true");
+      cancel.disabled = true;
+      cancel.setAttribute("aria-disabled", "true");
+      setzen.title = "Order-Tool nicht unterstützt";
+      return;
+    }
+    setzen.disabled = false;
+    setzen.removeAttribute("aria-disabled");
+    cancel.disabled = false;
+    cancel.removeAttribute("aria-disabled");
+    setzen.title =
+      side === "short" ? "Short-Limit auf Bybit setzen" : "Limit-Order auf Bybit setzen";
+    cancel.title = "Offene Limit-Order stornieren";
+    if (setzen.getAttribute("data-order-bound") === did) return;
+    setzen.setAttribute("data-order-bound", did);
+    cancel.setAttribute("data-order-bound", did);
+    setzen.addEventListener(
+      "click",
+      function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        if (!did) {
+          alert("Keine drawing_id — Zeichnung bitte speichern.");
+          return;
+        }
+        if (!window.bridge || !window.bridge.on_position_order) {
+          alert("Order-Brücke nicht bereit — Research-Chart neu laden.");
+          return;
+        }
+        window.bridge.on_position_order({ action: "prepare_place", drawing_id: did, overlay_id: p.id });
+      },
+      true
+    );
+    cancel.addEventListener(
+      "click",
+      function (ev) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        if (window.bridge && window.bridge.on_position_order) {
+          window.bridge.on_position_order({ action: "prepare_cancel", drawing_id: did, overlay_id: p.id });
+        }
+      },
+      true
+    );
+  }
+
+  function isPosOrderActionClick(ev) {
+    var el = ev && ev.target;
+    if (!el || !el.closest) return false;
+    return !!(el.closest(".pos-btn-setzen") || el.closest(".pos-btn-cancel") || el.closest(".pos-lamp"));
+  }
+
+  function bindPositionOrderUiEvents(controlsEl) {
+    if (!controlsEl || controlsEl.getAttribute("data-ui-bound") === "1") return;
+    controlsEl.setAttribute("data-ui-bound", "1");
+    controlsEl.addEventListener(
+      "pointerdown",
+      function (ev) {
+        if (isPosOrderActionClick(ev)) return;
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+      },
+      true
+    );
+    controlsEl.addEventListener(
+      "click",
+      function (ev) {
+        if (isPosOrderActionClick(ev)) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+      },
+      true
+    );
+  }
+
+  function positionOrderControlsHtml() {
+    return (
+      '<button type="button" class="pos-btn pos-btn-setzen" disabled aria-disabled="true" ' +
+      'data-ui-only="0" title="Setzen">' +
+      '<span class="pos-btn-icon pos-icon-target" aria-hidden="true"></span>' +
+      '<span class="pos-btn-label">Setzen</span></button>' +
+      '<button type="button" class="pos-btn pos-btn-cancel" disabled aria-disabled="true" ' +
+      'data-ui-only="0" title="Cancel">' +
+      '<span class="pos-btn-icon pos-icon-x" aria-hidden="true"></span>' +
+      '<span class="pos-btn-label">Cancel</span></button>' +
+      '<div class="pos-lamp" role="status" aria-live="polite">' +
+      '<span class="pos-lamp-icon" aria-hidden="true"></span></div>'
+    );
+  }
+
+  function applyPositionLampUi(lampEl, state) {
+    if (!lampEl) return;
+    var st =
+      state === "pending" || state === "filled" || state === "warning" || state === "loading"
+        ? state
+        : "inactive";
+    lampEl.className = "pos-lamp pos-lamp-" + st;
+    var titles = {
+      inactive: "Order nicht aktiv",
+      pending: "Limit-Order gesetzt – wartet auf Fill",
+      filled: "Position gefüllt",
+      warning: "Exchange-Zustand prüfen",
+      loading: "Order wird verarbeitet…",
+    };
+    lampEl.setAttribute("title", titles[st] || titles.inactive);
+    lampEl.setAttribute("aria-label", titles[st] || titles.inactive);
+  }
+
+  function initPositionOrderLegend() {
+    var ov = $("overlay");
+    if (!ov || document.getElementById("pos-order-legend")) return;
+    var leg = document.createElement("div");
+    leg.id = "pos-order-legend";
+    leg.className = "pos-order-legend";
+    leg.setAttribute("aria-hidden", "false");
+    leg.innerHTML =
+      '<span class="pol-item"><i class="pol-dot pol-inactive"></i> Nicht aktiv</span>' +
+      '<span class="pol-item"><i class="pol-dot pol-pending"></i> Order gesetzt</span>' +
+      '<span class="pol-item"><i class="pol-dot pol-filled"></i> Order gefüllt</span>';
+    ov.appendChild(leg);
+  }
+
   function refreshPositionLabels(p) {
+    var entry = Number(p.entry_price);
+    var displayNotional = resolvePositionDisplayNotional(p, entry);
     var stats = computePositionStats(
       p.side,
-      Number(p.entry_price),
+      entry,
       Number(p.stop_price),
       Number(p.target_price),
-      Number(p.position_notional)
+      displayNotional
     );
     if (!stats) return;
     var meta = p.metadata || {};
@@ -3269,17 +3529,82 @@
     p.target_label = labels.target;
   }
 
+  function estimatePositionLabelHeight() {
+    return 22;
+  }
+
+  function layoutPositionOrderChrome(el, controls, opts) {
+    if (!controls || !el) return { height: 30, width: 96, dockOutside: false };
+    var width = opts.width;
+    var boxH = opts.boxH;
+    var selected = !!opts.selected;
+    var compact = width < 150 || boxH < 92;
+    var mini = width < 82 || boxH < 44;
+    var dockOutside =
+      selected && (boxH < 96 || width < 118 || (mini && boxH < 120));
+    controls.classList.toggle("pos-ctrl-compact", compact);
+    controls.classList.toggle("pos-ctrl-mini", mini);
+    controls.classList.toggle("pos-ctrl-dock-outside", dockOutside);
+    controls.style.right = "5px";
+    controls.style.left = "auto";
+    if (dockOutside) {
+      controls.style.top = boxH + 6 + "px";
+      controls.style.bottom = "auto";
+    } else {
+      controls.style.top = "auto";
+      controls.style.bottom = "5px";
+    }
+    var ch = controls.offsetHeight;
+    var cw = controls.offsetWidth;
+    if (!ch || ch < 8) ch = mini ? 28 : compact ? 30 : 32;
+    if (!cw || cw < 8) cw = mini ? 30 : compact ? 96 : 168;
+    return { height: ch, width: cw, dockOutside: dockOutside, compact: compact, mini: mini };
+  }
+
+  function stylePositionLabel(node, text, color, width) {
+    if (!node) return;
+    node.textContent = text || "";
+    node.style.color = "#eef2f8";
+    node.style.background = hexAlpha(color, 0.9);
+    node.style.border = "1px solid " + hexAlpha(color, 0.72);
+    var bw = Math.min(Math.max(80, width - 10), 360);
+    node.style.maxWidth = bw + "px";
+    node.style.left = "5px";
+    node.style.overflow = "visible";
+    node.style.textOverflow = "clip";
+  }
+
+  function placePositionLabelNearPrice(node, yLocal, boxH, reservedBottom) {
+    if (!node) return 0;
+    var est = estimatePositionLabelHeight();
+    var h = node.offsetHeight > 4 ? node.offsetHeight : est;
+    var ideal = yLocal - Math.round(h * 0.45);
+    var ceiling = boxH - reservedBottom - h - 6;
+    var top = Math.min(ideal, ceiling);
+    if (top < 2) top = 2;
+    if (top + h > boxH - reservedBottom - 2 && ceiling >= 2) top = ceiling;
+    node.style.top = top + "px";
+    return h;
+  }
+
   function ensurePositionDom(rec) {
-    var el = ensureDom(rec, "ov-position");
+    var el = ensureDom(rec, "ov-position pos-order-v1");
     if (!el) return null;
-    if (!el.querySelector(".pos-profit")) {
+    if (!el.querySelector(".pos-inner")) {
       el.innerHTML =
+        '<div class="pos-inner">' +
         '<div class="pos-zone pos-profit"></div>' +
         '<div class="pos-zone pos-loss"></div>' +
         '<div class="pos-entry"></div>' +
         '<div class="pos-box pos-box-tp"></div>' +
         '<div class="pos-box pos-box-entry"></div>' +
-        '<div class="pos-box pos-box-sl"></div>';
+        '<div class="pos-box pos-box-sl"></div>' +
+        "</div>" +
+        '<div class="pos-order-controls" data-ui-only="1">' +
+        positionOrderControlsHtml() +
+        "</div>";
+      var controls = el.querySelector(".pos-order-controls");
+      bindPositionOrderUiEvents(controls);
     }
     return el;
   }
@@ -3298,24 +3623,31 @@
       return;
     }
     refreshPositionLabels(p);
+    var side = p.side === "short" ? "short" : "long";
+    var isLocked = !!(p.metadata && p.metadata.locked);
+    el.classList.remove("pos-long", "pos-short", "pos-edit-locked");
+    el.classList.add(side === "short" ? "pos-short" : "pos-long");
+    if (isLocked) el.classList.add("pos-edit-locked");
     var left = Math.min(x1, x2);
     var width = Math.max(4, Math.abs(x2 - x1));
     var top = Math.min(yStop, yTarget, yEntry);
     var bot = Math.max(yStop, yTarget, yEntry);
+    var boxH = Math.max(4, bot - top);
     el.style.display = "block";
     el.style.left = left + "px";
     el.style.top = top + "px";
     el.style.width = width + "px";
-    el.style.height = Math.max(4, bot - top) + "px";
+    el.style.height = boxH + "px";
     var profit = p.profit_color || COLORS.up;
     var loss = p.loss_color || COLORS.down;
-    var fill = p.fill_opacity != null ? p.fill_opacity : 0.18;
+    var fill = p.fill_opacity != null ? p.fill_opacity : 0.2;
     var yTpLocal = yTarget - top;
     var ySlLocal = yStop - top;
     var yEnLocal = yEntry - top;
-    var profitEl = el.querySelector(".pos-profit");
-    var lossEl = el.querySelector(".pos-loss");
-    var entryEl = el.querySelector(".pos-entry");
+    var inner = el.querySelector(".pos-inner");
+    var profitEl = inner ? inner.querySelector(".pos-profit") : el.querySelector(".pos-profit");
+    var lossEl = inner ? inner.querySelector(".pos-loss") : el.querySelector(".pos-loss");
+    var entryEl = inner ? inner.querySelector(".pos-entry") : el.querySelector(".pos-entry");
     function placeZone(node, ya, yb, color) {
       var zt = Math.min(ya, yb);
       var zh = Math.max(2, Math.abs(yb - ya));
@@ -3324,34 +3656,70 @@
       node.style.top = zt + "px";
       node.style.height = zh + "px";
       node.style.background = hexAlpha(color, fill);
-      node.style.border = "1px solid " + hexAlpha(color, 0.55);
+      node.style.border = "1px solid " + hexAlpha(color, 0.42);
     }
     placeZone(profitEl, yEnLocal, yTpLocal, profit);
     placeZone(lossEl, yEnLocal, ySlLocal, loss);
     var lw = Math.max(1, (p.style && p.style.width) || 2);
+    var entryAccent = side === "short" ? loss : profit;
     entryEl.style.left = "0";
     entryEl.style.width = "100%";
     entryEl.style.top = yEnLocal + "px";
     entryEl.style.height = lw + "px";
     entryEl.style.marginTop = -lw / 2 + "px";
-    entryEl.style.background = (p.style && p.style.color) || COLORS.ema20;
-    function placeBox(node, text, yLocal, color) {
-      node.textContent = text || "";
-      node.style.color = "#e6eaf2";
-      node.style.background = hexAlpha(color, 0.88);
-      node.style.border = "1px solid " + hexAlpha(color, 0.7);
-      var bw = Math.min(width - 6, 220);
-      node.style.maxWidth = Math.max(64, bw) + "px";
-      var nx = 4;
-      var ny = yLocal - 8;
-      if (ny < 2) ny = yLocal + 4;
-      if (ny + 16 > bot - top) ny = Math.max(2, yLocal - 18);
-      node.style.left = nx + "px";
-      node.style.top = ny + "px";
+    entryEl.style.background = entryAccent;
+    entryEl.style.boxShadow = "0 0 6px " + hexAlpha(entryAccent, 0.55);
+    var labelRoot = inner || el;
+    var tpNode = labelRoot.querySelector(".pos-box-tp");
+    var entryNode = labelRoot.querySelector(".pos-box-entry");
+    var slNode = labelRoot.querySelector(".pos-box-sl");
+    var controls = el.querySelector(".pos-order-controls");
+    var selected = !!(p.metadata && p.metadata.selected);
+    var chrome = { height: 32, width: 100, dockOutside: false };
+    if (controls) {
+      bindPositionOrderUiEvents(controls);
+      var did = p.metadata && p.metadata.drawing_id ? String(p.metadata.drawing_id) : "";
+      bindPositionOrderButtons(controls, rec);
+      var lampState = positionLampStateForRender(did);
+      if (
+        did &&
+        window.__mlbPosOrderStatus &&
+        window.__mlbPosOrderStatus[did] &&
+        window.__mlbPosOrderStatus[did].lamp_tooltip
+      ) {
+        var lampEl = controls.querySelector(".pos-lamp");
+        applyPositionLampUi(lampEl, lampState);
+        lampEl.setAttribute("title", window.__mlbPosOrderStatus[did].lamp_tooltip);
+        lampEl.setAttribute("aria-label", window.__mlbPosOrderStatus[did].lamp_tooltip);
+      } else {
+        applyPositionLampUi(controls.querySelector(".pos-lamp"), lampState);
+      }
+      chrome = layoutPositionOrderChrome(el, controls, {
+        width: width,
+        boxH: boxH,
+        selected: selected,
+      });
     }
-    placeBox(el.querySelector(".pos-box-tp"), p.target_label, yTpLocal, profit);
-    placeBox(el.querySelector(".pos-box-entry"), p.entry_label, yEnLocal, (p.style && p.style.color) || COLORS.ema20);
-    placeBox(el.querySelector(".pos-box-sl"), p.stop_label, ySlLocal, loss);
+    var reservedBottom = chrome.dockOutside ? 8 : chrome.height + 14;
+    var bottomPriceY = side === "long" ? ySlLocal : yTpLocal;
+    var topPriceY = side === "long" ? yTpLocal : ySlLocal;
+    stylePositionLabel(tpNode, p.target_label, profit, width);
+    stylePositionLabel(entryNode, p.entry_label, entryAccent, width);
+    stylePositionLabel(slNode, p.stop_label, loss, width);
+    var topNode = side === "long" ? tpNode : slNode;
+    var bottomNode = side === "long" ? slNode : tpNode;
+    placePositionLabelNearPrice(topNode, topPriceY, boxH, reservedBottom);
+    placePositionLabelNearPrice(entryNode, yEnLocal, boxH, reservedBottom);
+    placePositionLabelNearPrice(bottomNode, bottomPriceY, boxH, reservedBottom);
+    if (controls && !chrome.dockOutside) {
+      var bn = bottomNode.getBoundingClientRect();
+      var cn = controls.getBoundingClientRect();
+      if (bn.height > 0 && cn.height > 0 && bn.bottom > cn.top - 2) {
+        var pull = bn.bottom - cn.top + 8;
+        var newTop = Math.max(2, parseFloat(bottomNode.style.top || "0") - pull);
+        bottomNode.style.top = newTop + "px";
+      }
+    }
   }
 
   function positionHandlePoints(p) {
@@ -3454,16 +3822,25 @@
         ]);
       } else clearHandles(rec);
     } else if (selected && p.type === "position") {
-      const pts = positionHandlePoints(p);
-      if (pts) {
-        syncHandles(
-          rec,
-          pts.map(function (h) {
-            return { x: h.x, y: h.y };
-          })
-        );
-      } else {
+      if (p.metadata && p.metadata.locked) {
         clearHandles(rec);
+      } else {
+        const pts = positionHandlePoints(p);
+        if (pts) {
+          syncHandles(
+            rec,
+            pts.map(function (h) {
+              return { x: h.x, y: h.y };
+            }),
+            {
+              classes: pts.map(function (h) {
+                return h.mode === "resize-right" ? "ov-handle-lock-hint" : "";
+              }),
+            }
+          );
+        } else {
+          clearHandles(rec);
+        }
       }
     } else if (selected && p.shape === "ellipse") {
       const zx1 = xOf(p.start_timestamp);
@@ -5367,12 +5744,13 @@
       const side = tool === "long_position" ? "long" : "short";
       const prices = pricesFromTwoPoints(side, aPrice, bPrice);
       if (!prices) return null;
+      const previewNotional = positionNotionalForPreview(side, prices.entry);
       const stats = computePositionStats(
         side,
         prices.entry,
         prices.stop,
         prices.target,
-        DEFAULT_POS_NOTIONAL
+        previewNotional
       );
       const labels = formatPositionLabels(stats);
       return {
@@ -5384,7 +5762,7 @@
         entry_price: prices.entry,
         stop_price: prices.stop,
         target_price: prices.target,
-        position_notional: DEFAULT_POS_NOTIONAL,
+        position_notional: previewNotional,
         entry_label: labels.entry,
         stop_label: labels.stop,
         target_label: labels.target,
@@ -6426,6 +6804,17 @@
     dragState = null;
     setPanEnabled(interactionMode === "select");
     setChartCursor("crosshair");
+    if (
+      !moved &&
+      payload &&
+      payload.type === "position" &&
+      mode === "resize-right" &&
+      payload.metadata &&
+      !payload.metadata.locked
+    ) {
+      emitDrawing({ type: "toggle_lock", overlay_id: overlayId, locked: true });
+      return;
+    }
     if (moved && payload) {
       suppressNextClick = true;
       const event = {
@@ -7355,6 +7744,34 @@
     DEFAULT_VISIBLE_BARS: DEFAULT_VISIBLE_BARS,
     DEFAULT_RIGHT_OFFSET: DEFAULT_RIGHT_OFFSET,
     computePositionStats: computePositionStats,
+    setPositionLampPreviewForTests: function (state) {
+      if (state == null || state === false) {
+        delete window.__mlbPosLampPreview;
+      } else {
+        window.__mlbPosLampPreview = { state: String(state) };
+      }
+      layoutOverlays();
+    },
+    setPositionOrderStatuses: function (statuses) {
+      window.__mlbPosOrderStatus = statuses || {};
+      layoutOverlays();
+    },
+    setMlbSizingConfig: function (cfg) {
+      if (!cfg || cfg.ok === false) {
+        delete window.__mlbSizing;
+      } else {
+        window.__mlbSizing = {
+          symbol: cfg.symbol,
+          notional_cap_usdt: Number(cfg.notional_cap_usdt),
+          qty_step: Number(cfg.qty_step),
+          min_order_qty: Number(cfg.min_order_qty),
+        };
+      }
+      layoutOverlays();
+    },
+    mlbPlannedOrderNotional: mlbPlannedOrderNotional,
+    resolvePositionDisplayNotional: resolvePositionDisplayNotional,
+    POSITION_ORDER_UI_ONLY: POSITION_ORDER_UI_ONLY,
     pricesFromTwoPoints: pricesFromTwoPoints,
     computeShiftMeasure: computeShiftMeasure,
     startShiftMeasure: apiStartShiftMeasure,

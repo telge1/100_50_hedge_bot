@@ -315,6 +315,7 @@
                     <span id="researchExactOriginPoolTfWrap" class="trp-dock-ind" hidden title="PD1 Pool-Timeframe (unabhängig vom Kerzen-Chart)">
                         <span class="trp-muted">Pool-TF:</span>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="5m" autocomplete="off" checked> 5m</label>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="30m" autocomplete="off"> 30m</label>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="1h" autocomplete="off"> 1h</label>
                     </span>
                     <span id="researchExactOriginPdWrap" class="trp-dock-ind" hidden title="Density pool detail — unabhängig von Chart-Kerzen-TF und Historical LLD V2">
@@ -558,6 +559,18 @@
         </div>
     </div>
 
+    <div class="trp-modal" id="modalMlbOrder" hidden>
+        <div class="trp-modal-card">
+            <h2 id="mlbOrderTitle">Bybit Limit bestätigen</h2>
+            <pre id="mlbOrderBody" class="trp-muted" style="white-space:pre-wrap;font-size:12px;line-height:1.45"></pre>
+            <p class="trp-muted" id="mlbOrderHint"></p>
+            <div class="trp-modal-actions">
+                <button type="button" class="trp-text-btn" data-close="modalMlbOrder">Abbrechen</button>
+                <button type="button" class="trp-text-btn trp-primary" id="mlbOrderConfirm" disabled>Order bestätigen</button>
+            </div>
+        </div>
+    </div>
+
     <div class="trp-modal" id="modalCsw" hidden>
         <div class="trp-modal-card trp-modal-wide">
             <h2>Cluster Sweep EMA 9/20/59</h2>
@@ -676,10 +689,10 @@
 
     <script src="/static/js/research/goto_time.js?v=goto-replay-lock-1"></script>
     <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-bt-d34-density-cache-v1"></script>
-    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=pd1-1h-fixed-tile-v2"></script>
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-1h-fixed-tile-v2"></script>
+    <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=pd1-30m-1h-fixed-tile-v1"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-30m-1h-fixed-tile-v1"></script>
     <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 long-v3-phase3g-sept-sl-cap-v1 -->
-    <script src="/static/js/research/research_charts.js?v=tf-1d-local-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=mlb-setzen-v6"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

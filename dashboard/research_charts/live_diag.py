@@ -33,14 +33,27 @@ _STATS: dict[str, int] = {
 
 _LOG_PATH = Path(__file__).resolve().parents[1] / "logs" / "research_live_diag.ndjson"
 _LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+_MAX_LOG_BYTES = 32 * 1024 * 1024
 
 
 def _utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _maybe_rotate_log_file() -> None:
+    """Cap NDJSON growth; keep one .prev snapshot (API reads in-memory ring buffer)."""
+    try:
+        if _LOG_PATH.is_file() and _LOG_PATH.stat().st_size > _MAX_LOG_BYTES:
+            rotated = _LOG_PATH.with_suffix(_LOG_PATH.suffix + ".prev")
+            rotated.unlink(missing_ok=True)
+            _LOG_PATH.replace(rotated)
+    except OSError:
+        pass
+
+
 def _append_log(row: dict[str, Any]) -> None:
     try:
+        _maybe_rotate_log_file()
         with _LOG_PATH.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
     except Exception:

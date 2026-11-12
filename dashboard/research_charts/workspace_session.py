@@ -4208,6 +4208,20 @@ class ResearchWorkspace:
         self._selected_drawing_id = did
         return self.snapshot()
 
+    def set_drawing_lock(self, overlay_id: str, locked: bool) -> dict[str, Any]:
+        trp = self._trp
+        dc_replace = trp["dc_replace"]
+        did = overlay_id.rsplit(":", 1)[0] if overlay_id else ""
+        if did not in self.drawings:
+            return self.snapshot()
+        drawing = self.drawings.get_drawing(did)
+        if drawing.drawing_type not in trp["POSITION_TYPES"]:
+            return self.snapshot()
+        self.drawings.update_drawing(dc_replace(drawing, locked=bool(locked)))
+        self._selected_drawing_id = did
+        self.persist_drawings()
+        return self.snapshot()
+
     def _extend_right_ui_state(self, selected: Any) -> dict[str, bool]:
         if selected is None or getattr(selected, "drawing_type", None) != "trend":
             return {"available": False, "enabled": False}
@@ -4327,6 +4341,11 @@ class ResearchWorkspace:
                 if key in body:
                     extra[key] = body[key]
             return self.on_drag(str(body.get("overlay_id") or ""), body.get("time"), body.get("price"), extra)
+        if kind == "toggle_lock":
+            return self.set_drawing_lock(
+                str(body.get("overlay_id") or ""),
+                bool(body.get("locked")),
+            )
         if kind == "cancel_preview":
             return self.cancel_preview()
         if kind == "escape":
@@ -4421,6 +4440,9 @@ class ResearchWorkspace:
                 payload["extend_right"] = True
             cleaned = json_safe(payload)
             if isinstance(cleaned, dict):
+                from .manual_long_box_orders_v1 import patch_mlb_test_position_overlay
+
+                cleaned = patch_mlb_test_position_overlay(cleaned)
                 safe.append(cleaned)
         return safe
 
