@@ -39,6 +39,7 @@ Browser-confirmed DOGE Exact-Origin pools across **5m, 30m, 1h, and 4h** (user a
 |------|--------|
 | Branch | `pools-ob-delta-bot` |
 | Pre-P25 HEAD | `e4ada867b3f6f93d9f901cae290a9f8fe50f4fde` |
+| Post-P25 HEAD | `c87bdea3` (docs hash fix on `5be64b69`) |
 | Working tree | Large unrelated dashboard/MC4 deltas under `backtester/short/` — **not** part of P25 release |
 
 ### SHA256 — live served assets (pre/post commit identical on disk)
