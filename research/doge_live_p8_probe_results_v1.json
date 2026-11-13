@@ -1,0 +1,15 @@
+{
+  "probe_utc": "2026-11-12T16:22Z",
+  "bybit_linear_last": 0.0659,
+  "collector_forming_note": "forming-bar dashboard route requires auth; chain measured via collector :8787",
+  "ch_1m_max": "2026-11-12T16:21:00Z",
+  "parity_samples_collector_vs_bybit": [
+    {"collector_close": 0.0659, "pct_vs_bybit": 0.0, "forming_time": 1794500880, "http_ms": 3.8},
+    {"collector_close": 0.06591, "pct_vs_bybit": 0.01517, "forming_time": 1794500880, "http_ms": 0.7},
+    {"collector_close": 0.06592, "pct_vs_bybit": 0.03035, "forming_time": 1794500880, "http_ms": 0.8}
+  ],
+  "latency_ms_typical": {
+    "collector_forming_http": "0.6-3.8",
+    "bybit_public_ticker": "~100-300"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "audit_utc": "2026-11-13T07:41:06.808079+00:00",
+  "bounds": {
+    "data_available_to": "2026-11-13T07:35:00Z",
+    "data_available_from": "2026-05-01T00:00:00Z",
+    "release_source": "validated_publish_ssot"
+  },
+  "probes": [
+    {
+      "label": "nov13_6h",
+      "from": "2026-11-13T01:25:00Z",
+      "to": "2026-11-13T07:35:00Z",
+      "wall_s": 10.113,
+      "pools": 335
+    },
+    {
+      "label": "nov13_07_window",
+      "from": "2026-11-13T06:00:00Z",
+      "to": "2026-11-13T07:35:00Z",
+      "wall_s": 9.155,
+      "pools": 283
+    },
+    {
+      "label": "nov09_tile",
+      "from": "2026-11-09T00:00:00Z",
+      "to": "2026-11-10T00:00:00Z",
+      "wall_s": 9.674,
+      "pools": 441
+    }
+  ],
+  "publisher_journal_07_20_07_35_utc": [
+    "2026-11-13T06:15:00+00:00 published ~07:20:06",
+    "2026-11-13T06:20:00+00:00 published ~07:25:11",
+    "2026-11-13T06:25:00+00:00 published ~07:30:15",
+    "2026-11-13T06:30:00+00:00 published ~07:35:20"
+  ]
+}

@@ -1,0 +1,27 @@
+# DOGE-LIVE-P5A — user systemd unit (NOT enabled by default).
+# Install: mkdir -p ~/.config/systemd/user && cp this file there, then:
+#   systemctl --user daemon-reload
+#   systemctl --user start doge-pd1-5m-live-publisher.service   # only after explicit approval
+#
+# Do NOT enable until P5A/P5B sign-off.
+
+[Unit]
+Description=DOGEUSDT 5m PD1 live publisher (catch-up + tick)
+After=network-online.target
+Wants=network-online.target
+# Optional: After=bybit-live-1m-collector.service
+
+[Service]
+Type=simple
+WorkingDirectory=%h/projects/pools+ob+delta_bot
+Environment=PYTHONUNBUFFERED=1
+Environment=TRADING_RESEARCH_PLATFORM_ROOT=%h/projects/trading_research_platform
+# Use the same interpreter as interactive runs (must have clickhouse_connect).
+ExecStart=%h/miniconda3/bin/python3 tools/doge_live_p4_live_publisher_v1/run_doge_p4_live.py --catch-up --live --allow-doge-production --batch-size 50 --poll-sec 20
+Restart=on-failure
+RestartSec=30
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

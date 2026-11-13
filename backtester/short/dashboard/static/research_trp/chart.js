@@ -286,7 +286,9 @@
   };
 
   const DEFAULT_VISIBLE_BARS = 120;
-  const DEFAULT_RIGHT_OFFSET = 6;
+  const DEFAULT_VISIBLE_BARS_1D = 90;
+  /** Empty bars right of last candle (pan + anchors in kerzenfreiem Bereich). */
+  const DEFAULT_RIGHT_OFFSET = 96;
   const DEFAULT_BAR_SPACING = 7;
   const PRICE_SCALE_MARGINS = { top: 0.08, bottom: 0.08 };
   const OSC_SCALE_MARGINS = { top: 0.04, bottom: 0.04 };
@@ -319,6 +321,7 @@
   let lastSetDataError = null;
   let lastCandleSetCount = 0;
   let lastAppliedSize = { w: 0, h: 0 };
+  let candlePaintPending = false;
   const overlayRegistry = new Map();
   /** EZM / research point markers — canvas layer (DOM overlays freeze with 1k+ markers). */
   const researchMarkers = new Map();
@@ -402,6 +405,9 @@
     width: "normal",
   };
   let vpHoverIndex = -1;
+  let eodDensityPayload = null;
+  const EOD_DENSITY_MAX_DRAW_SEGMENTS = 8000;
+  let eodDensityLastDraw = { ms: 0, segmentsDrawn: 0, segmentsTotal: 0 };
   let obpPayload = null;
   let obpSettings = {
     enabled: false,
@@ -504,11 +510,131 @@
     return Math.max(0, chartSize().h - timeAxisHeight());
   }
 
+  function crosshairTimeFormatter(unixSec) {
+    if (
+      typeof ResearchChartTimeUtc !== "undefined" &&
+      ResearchChartTimeUtc.formatCrosshairTimeUtc
+    ) {
+      return ResearchChartTimeUtc.formatCrosshairTimeUtc(unixSec);
+    }
+    const n = Number(unixSec);
+    if (!Number.isFinite(n)) return "";
+    const d = new Date(n * 1000);
+    const pad = function (x) {
+      return String(x).padStart(2, "0");
+    };
+    return (
+      d.getUTCFullYear() +
+      "-" +
+      pad(d.getUTCMonth() + 1) +
+      "-" +
+      pad(d.getUTCDate()) +
+      " " +
+      pad(d.getUTCHours()) +
+      ":" +
+      pad(d.getUTCMinutes()) +
+      " UTC"
+    );
+  }
+
+  function applyCrosshairTimeLocalization(targetChart) {
+    const ch = targetChart || chart;
+    if (!ch) return;
+    try {
+      ch.applyOptions({
+        localization: {
+          timeFormatter: crosshairTimeFormatter,
+        },
+      });
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function formatVlineTimestampUtc(unixSec) {
+    const n = Number(unixSec);
+    if (!Number.isFinite(n)) return "";
+    const d = new Date(n * 1000);
+    const pad = function (x) {
+      return String(x).padStart(2, "0");
+    };
+    return (
+      d.getUTCFullYear() +
+      "-" +
+      pad(d.getUTCMonth() + 1) +
+      "-" +
+      pad(d.getUTCDate()) +
+      " " +
+      pad(d.getUTCHours()) +
+      ":" +
+      pad(d.getUTCMinutes()) +
+      ":" +
+      pad(d.getUTCSeconds()) +
+      " UTC"
+    );
+  }
+
+  function vlineAxisLabelLayer() {
+    var host = document.getElementById("price-main") || $("chart");
+    if (!host) return null;
+    var layer = document.getElementById("vline-axis-labels");
+    if (!layer) {
+      layer = document.createElement("div");
+      layer.id = "vline-axis-labels";
+      layer.setAttribute("aria-hidden", "true");
+      host.appendChild(layer);
+    }
+    return layer;
+  }
+
+  function clipVlineAxisLabelLayer() {
+    const layer = vlineAxisLabelLayer();
+    if (!layer) return;
+    const ah = Math.max(18, timeAxisHeight());
+    const plotW = Math.max(0, plotRightX());
+    layer.style.left = "0px";
+    layer.style.bottom = "0px";
+    layer.style.top = "auto";
+    layer.style.width = plotW + "px";
+    layer.style.right = "auto";
+    layer.style.height = ah + "px";
+  }
+
   function clipOverlayLayerToPlot() {
     const layer = overlayLayer();
     if (!layer) return;
     layer.style.right = Math.max(0, priceAxisWidth()) + "px";
     layer.style.bottom = Math.max(0, timeAxisHeight()) + "px";
+    clipVlineAxisLabelLayer();
+  }
+
+  function syncVlineAxisTimestampLabel(rec, x, text) {
+    clipVlineAxisLabelLayer();
+    const layer = vlineAxisLabelLayer();
+    if (!layer || !rec || !rec.payload) return;
+    const show = text && x != null && Number.isFinite(Number(x));
+    if (!show) {
+      if (rec.vlineAxisLabel && rec.vlineAxisLabel.parentNode) {
+        rec.vlineAxisLabel.parentNode.removeChild(rec.vlineAxisLabel);
+      }
+      rec.vlineAxisLabel = null;
+      return;
+    }
+    let el = rec.vlineAxisLabel;
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "ov-vline-ts-label";
+      el.setAttribute("data-overlay-id", rec.payload.id || "");
+      layer.appendChild(el);
+      rec.vlineAxisLabel = el;
+    }
+    const color = (rec.payload.style && rec.payload.style.color) || "#9aa5bf";
+    el.textContent = text;
+    el.style.left = x + "px";
+    el.style.color = color;
+    el.style.borderColor = hexAlpha(color, 0.55);
+    el.style.background = hexAlpha("#0f1218", 0.92);
+    el.style.display = "block";
   }
 
   function toOhlc(candles) {
@@ -636,6 +762,9 @@
         mouseWheel: true,
         pinch: true,
         axisDoubleClickReset: { time: true, price: true },
+      },
+      localization: {
+        timeFormatter: crosshairTimeFormatter,
       },
       width: w,
       height: h,
@@ -807,6 +936,9 @@
         emitDrawing({ type: "hit", overlay_id: hit });
         return;
       }
+      if (interactionMode === "select") {
+        emitDrawing({ type: "deselect" });
+      }
       if (pt.time == null) return;
       if (typeof window.bridge.on_chart_click === "function") {
         window.bridge.on_chart_click(Number(pt.time));
@@ -896,14 +1028,25 @@
     const size = chartSize();
     if (size.w < 16 || size.h < 16) return;
     const wasInvalid = lastAppliedSize.w < 16 || lastAppliedSize.h < 16;
+    const grewEnough =
+      size.w >= 48 &&
+      size.h >= 48 &&
+      (size.w > lastAppliedSize.w + 24 || size.h > lastAppliedSize.h + 24);
     chart.applyOptions({ width: size.w, height: size.h });
     lastAppliedSize = size;
     // Candlestick series set at 0×0 often never paints; line series still does.
     // Re-apply once the pane has a real size. Do not do this on every resize
     // (that would reset the user's zoom via applyDefaultView).
-    if (wasInvalid && lastPayload && lastPayload.candles && lastPayload.candles.length) {
+    const needsCandleRepaint =
+      candlePaintPending ||
+      wasInvalid ||
+      (grewEnough && lastCandleSetCount > 0 && lastPayload && lastPayload.candles && lastPayload.candles.length);
+    if (needsCandleRepaint && lastPayload && lastPayload.candles && lastPayload.candles.length) {
       applySeriesData(lastPayload);
-      if (!(replayViewLock && replayViewLock.soft)) applyDefaultView();
+      if (!(replayViewLock && replayViewLock.soft) && (wasInvalid || candlePaintPending)) {
+        applyDefaultView();
+      }
+      candlePaintPending = false;
     }
     if (wasInvalid) {
       recreateNativeOverlays();
@@ -1367,6 +1510,11 @@
       return;
     }
     applySeriesData(lastPayload);
+    const szAfterSet = chartSize();
+    if (szAfterSet.w < 48 || szAfterSet.h < 48) {
+      candlePaintPending = true;
+    }
+    applyTimeScaleForTimeframe(lastPayload);
     const tip = candles[candles.length - 1];
     if (tip && tip.close != null) ensureLivePriceLine(Number(tip.close));
     updateOscTimeBase();
@@ -1521,6 +1669,9 @@
         priceScaleId: "right",
         priceFormat: lastPriceFormat,
       });
+      if (spec.line_style) {
+        seriesOpts.lineStyle = lineStyleEnum(spec.line_style);
+      }
       if (!series) {
         series = chart.addLineSeries(seriesOpts);
         emaOverlaySeries.set(id, series);
@@ -2068,6 +2219,17 @@
     if (!Number.isFinite(t)) return null;
     let coord = chart.timeScale().timeToCoordinate(t);
     if (coord != null) return coord;
+    const logical = logicalFromUnix(t);
+    if (logical != null) {
+      try {
+        if (chart.timeScale().logicalToCoordinate) {
+          coord = chart.timeScale().logicalToCoordinate(logical);
+          if (coord != null) return coord;
+        }
+      } catch (err) {
+        /* ignore */
+      }
+    }
     const snapped = snapUnixToBar(t);
     if (snapped == null) return null;
     coord = chart.timeScale().timeToCoordinate(Number(snapped));
@@ -2203,11 +2365,31 @@
     return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
   }
 
-  function computeDefaultLogicalRange(barCount) {
+  function defaultVisibleBarsForPayload(payload) {
+    const tf = payload && payload.timeframe ? String(payload.timeframe).toLowerCase() : "";
+    return tf === "1d" ? DEFAULT_VISIBLE_BARS_1D : DEFAULT_VISIBLE_BARS;
+  }
+
+  function applyTimeScaleForTimeframe(payload) {
+    if (!chart) return;
+    const tf = payload && payload.timeframe ? String(payload.timeframe).toLowerCase() : "";
+    const daily = tf === "1d";
+    try {
+      chart.timeScale().applyOptions({
+        timeVisible: !daily,
+        secondsVisible: false,
+      });
+      applyCrosshairTimeLocalization(chart);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  function computeDefaultLogicalRange(barCount, payload) {
     const n = Number(barCount) || 0;
     if (n < 1) return null;
     const last = n - 1;
-    const visible = Math.min(DEFAULT_VISIBLE_BARS, n);
+    const visible = Math.min(defaultVisibleBarsForPayload(payload), n);
     return {
       from: Math.max(0, last - visible + 1),
       to: last + DEFAULT_RIGHT_OFFSET,
@@ -2440,7 +2622,7 @@
       });
       ok = true;
     } catch (err) {
-      const range = computeDefaultLogicalRange(candles.length);
+      const range = computeDefaultLogicalRange(candles.length, lastPayload);
       if (range) {
         try {
           programmaticNavDepth += 1;
@@ -2476,7 +2658,7 @@
     clearShiftMeasure();
     resetViewCount += 1;
     const candles = (lastPayload && lastPayload.candles) || [];
-    const range = computeDefaultLogicalRange(candles.length);
+    const range = computeDefaultLogicalRange(candles.length, lastPayload);
     const ok = applyDefaultView();
     let applied = null;
     try {
@@ -2537,6 +2719,11 @@
       rec.el.parentNode.removeChild(rec.el);
     }
     rec.el = null;
+    if (rec.vlineAxisLabel && rec.vlineAxisLabel.parentNode) {
+      rec.vlineAxisLabel.parentNode.removeChild(rec.vlineAxisLabel);
+    }
+    rec.vlineAxisLabel = null;
+    rec.vlineTopLabel = null;
   }
 
   function ensureDom(rec, className) {
@@ -2580,33 +2767,55 @@
     if (rec.el) hideEl(rec.el);
   }
 
+  function shouldShowVlineTimestamp(p) {
+    if (!p || p.type !== "line" || p.kind !== "vertical" || p.timestamp == null) return false;
+    if (!isUserDrawing(p)) return false;
+    const dt = userDrawingType(p);
+    return !dt || dt === "vline";
+  }
+
   function renderVertical(rec) {
     const el = ensureDom(rec, "ov-vline");
     if (!el) return;
-    const x = xOf(rec.payload.timestamp);
+    const p = rec.payload;
+    const x = xOf(p.timestamp);
     if (x == null) {
       hideEl(el);
+      syncVlineAxisTimestampLabel(rec, null, "");
       return;
     }
-    const color = rec.payload.style.color;
+    const color = p.style.color;
     el.style.display = "block";
     el.style.left = x + "px";
     el.style.background = color;
-    el.style.opacity = String(rec.payload.style.opacity);
-    el.style.width = Math.max(1, rec.payload.style.width || 1) + "px";
-    const label = rec.payload.label_text;
-    if (label) {
+    el.style.opacity = String(p.style.opacity);
+    el.style.width = Math.max(1, p.style.width || 1) + "px";
+
+    if (shouldShowVlineTimestamp(p)) {
+      syncVlineAxisTimestampLabel(rec, x, formatVlineTimestampUtc(p.timestamp));
       el.textContent = "";
-      const tag = document.createElement("div");
-      tag.className = "ov-vline-label";
-      tag.textContent = label;
-      tag.style.color = color;
-      tag.style.background = hexAlpha(color, 0.15);
-      tag.style.left = "4px";
-      tag.style.top = "8px";
-      el.appendChild(tag);
     } else {
-      el.textContent = "";
+      syncVlineAxisTimestampLabel(rec, null, "");
+      const label = p.label_text;
+      if (label) {
+        el.textContent = "";
+        let tag = rec.vlineTopLabel;
+        if (!tag) {
+          tag = document.createElement("div");
+          tag.className = "ov-vline-label";
+          el.appendChild(tag);
+          rec.vlineTopLabel = tag;
+        }
+        tag.textContent = label;
+        tag.style.color = color;
+        tag.style.background = hexAlpha(color, 0.15);
+        tag.style.left = "4px";
+        tag.style.top = "8px";
+        tag.style.display = "block";
+      } else {
+        if (rec.vlineTopLabel) rec.vlineTopLabel.style.display = "none";
+        el.textContent = "";
+      }
     }
   }
 
@@ -2622,8 +2831,15 @@
       hideEl(el);
       return;
     }
-    const dx = x2 - x1;
-    const dy = y2 - y1;
+    let ex = x2;
+    let ey = y2;
+    if (drawingExtendRight(p)) {
+      const ext = segmentExtendedEnd(x1, y1, x2, y2);
+      ex = ext.x;
+      ey = ext.y;
+    }
+    const dx = ex - x1;
+    const dy = ey - y1;
     const len = Math.sqrt(dx * dx + dy * dy);
     el.style.display = "block";
     el.style.left = x1 + "px";
@@ -3011,16 +3227,31 @@
     return (value > 0 ? "+" : "\u2212") + Math.abs(value).toFixed(digits);
   }
 
-  function formatPositionLabels(stats) {
+  function formatPositionLabels(stats, options) {
+    options = options || {};
     if (!stats) return { entry: "", stop: "", target: "" };
     var tpPct = fmtSignedFixed(((stats.target - stats.entry) / stats.entry) * 100, 2) + "%";
     var slPct = fmtSignedFixed(((stats.stop - stats.entry) / stats.entry) * 100, 2) + "%";
+    var rr = stats.riskReward == null ? "—" : stats.riskReward.toFixed(2);
+    if (options.planOnly) {
+      var status = options.statusLabel || "PLANNED SHORT / UNFILLED";
+      return {
+        target: "TP: " + fmt(stats.target) + " \u00b7 " + tpPct + " \u00b7 R:R " + rr,
+        entry: status + " \u00b7 Entry: " + fmt(stats.entry) + " \u00b7 R:R " + rr,
+        stop: "SL: " + fmt(stats.stop) + " \u00b7 " + slPct,
+      };
+    }
     var pnl = stats.profitAtTarget != null ? fmtSignedFixed(stats.profitAtTarget, 2) + " USDT" : "";
     var loss = stats.lossAtStop != null ? fmtSignedFixed(-stats.lossAtStop, 2) + " USDT" : "";
-    var rr = stats.riskReward == null ? "—" : stats.riskReward.toFixed(2);
+    var entryPrefix = options.statusLabel ? options.statusLabel + " \u00b7 " : "";
+    if (options.realizedPnlUsdt != null && isFinite(Number(options.realizedPnlUsdt))) {
+      entryPrefix +=
+        "Netto " + fmtSignedFixed(Number(options.realizedPnlUsdt), 2) + " USDT \u00b7 ";
+    }
     return {
       target: ["Ziel: " + fmt(stats.target), tpPct, pnl].filter(Boolean).join(" \u00b7 "),
       entry:
+        entryPrefix +
         "Entry: " +
         fmt(stats.entry) +
         " \u00b7 Größe: " +
@@ -3040,7 +3271,13 @@
       Number(p.position_notional)
     );
     if (!stats) return;
-    var labels = formatPositionLabels(stats);
+    var meta = p.metadata || {};
+    var planOnly = !!(meta.plan_only || meta.preview_only);
+    var labels = formatPositionLabels(stats, {
+      planOnly: planOnly,
+      statusLabel: meta.status_label || null,
+      realizedPnlUsdt: meta.realized_net_pnl_usdt,
+    });
     p.entry_label = labels.entry;
     p.stop_label = labels.stop;
     p.target_label = labels.target;
@@ -3180,13 +3417,17 @@
     if (rec.el) {
       if (rec.payload.metadata && rec.payload.metadata.selected) {
         rec.el.classList.add("ov-selected");
+        if (isEditableTrendSegment(rec.payload)) {
+          rec.el.style.zIndex = "36";
+        }
       } else {
         rec.el.classList.remove("ov-selected");
+        if (rec.el.style.zIndex === "36") rec.el.style.zIndex = "";
       }
     }
     const selected = rec.payload.metadata && rec.payload.metadata.selected;
     const p = rec.payload;
-    if (selected && p.kind === "arrow") {
+    if (selected && (p.kind === "arrow" || isEditableUserSegment(p))) {
       const ax1 = xOf(p.start_timestamp);
       const ay1 = yOf(p.start_price);
       const ax2 = xOf(p.end_timestamp);
@@ -3199,6 +3440,33 @@
       } else {
         clearHandles(rec);
       }
+    } else if (selected && p.type === "line" && p.kind === "horizontal" && isUserDrawing(p)) {
+      const py = yOf(p.price);
+      const midX = Math.max(20, plotInteractionMaxX() * 0.5);
+      if (py != null) syncHandles(rec, [{ x: midX, y: py }]);
+      else clearHandles(rec);
+    } else if (selected && p.type === "line" && p.kind === "vertical" && isUserDrawing(p)) {
+      const px = xOf(p.timestamp);
+      const midY = Math.max(20, plotBottomY() * 0.5);
+      if (px != null) syncHandles(rec, [{ x: px, y: midY }]);
+      else clearHandles(rec);
+    } else if (selected && isEditableUserZone(p)) {
+      const zx1 = xOf(p.start_timestamp);
+      const zx2 = p.end_timestamp != null ? xOf(p.end_timestamp) : null;
+      const zy1 = yOf(p.top_price);
+      const zy2 = yOf(p.bottom_price);
+      if (zx1 != null && zx2 != null && zy1 != null && zy2 != null) {
+        const left = Math.min(zx1, zx2);
+        const right = Math.max(zx1, zx2);
+        const top = Math.min(zy1, zy2);
+        const bot = Math.max(zy1, zy2);
+        syncHandles(rec, [
+          { x: left, y: top },
+          { x: right, y: top },
+          { x: left, y: bot },
+          { x: right, y: bot },
+        ]);
+      } else clearHandles(rec);
     } else if (selected && p.type === "position") {
       const pts = positionHandlePoints(p);
       if (pts) {
@@ -4142,6 +4410,83 @@
     return Number.isFinite(d) && d > 0 ? d : 60;
   }
 
+  function timeframeBarSecFallback() {
+    const tf = String((lastPayload && lastPayload.timeframe) || "").toLowerCase();
+    const map = { "1m": 60, "3m": 180, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400 };
+    return map[tf] || 300;
+  }
+
+  function seriesBarSec(candles) {
+    const sec = estimateBarSec(candles);
+    return sec > 0 ? sec : timeframeBarSecFallback();
+  }
+
+  /** Map UTC to continuous bar index (fractional); extends past last / before first candle. */
+  function logicalFromUnix(unix) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length || unix == null) return null;
+    const t = Number(unix);
+    if (!Number.isFinite(t)) return null;
+    const lastIdx = candles.length - 1;
+    const barSec = seriesBarSec(candles);
+    const firstT = Number(candles[0].time);
+    const lastT = Number(candles[lastIdx].time);
+    if (t >= lastT) return lastIdx + (t - lastT) / barSec;
+    if (t <= firstT) return (t - firstT) / barSec;
+    const idx = candleIndexForTime(t, candles);
+    if (idx == null) return null;
+    const t0 = Number(candles[idx].time);
+    const t1 =
+      idx + 1 <= lastIdx ? Number(candles[idx + 1].time) : t0 + barSec;
+    const span = t1 - t0;
+    const frac = span > 0 ? (t - t0) / span : 0;
+    return idx + Math.max(0, Math.min(1, frac));
+  }
+
+  /** Inverse of logicalFromUnix — future bars use uniform barSec (no fake candles). */
+  function unixFromLogical(logical) {
+    const candles = (lastPayload && lastPayload.candles) || [];
+    if (!candles.length || logical == null) return null;
+    const L = Number(logical);
+    if (!Number.isFinite(L)) return null;
+    const lastIdx = candles.length - 1;
+    const barSec = seriesBarSec(candles);
+    const firstT = Number(candles[0].time);
+    const lastT = Number(candles[lastIdx].time);
+    if (L >= lastIdx) return lastT + (L - lastIdx) * barSec;
+    if (L <= 0) return firstT + L * barSec;
+    const idx = Math.floor(L);
+    const frac = L - idx;
+    const i = Math.max(0, Math.min(lastIdx, idx));
+    const t0 = Number(candles[i].time);
+    const t1 = i + 1 <= lastIdx ? Number(candles[i + 1].time) : t0 + barSec;
+    return t0 + frac * (t1 - t0);
+  }
+
+  /** Plot X → UTC; coordinateToTime is null in kerzenfreiem rightOffset — use logical extrapolation. */
+  function unixFromPlotX(x) {
+    if (!chart || x == null || !Number.isFinite(Number(x))) return null;
+    let t = null;
+    try {
+      t = chart.timeScale().coordinateToTime(x);
+    } catch (err) {
+      t = null;
+    }
+    if (t != null && Number.isFinite(Number(t))) return Number(t);
+    let logical = null;
+    try {
+      if (chart.timeScale().coordinateToLogical) {
+        logical = chart.timeScale().coordinateToLogical(x);
+      }
+    } catch (err2) {
+      logical = null;
+    }
+    if (logical != null && Number.isFinite(Number(logical))) {
+      return unixFromLogical(logical);
+    }
+    return null;
+  }
+
   function focusOnTime(centerUnix, padSec) {
     if (!chart) return false;
     const candles = (lastPayload && lastPayload.candles) || [];
@@ -4185,6 +4530,169 @@
         return applyVisibleTimeRange(wantFrom, wantTo);
       }
     });
+  }
+
+  function eodDensityCanvas() {
+    return $("eod-density-overlay");
+  }
+
+  function clipEodDensityOverlayToPlot() {
+    const canvas = eodDensityCanvas();
+    if (!canvas) return;
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, size.w || 0);
+    const h = Math.max(1, size.h || 0);
+    canvas.style.position = "absolute";
+    canvas.style.left = "0";
+    canvas.style.top = "0";
+    canvas.style.right = "auto";
+    canvas.style.bottom = "auto";
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    canvas.style.pointerEvents = "none";
+    canvas.style.zIndex = "2";
+    const wantW = Math.max(1, Math.floor(w * dpr));
+    const wantH = Math.max(1, Math.floor(h * dpr));
+    if (canvas.width !== wantW || canvas.height !== wantH) {
+      canvas.width = wantW;
+      canvas.height = wantH;
+    }
+  }
+
+  function eodSegmentHitsViewport(seg, tLo, tHi, pLo, pHi) {
+    if (!seg) return false;
+    const zs = Number(seg.start_timestamp);
+    const ze = Number(seg.end_timestamp != null ? seg.end_timestamp : zs);
+    const zb = Number(seg.bottom_price);
+    const zt = Number(seg.top_price);
+    if (![zs, ze, zb, zt].every(Number.isFinite)) return false;
+    const t0 = Math.min(zs, ze);
+    const t1 = Math.max(zs, ze);
+    const p0 = Math.min(zb, zt);
+    const p1 = Math.max(zb, zt);
+    return t1 >= tLo && t0 <= tHi && p1 >= pLo && p0 <= pHi;
+  }
+
+  function densityDrawUsesStrictViewportCull() {
+    if (shiftMeasure) return false;
+    if (interactionMode && interactionMode !== "select") return false;
+    if (overlayRegistry.has("__preview__")) return false;
+    if (dragState) return false;
+    return true;
+  }
+
+  function drawEodDensity() {
+    const canvas = eodDensityCanvas();
+    if (!canvas) return;
+    clipEodDensityOverlayToPlot();
+    const size = chartSize();
+    const dpr = window.devicePixelRatio || 1;
+    const boxW = Math.max(1, size.w);
+    const boxH = Math.max(1, size.h);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, boxW, boxH);
+    eodDensityLastDraw = { ms: 0, segmentsDrawn: 0, segmentsTotal: 0 };
+    if (!eodDensityPayload || !eodDensityPayload.segments || !eodDensityPayload.segments.length) {
+      canvas.style.display = "none";
+      return;
+    }
+    if (!chart || boxW < 16 || boxH < 16) {
+      canvas.style.display = "none";
+      return;
+    }
+    canvas.style.display = "block";
+    const plotW = plotRightX();
+    const plotH = plotBottomY();
+    let visFrom = null;
+    let visTo = null;
+    try {
+      const vr = chart.timeScale().getVisibleRange();
+      if (vr && vr.from != null && vr.to != null) {
+        visFrom = Number(vr.from);
+        visTo = Number(vr.to);
+      }
+    } catch (e) { /* ignore */ }
+    const priceVis = getVisiblePriceRange();
+    let tLo = visFrom;
+    let tHi = visTo;
+    let pLo = priceVis ? priceVis.from : null;
+    let pHi = priceVis ? priceVis.to : null;
+    if (tLo != null && tHi != null) {
+      const tPad = Math.max(3600, (tHi - tLo) * 0.08);
+      tLo -= tPad;
+      tHi += tPad;
+    }
+    if (pLo != null && pHi != null) {
+      const pPad = Math.max((pHi - pLo) * 0.12, Math.abs(pHi + pLo) * 0.0005);
+      pLo -= pPad;
+      pHi += pPad;
+    }
+    const strictCull = densityDrawUsesStrictViewportCull();
+    const tDraw0 = typeof performance !== "undefined" ? performance.now() : 0;
+    const segments = eodDensityPayload.segments;
+    eodDensityLastDraw.segmentsTotal = segments.length;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, plotW, plotH);
+    ctx.clip();
+    for (let i = 0; i < segments.length; i++) {
+      const seg = segments[i];
+      if (strictCull && tLo != null && tHi != null && pLo != null && pHi != null) {
+        if (!eodSegmentHitsViewport(seg, tLo, tHi, pLo, pHi)) continue;
+      }
+      const x1 = xOf(seg.start_timestamp);
+      const x2 = xOf(seg.end_timestamp != null ? seg.end_timestamp : seg.start_timestamp);
+      const yTop = yOf(seg.top_price);
+      const yBot = yOf(seg.bottom_price);
+      if (x1 == null || x2 == null || yTop == null || yBot == null) continue;
+      const left = Math.min(x1, x2);
+      const right = Math.max(x1, x2);
+      const top = Math.min(yTop, yBot);
+      const bot = Math.max(yTop, yBot);
+      if (right < -8 || left > plotW + 8 || bot < -8 || top > plotH + 8) continue;
+      const w = Math.max(1, right - left);
+      const h = Math.max(1, bot - top);
+      const color = (seg.style && seg.style.color) || seg.color || "#7986cb";
+      const alpha = seg.opacity != null ? Number(seg.opacity) : 0.55;
+      ctx.fillStyle = hexAlpha(color, alpha);
+      ctx.fillRect(left, top, w, h);
+      eodDensityLastDraw.segmentsDrawn += 1;
+    }
+    ctx.restore();
+    const tDraw1 = typeof performance !== "undefined" ? performance.now() : 0;
+    eodDensityLastDraw.ms = Math.round(tDraw1 - tDraw0);
+  }
+
+  function setExactOriginDensity(payload) {
+    if (!payload || !payload.segments || !payload.segments.length) {
+      eodDensityPayload = null;
+      drawEodDensity();
+      return false;
+    }
+    eodDensityPayload = {
+      segments: payload.segments,
+      warning: payload.warning || null,
+      metrics: payload.metrics || null,
+    };
+    drawEodDensity();
+    return true;
+  }
+
+  function clearExactOriginDensity() {
+    eodDensityPayload = null;
+    drawEodDensity();
+    return true;
+  }
+
+  function getExactOriginDensityDrawStats() {
+    return {
+      ms: eodDensityLastDraw.ms,
+      segmentsDrawn: eodDensityLastDraw.segmentsDrawn,
+      segmentsTotal: eodDensityLastDraw.segmentsTotal,
+    };
   }
 
   function drawVolumeProfile() {
@@ -4429,6 +4937,13 @@
       // Cull off-screen LLD/DOM overlays — full style pass on 2k+ nodes lags pans.
       if (overlayOutsideVisibleRange(rec.payload, visFrom, visTo)) {
         if (rec.el) hideEl(rec.el);
+        if (
+          rec.payload.type === "line" &&
+          rec.payload.kind === "vertical" &&
+          isUserDrawing(rec.payload)
+        ) {
+          syncVlineAxisTimestampLabel(rec, null, "");
+        }
         else if (rec.payload.type === "zone" || rec.payload.type === "label" || rec.payload.type === "marker") {
           // Avoid creating DOM for off-screen items until they enter the view.
           return;
@@ -4439,6 +4954,7 @@
     });
     scheduleResearchMarkersPaint();
     layoutShiftMeasure();
+    drawEodDensity();
     drawVolumeProfile();
     drawOrderbookProfile();
     // Throttle OB level canvas wipe; coalesced layout already limits calls per frame.
@@ -4579,7 +5095,7 @@
     if (param.time != null) {
       pt.time = Number(param.time);
     } else if (pt.x != null && chart) {
-      const t = chart.timeScale().coordinateToTime(pt.x);
+      const t = unixFromPlotX(pt.x);
       if (t != null) pt.time = Number(t);
     }
     return pt;
@@ -4609,7 +5125,72 @@
     return Math.max(6, w + 4);
   }
 
+  function isUserDrawing(p) {
+    return !!(p && p.metadata && p.metadata.drawing_id);
+  }
+
+  function userDrawingType(p) {
+    return String((p && p.metadata && p.metadata.drawing_type) || "");
+  }
+
+  function drawingExtendRight(p) {
+    if (!p) return false;
+    if (p.extend_right) return true;
+    const meta = p.metadata || {};
+    return !!meta.extend_right;
+  }
+
+  function isEditableUserSegment(p) {
+    if (!p || p.type !== "line" || p.kind !== "segment" || !isUserDrawing(p)) return false;
+    const t = userDrawingType(p);
+    return t === "trend" || t === "measure";
+  }
+
+  function isEditableTrendSegment(p) {
+    return isEditableUserSegment(p) && userDrawingType(p) === "trend";
+  }
+
+  function isEditableUserZone(p) {
+    if (!p || p.type !== "zone" || !isUserDrawing(p)) return false;
+    const t = userDrawingType(p);
+    return t === "rectangle" || t === "circle";
+  }
+
+  function isEditableTwoPointLine(p) {
+    if (!p || p.type !== "line" || !isUserDrawing(p)) return false;
+    return p.kind === "arrow" || isEditableUserSegment(p);
+  }
+
+  function plotInteractionMaxX() {
+    return Math.max(0, plotRightX() - 1);
+  }
+
+  function isPlotInteractionX(x) {
+    if (x == null || !Number.isFinite(Number(x))) return false;
+    return Number(x) <= plotInteractionMaxX();
+  }
+
+  function clampPlotXY(xy) {
+    if (!xy) return null;
+    const maxX = plotInteractionMaxX();
+    const pb = plotBottomY();
+    return {
+      x: Math.max(0, Math.min(maxX, xy.x)),
+      y: Math.max(0, Math.min(pb > 2 ? pb - 2 : pb, xy.y)),
+    };
+  }
+
+  function segmentExtendedEnd(x1, y1, x2, y2) {
+    const plotRight = plotRightX();
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (Math.abs(dx) < 1e-6) return { x: x2, y: y2 };
+    const yAtRight = y1 + (dy / dx) * (plotRight - x1);
+    return { x: plotRight, y: yAtRight };
+  }
+
   function hitTestXY(x, y) {
+    if (!isPlotInteractionX(x)) return null;
     let best = null;
     let bestZ = -1e9;
     overlayRegistry.forEach(function (rec) {
@@ -4620,17 +5201,27 @@
       const thresh = hitThreshold(p);
       if (p.type === "line" && p.kind === "horizontal") {
         const py = yOf(p.price);
-        hit = py != null && Math.abs(py - y) <= thresh;
+        hit = py != null && Math.abs(py - y) <= thresh && isPlotInteractionX(x);
       } else if (p.type === "line" && p.kind === "vertical") {
         const px = xOf(p.timestamp);
-        hit = px != null && Math.abs(px - x) <= thresh;
+        hit = px != null && Math.abs(px - x) <= thresh && isPlotInteractionX(px);
       } else if (p.type === "line" && (p.kind === "segment" || p.kind === "arrow")) {
         const x1 = xOf(p.start_timestamp);
         const y1 = yOf(p.start_price);
         const x2 = xOf(p.end_timestamp);
         const y2 = yOf(p.end_price);
         if (x1 != null && y1 != null && x2 != null && y2 != null) {
-          hit = distToSeg(x, y, x1, y1, x2, y2) <= Math.max(7, thresh);
+          const segThresh = isEditableUserSegment(p)
+            ? Math.max(12, thresh + 6)
+            : Math.max(7, thresh);
+          let ex = x2;
+          let ey = y2;
+          if (drawingExtendRight(p)) {
+            const ext = segmentExtendedEnd(x1, y1, x2, y2);
+            ex = ext.x;
+            ey = ext.y;
+          }
+          hit = distToSeg(x, y, x1, y1, ex, ey) <= segThresh;
         }
       } else if (p.type === "zone") {
         const x1 = xOf(p.start_timestamp);
@@ -4859,7 +5450,7 @@
     const el = $("chart");
     if (!el) return null;
     const rect = el.getBoundingClientRect();
-    return { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+    return clampPlotXY({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
   }
 
   function marketPointFromXY(xy) {
@@ -4885,41 +5476,7 @@
     }
     if (price == null || Number.isNaN(Number(price))) return null;
 
-    let time = null;
-    try {
-      time = chart.timeScale().coordinateToTime(xy.x);
-    } catch (err) {
-      time = null;
-    }
-
-    // Empty right/left padding (common after TF change / Zentrieren) returns
-    // null from coordinateToTime — clamp to the nearest candle instead so
-    // Shift+measure still starts.
-    if (time == null) {
-      let logical = null;
-      try {
-        if (chart.timeScale().coordinateToLogical) {
-          logical = chart.timeScale().coordinateToLogical(xy.x);
-        }
-      } catch (err2) {
-        logical = null;
-      }
-      if (logical != null && Number.isFinite(Number(logical))) {
-        const idx = Math.max(0, Math.min(candles.length - 1, Math.round(Number(logical))));
-        time = candles[idx].time;
-      } else {
-        // Past the live tip → last bar; before history → first bar.
-        try {
-          const lastX = chart.timeScale().timeToCoordinate(candles[candles.length - 1].time);
-          const firstX = chart.timeScale().timeToCoordinate(candles[0].time);
-          if (lastX != null && xy.x >= lastX) time = candles[candles.length - 1].time;
-          else if (firstX != null && xy.x <= firstX) time = candles[0].time;
-          else time = candles[candles.length - 1].time;
-        } catch (err3) {
-          time = candles[candles.length - 1].time;
-        }
-      }
-    }
+    const time = unixFromPlotX(xy.x);
     if (time == null || !Number.isFinite(Number(time))) return null;
     return { time: Number(time), price: Number(price) };
   }
@@ -4954,7 +5511,13 @@
       }
       return "move";
     }
-    if (p.kind === "arrow") {
+    if (p.type === "line" && p.kind === "horizontal" && isUserDrawing(p)) {
+      return "move";
+    }
+    if (p.type === "line" && p.kind === "vertical" && isUserDrawing(p)) {
+      return "move";
+    }
+    if (isEditableTwoPointLine(p)) {
       const x1 = xOf(p.start_timestamp);
       const y1 = yOf(p.start_price);
       const x2 = xOf(p.end_timestamp);
@@ -4967,7 +5530,7 @@
       }
       return "move";
     }
-    if (p.shape === "ellipse") {
+    if (p.shape === "ellipse" || isEditableUserZone(p)) {
       const x1 = xOf(p.start_timestamp);
       const x2 = p.end_timestamp != null ? xOf(p.end_timestamp) : null;
       const y1 = yOf(p.top_price);
@@ -5283,7 +5846,7 @@
   }
 
   function beginShiftMeasure(anchor, ev) {
-    abortDrawingPreview();
+    clearPreview();
     if (dragState) {
       dragState = null;
     }
@@ -5714,8 +6277,9 @@
     const p = rec.payload;
     const kind = p.kind;
     const movable =
-      (p.type === "line" && (kind === "horizontal" || kind === "vertical" || kind === "arrow")) ||
-      (p.type === "zone" && p.shape === "ellipse") ||
+      (p.type === "line" && (kind === "horizontal" || kind === "vertical" || kind === "arrow") && isUserDrawing(p)) ||
+      isEditableUserSegment(p) ||
+      (p.type === "zone" && (p.shape === "ellipse" || isEditableUserZone(p))) ||
       p.type === "position";
     if (!movable) return;
     if (ev.preventDefault) ev.preventDefault();
@@ -5777,7 +6341,7 @@
       return;
     }
     if (dragState.kind === "vertical") {
-      const t = chart.timeScale().coordinateToTime(xy.x);
+      const t = unixFromPlotX(xy.x);
       if (t == null) return;
       rec.payload.timestamp = Number(t);
       renderVertical(rec);
@@ -5791,12 +6355,12 @@
     if (mode === "move" && grab) {
       const dt = mp.time - grab.time;
       const dp = mp.price - grab.price;
-      if (rec.payload.kind === "arrow") {
+      if (isEditableTwoPointLine(rec.payload)) {
         rec.payload.start_timestamp = orig.start_timestamp + dt;
         rec.payload.end_timestamp = orig.end_timestamp + dt;
         rec.payload.start_price = orig.start_price + dp;
         rec.payload.end_price = orig.end_price + dp;
-      } else if (rec.payload.shape === "ellipse") {
+      } else if (rec.payload.shape === "ellipse" || isEditableUserZone(rec.payload)) {
         rec.payload.start_timestamp = orig.start_timestamp + dt;
         rec.payload.end_timestamp = orig.end_timestamp + dt;
         rec.payload.top_price = orig.top_price + dp;
@@ -5829,7 +6393,7 @@
     } else if (mode === "resize-end") {
       rec.payload.end_timestamp = mp.time;
       rec.payload.end_price = mp.price;
-    } else if (mode.indexOf("resize-") === 0 && rec.payload.shape === "ellipse") {
+    } else if (mode.indexOf("resize-") === 0 && (rec.payload.shape === "ellipse" || isEditableUserZone(rec.payload))) {
       if (mode === "resize-nw" || mode === "resize-sw") {
         rec.payload.start_timestamp = mp.time;
       } else {
@@ -5885,12 +6449,12 @@
         price: payload.price != null ? payload.price : payload.end_price,
         mode: mode,
       };
-      if (payload.kind === "arrow") {
+      if (isEditableTwoPointLine(payload)) {
         event.start_timestamp = payload.start_timestamp;
         event.start_price = payload.start_price;
         event.end_timestamp = payload.end_timestamp;
         event.end_price = payload.end_price;
-      } else if (payload.shape === "ellipse") {
+      } else if (payload.shape === "ellipse" || isEditableUserZone(payload)) {
         event.start_timestamp = payload.start_timestamp;
         event.start_price = payload.top_price;
         event.end_timestamp = payload.end_timestamp;
@@ -6213,6 +6777,9 @@
         mouseWheel: true,
         pinch: true,
         axisDoubleClickReset: { time: true, price: true },
+      },
+      localization: {
+        timeFormatter: crosshairTimeFormatter,
       },
       width: w,
       height: h,
@@ -6687,6 +7254,9 @@
       defaultRightOffset: DEFAULT_RIGHT_OFFSET,
       resetViewCount: resetViewCount,
       lastReset: lastResetResult,
+      candlePaintPending: candlePaintPending,
+      lastAppliedSize: lastAppliedSize,
+      visibleTime: getVisibleTimeRange(),
       shiftMeasure: snapshotShiftMeasure(),
       shiftMeasureVisible: !!(shiftMeasure && $("shift-measure") && $("shift-measure").style.display !== "none"),
       shiftMeasureDragging: !!(shiftMeasure && shiftMeasure.dragging),
@@ -6822,6 +7392,9 @@
     setHostShift: setHostShift,
     setVolumeProfile: setVolumeProfile,
     clearVolumeProfile: clearVolumeProfile,
+    setExactOriginDensity: setExactOriginDensity,
+    clearExactOriginDensity: clearExactOriginDensity,
+    getExactOriginDensityDrawStats: getExactOriginDensityDrawStats,
     setOrderbookProfile: setOrderbookProfile,
     clearOrderbookProfile: clearOrderbookProfile,
     debugOrderbookProfile: debugOrderbookProfile,

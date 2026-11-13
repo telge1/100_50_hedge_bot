@@ -67,6 +67,12 @@
   }
   var RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO = "2026-04-01T00:00:00Z";
   var RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO = "2026-09-30T23:45:00Z";
+  var DOGE_5M_PD1_VIEWER_FROM_ISO = "2026-05-01T00:00:00Z";
+  var DOGE_5M_PD1_VIEWER_TO_ISO = null;
+  var DOGE_5M_PD1_VIEWER_FROM_UNIX = Math.floor(
+    Date.parse(DOGE_5M_PD1_VIEWER_FROM_ISO) / 1000
+  );
+  var DOGE_5M_PD1_VIEWER_TO_UNIX = null;
   var RESEARCH_STATIC_TIMELINE_FROM_UNIX = Math.floor(
     Date.parse(RESEARCH_STATIC_TIMELINE_IMPORT_FROM_ISO) / 1000
   );
@@ -446,9 +452,10 @@
     return base.concat(styled);
   }
 
-  function clipUnixToHistoricalPilot(fromUnix, toUnix) {
-    var covFrom = HISTORICAL_LMV2_PILOT_FROM_UNIX;
-    var covTo = HISTORICAL_LMV2_PILOT_TO_UNIX;
+  function clipUnixToHistoricalPilot(fromUnix, toUnix, tfSec) {
+    var cov = historicalLmv2CoverageBoundsUnix(tfSec);
+    var covFrom = cov.from_unix;
+    var covTo = cov.to_unix;
     var from = Math.max(Math.floor(Number(fromUnix) || 0), covFrom);
     var to = Math.min(Math.floor(Number(toUnix) || 0), covTo);
     if (to < covFrom || from > covTo || from > to) return null;
@@ -481,14 +488,15 @@
     var maxCloses = HISTORICAL_LMV2_MAX_CLOSES_PER_REQUEST;
     var decisionClose = resolveHistoricalLmv2AsOfCloseUnix(ctx);
     if (decisionClose == null) return null;
-    var toClose = Math.min(Math.floor(Number(decisionClose)), HISTORICAL_LMV2_PILOT_TO_UNIX);
-    toClose = Math.max(toClose, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    var cov = historicalLmv2CoverageBoundsUnix(sec);
+    var toClose = Math.min(Math.floor(Number(decisionClose)), cov.to_unix);
+    toClose = Math.max(toClose, cov.from_unix);
     var spanSec = (maxCloses - 1) * sec;
     var fromClose = toClose - spanSec;
-    fromClose = Math.max(fromClose, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    fromClose = Math.max(fromClose, cov.from_unix);
     var paneBase = resolvePaneCloseWindow(pane, sec);
     if (paneBase && Number.isFinite(paneBase.from_close_unix) && Number.isFinite(paneBase.to_close_unix)) {
-      var paneFrom = Math.max(Math.floor(paneBase.from_close_unix), HISTORICAL_LMV2_PILOT_FROM_UNIX);
+      var paneFrom = Math.max(Math.floor(paneBase.from_close_unix), cov.from_unix);
       var paneTo = Math.min(Math.floor(paneBase.to_close_unix), toClose);
       if (paneTo >= paneFrom && paneFrom >= fromClose && paneTo <= toClose) {
         var closeCount = Math.floor((paneTo - paneFrom) / sec) + 1;
@@ -498,15 +506,32 @@
         }
       }
     }
-    return clipUnixToHistoricalPilot(fromClose, toClose);
+    return clipUnixToHistoricalPilot(fromClose, toClose, sec);
   }
 
   function resolveHistoricalLmv2ViewportCloseWindow(pane, tfSec, ctx, chartApi) {
     var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
-    var asOf = resolveHistoricalLmv2AsOfCloseUnix(ctx || {});
+    var cov = historicalLmv2CoverageBoundsUnix(sec);
+    var ctxMerged = Object.assign({}, ctx || {}, { tfSec: sec });
+    var asOf = resolveHistoricalLmv2AsOfCloseUnix(ctxMerged);
+    if (
+      typeof window !== "undefined" &&
+      window.DogeExactOriginTrace &&
+      window.DogeExactOriginTrace.enabled()
+    ) {
+      var T0 = window.DogeExactOriginTrace;
+      T0.event(null, "resolveHistoricalLmv2ViewportCloseWindow", {
+        membership_sec: sec,
+        ctx_chart_tf_sec: ctx && ctx.tfSec,
+        cov_from: T0.isoFromUnix(cov.from_unix),
+        cov_to: T0.isoFromUnix(cov.to_unix),
+        as_of: asOf == null ? null : T0.isoFromUnix(asOf),
+        doge_active: doge5mPd1ViewerBoundsActive(),
+      });
+    }
     if (asOf == null) return null;
-    asOf = Math.min(Math.floor(Number(asOf)), HISTORICAL_LMV2_PILOT_TO_UNIX);
-    asOf = Math.max(asOf, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    asOf = Math.min(Math.floor(Number(asOf)), cov.to_unix);
+    asOf = Math.max(asOf, cov.from_unix);
     var viewFrom = null;
     var viewTo = null;
     if (chartApi && chartApi.getVisibleTimeRange) {
@@ -539,16 +564,30 @@
     var visibleFrom = viewFrom;
     var visibleTo = viewTo;
     viewTo = Math.min(viewTo, asOf);
-    viewFrom = Math.max(viewFrom, HISTORICAL_LMV2_PILOT_FROM_UNIX);
+    viewFrom = Math.max(viewFrom, cov.from_unix);
     if (visibleFrom > asOf || viewTo < viewFrom) {
-      return {
+      var cutoff = {
         view_from_close_unix: visibleFrom,
         view_to_close_unix: visibleTo,
         as_of_close_unix: asOf,
         viewport_after_replay_cutoff: true,
       };
+      if (
+        typeof window !== "undefined" &&
+        window.DogeExactOriginTrace &&
+        window.DogeExactOriginTrace.enabled()
+      ) {
+        var T1 = window.DogeExactOriginTrace;
+        T1.event(null, "resolveHistoricalLmv2ViewportCloseWindow", {
+          path: "replay_cutoff",
+          visible_from: T1.isoFromUnix(visibleFrom),
+          visible_to: T1.isoFromUnix(visibleTo),
+          as_of: T1.isoFromUnix(asOf),
+        });
+      }
+      return cutoff;
     }
-    return {
+    var okVp = {
       view_from_close_unix: viewFrom,
       view_to_close_unix: viewTo,
       display_from_close_unix: viewFrom,
@@ -556,22 +595,121 @@
       as_of_close_unix: asOf,
       viewport_after_replay_cutoff: false,
     };
+    if (
+      typeof window !== "undefined" &&
+      window.DogeExactOriginTrace &&
+      window.DogeExactOriginTrace.enabled()
+    ) {
+      var T2 = window.DogeExactOriginTrace;
+      T2.event(null, "resolveHistoricalLmv2ViewportCloseWindow", {
+        path: "ok",
+        view_from: T2.isoFromUnix(viewFrom),
+        view_to: T2.isoFromUnix(viewTo),
+      });
+    }
+    return okVp;
   }
 
-  function clampCloseUnixToStaticImport(unix) {
+  function applyDoge5mPd1ViewerBounds(payload) {
+    if (!payload || !payload.data_available_to) {
+      if (
+        typeof window !== "undefined" &&
+        window.DogeExactOriginTrace &&
+        window.DogeExactOriginTrace.enabled()
+      ) {
+        window.DogeExactOriginTrace.event(null, "applyDoge5mPd1ViewerBounds", {
+          result: "skip",
+          reason: "missing_data_available_to",
+        });
+      }
+      return null;
+    }
+    DOGE_5M_PD1_VIEWER_TO_ISO = String(payload.data_available_to);
+    DOGE_5M_PD1_VIEWER_TO_UNIX = Math.floor(Date.parse(DOGE_5M_PD1_VIEWER_TO_ISO) / 1000);
+    if (payload.data_available_from) {
+      DOGE_5M_PD1_VIEWER_FROM_ISO = String(payload.data_available_from);
+      DOGE_5M_PD1_VIEWER_FROM_UNIX = Math.floor(Date.parse(DOGE_5M_PD1_VIEWER_FROM_ISO) / 1000);
+    }
+    var out = {
+      from_unix: DOGE_5M_PD1_VIEWER_FROM_UNIX,
+      to_unix: DOGE_5M_PD1_VIEWER_TO_UNIX,
+    };
+    if (
+      typeof window !== "undefined" &&
+      window.DogeExactOriginTrace &&
+      window.DogeExactOriginTrace.enabled()
+    ) {
+      var T = window.DogeExactOriginTrace;
+      window.DogeExactOriginTrace.event(null, "applyDoge5mPd1ViewerBounds", {
+        result: "ok",
+        from: T.shortIso(DOGE_5M_PD1_VIEWER_FROM_ISO),
+        to: T.shortIso(DOGE_5M_PD1_VIEWER_TO_ISO),
+        pipeline: payload.pipeline_line_id || null,
+      });
+    }
+    return out;
+  }
+
+  function doge5mPd1ViewerBoundsActive() {
+    return Number.isFinite(DOGE_5M_PD1_VIEWER_TO_UNIX);
+  }
+
+  /** Published chart coverage for historical/Exact-Origin paths (pool TF sec, not chart candle TF). */
+  function historicalLmv2CoverageBoundsUnix(tfSec) {
+    var sec = tfSec || HISTORICAL_LMV2_TF_SEC;
+    if (sec === 300 && doge5mPd1ViewerBoundsActive()) {
+      return {
+        from_unix: DOGE_5M_PD1_VIEWER_FROM_UNIX,
+        to_unix: DOGE_5M_PD1_VIEWER_TO_UNIX,
+      };
+    }
+    return {
+      from_unix: HISTORICAL_LMV2_PILOT_FROM_UNIX,
+      to_unix: HISTORICAL_LMV2_PILOT_TO_UNIX,
+    };
+  }
+
+  function doge5mPd1ViewerBoundsIso() {
+    if (!doge5mPd1ViewerBoundsActive()) return null;
+    return {
+      data_available_from: DOGE_5M_PD1_VIEWER_FROM_ISO,
+      data_available_to: DOGE_5M_PD1_VIEWER_TO_ISO,
+    };
+  }
+
+  function effectiveStaticTimelineImportToUnix(timeframe) {
+    if (String(timeframe || "") === "5m" && doge5mPd1ViewerBoundsActive()) {
+      return DOGE_5M_PD1_VIEWER_TO_UNIX;
+    }
+    return RESEARCH_STATIC_TIMELINE_TO_UNIX;
+  }
+
+  function effectiveStaticTimelineImportFromUnix(timeframe) {
+    if (String(timeframe || "") === "5m" && doge5mPd1ViewerBoundsActive()) {
+      return DOGE_5M_PD1_VIEWER_FROM_UNIX;
+    }
+    return RESEARCH_STATIC_TIMELINE_FROM_UNIX;
+  }
+
+  function clampCloseUnixToStaticImport(unix, timeframe) {
     var u = Math.floor(Number(unix));
-    if (!Number.isFinite(u)) return RESEARCH_STATIC_TIMELINE_FROM_UNIX;
-    return Math.min(
-      Math.max(u, RESEARCH_STATIC_TIMELINE_FROM_UNIX),
-      RESEARCH_STATIC_TIMELINE_TO_UNIX
-    );
+    var fromU = effectiveStaticTimelineImportFromUnix(timeframe);
+    var toU = effectiveStaticTimelineImportToUnix(timeframe);
+    if (!Number.isFinite(u)) return fromU;
+    return Math.min(Math.max(u, fromU), toU);
   }
 
-  function planStaticTimelineWindows(fromCloseUnix, toCloseUnix) {
+  function planStaticTimelineWindows(fromCloseUnix, toCloseUnix, timeframe) {
     var sec = HISTORICAL_LMV2_TF_SEC;
+    if (String(timeframe || "") === "5m") {
+      sec = 300;
+    }
     var span = STATIC_TIMELINE_MAX_SPAN_UNIX;
-    var from = clampCloseUnixToStaticImport(fromCloseUnix);
-    var to = clampCloseUnixToStaticImport(toCloseUnix);
+    if (String(timeframe || "") === "5m") {
+      span = (STATIC_TIMELINE_MAX_CLOSES - 1) * 300;
+    }
+    var from = clampCloseUnixToStaticImport(fromCloseUnix, timeframe);
+    var to = clampCloseUnixToStaticImport(toCloseUnix, timeframe);
     if (to < from) return [];
     var out = [];
     var start = from;
@@ -1750,6 +1888,14 @@
     RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO: RESEARCH_STATIC_TIMELINE_IMPORT_TO_ISO,
     RESEARCH_STATIC_TIMELINE_FROM_UNIX: RESEARCH_STATIC_TIMELINE_FROM_UNIX,
     RESEARCH_STATIC_TIMELINE_TO_UNIX: RESEARCH_STATIC_TIMELINE_TO_UNIX,
+    DOGE_5M_PD1_VIEWER_FROM_ISO: DOGE_5M_PD1_VIEWER_FROM_ISO,
+    DOGE_5M_PD1_VIEWER_TO_ISO: DOGE_5M_PD1_VIEWER_TO_ISO,
+    applyDoge5mPd1ViewerBounds: applyDoge5mPd1ViewerBounds,
+    doge5mPd1ViewerBoundsActive: doge5mPd1ViewerBoundsActive,
+    doge5mPd1ViewerBoundsIso: doge5mPd1ViewerBoundsIso,
+    historicalLmv2CoverageBoundsUnix: historicalLmv2CoverageBoundsUnix,
+    effectiveStaticTimelineImportToUnix: effectiveStaticTimelineImportToUnix,
+    effectiveStaticTimelineImportFromUnix: effectiveStaticTimelineImportFromUnix,
     STATIC_TIMELINE_MAX_CLOSES: STATIC_TIMELINE_MAX_CLOSES,
     STATIC_TIMELINE_MAX_SPAN_UNIX: STATIC_TIMELINE_MAX_SPAN_UNIX,
     planStaticTimelineWindows: planStaticTimelineWindows,
