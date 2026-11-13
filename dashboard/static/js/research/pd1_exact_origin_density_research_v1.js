@@ -6,18 +6,18 @@
   "use strict";
 
   const API_WINDOW = "/live-charts/viewer/api/window";
-  /** Server applies WARMUP_HOURS=168 inside build_landscape_window; do not subtract here. */
-  const MAX_API_VISIBLE_MS = 72 * 3600 * 1000;
+  const STEP_MS = 5 * 60 * 1000;
+  /** Match backend MAX_5M_BARS=864 inclusive: span may cover at most 863×5m between endpoints. */
+  const MAX_API_VISIBLE_MS = (864 - 1) * STEP_MS;
   const API_TAIL_PAD_MS = 6 * 3600 * 1000;
   const SWEEP_PAD_MS = 2 * 3600 * 1000;
   const VIEWER_CAP = "/live-charts/viewer/api/capabilities";
-  const STEP_MS = 5 * 60 * 1000;
   const DEFAULT_MAX_CHART_ZONES = 900;
   const EOD_CANVAS_FLAG_KEY = "phase6xt_eod_density_canvas_v1";
   const EOD_FIXED_TILE_48H_FLAG_KEY = "phase6xt_eod_fixed_tile_48h_v1";
   const MIN_ORIGINS_STORAGE_KEY = "phase6xt_eod_density_min_origins_v1";
   const MIN_ORIGINS_SLIDER_MAX = 10;
-  const VERSION = "pd1-1h-fixed-tile-v2";
+  const VERSION = "pd1-p6-1h-4h-v1";
   /** Viewer API release matrix (no silent fallbacks). */
   const RELEASED_VIEWER_SCOPES = [
     { timeframe: "15m", pool_detail: 1 },
@@ -26,7 +26,9 @@
     { timeframe: "5m", pool_detail: 1 },
     { timeframe: "5m", pool_detail: 5 },
     { timeframe: "5m", pool_detail: 10 },
+    { timeframe: "30m", pool_detail: 1 },
     { timeframe: "1h", pool_detail: 1 },
+    { timeframe: "4h", pool_detail: 1 },
     { timeframe: "4h", pool_detail: 10 },
   ];
   const POOL_DETAIL_VALUES = [1, 5, 10];
@@ -35,8 +37,66 @@
 
   let deps = null;
   let caps = null;
+  let capsLoadInflight = null;
   const inflight = new Map();
   let lastMetrics = null;
+
+  function eoTr() {
+    return typeof window !== "undefined" ? window.DogeExactOriginTrace : null;
+  }
+
+  function traceIdForPane(pane) {
+    return pane && pane._eoTraceId ? pane._eoTraceId : null;
+  }
+
+  function ensureEoTrace(pane) {
+    const T = eoTr();
+    if (!T || !T.enabled()) return null;
+    if (pane && !pane._eoTraceId) pane._eoTraceId = T.newTraceId();
+    if (pane && pane._eoTraceId) return pane._eoTraceId;
+    return T.newTraceId();
+  }
+
+  function traceContext(pane) {
+    const sym =
+      deps && deps.state && deps.state.symbol ? String(deps.state.symbol).toUpperCase() : "?";
+    const chart = pane ? paneChartTimeframe(pane) : "?";
+    const pool = selectedPoolTimeframe();
+    const T = eoTr();
+    const p5k = T && T.p5kCaseLabel ? T.p5kCaseLabel(chart, pool) : chart + "/" + pool;
+    const candles = pane && pane.pendingData && pane.pendingData.candles;
+    const lastCandle =
+      candles && candles.length ? Number(candles[candles.length - 1].time) : null;
+    let visible = null;
+    const chartApi = deps && deps.api && pane ? deps.api(pane) : null;
+    if (chartApi && chartApi.getVisibleTimeRange) {
+      try {
+        visible = chartApi.getVisibleTimeRange();
+      } catch (eVis) {
+        visible = null;
+      }
+    }
+    const histLmv2 = deps.$("researchIndHistoricalLmv2Pools");
+    const activeCb = deps.$("researchIndLiveMicroLldV2Remaining");
+    return {
+      p5k_case: p5k,
+      chart: chart,
+      pool: pool,
+      symbol: sym,
+      js: VERSION,
+      min_origins: getMinOrigins(),
+      exact_origin_on: isEnabled(),
+      hist_lmv2_on: !!(histLmv2 && histLmv2.checked),
+      active_overlay_on: !!(activeCb && activeCb.checked),
+      historical_replay: deps.isHistoricalReplay ? deps.isHistoricalReplay() : null,
+      history_blocks_live: deps.historyBlocksLive ? deps.historyBlocksLive() : null,
+      last_candle_unix: lastCandle,
+      last_candle_open_utc: lastCandle != null ? isoFromMs(lastCandle * 1000) : null,
+      last_candle_close: candles && candles.length ? Number(candles[candles.length - 1].close) : null,
+      visible_from_unix: visible && visible.from != null ? Math.floor(Number(visible.from)) : null,
+      visible_to_unix: visible && visible.to != null ? Math.floor(Number(visible.to)) : null,
+    };
+  }
 
   function isoFromMs(ms) {
     return new Date(ms).toISOString().replace(".000", "");
@@ -117,6 +177,7 @@
       return AD.membershipSlotMinutesForTimeframe(tf) * 60;
     }
     if (tf === "5m") return 300;
+    if (tf === "30m") return 1800;
     if (tf === "1h") return 3600;
     if (tf === "4h") return 14400;
     return 900;
@@ -140,21 +201,178 @@
       .join("+");
   }
 
+  function chartTfDiffersFromPool(pane) {
+    const chartTf = paneChartTimeframe(pane);
+    const poolTf = selectedPoolTimeframe();
+    return !!(chartTf && poolTf && chartTf !== poolTf);
+  }
+
+  const ON_DEMAND_BOUNDS_STORAGE_KEY = {
+    "30m": "_onDemand30mPd1ViewerBounds",
+    "1h": "_onDemand1hPd1ViewerBounds",
+    "4h": "_onDemand4hPd1ViewerBounds",
+  };
+
+  const ON_DEMAND_POOL_TIMEFRAMES = ["30m", "1h", "4h"];
+
+  function onDemandPd1BoundsPatch(c, poolTf) {
+    if (!c || !poolTf) return null;
+    const key = ON_DEMAND_BOUNDS_STORAGE_KEY[String(poolTf)];
+    if (!key) return null;
+    const stored = c[key];
+    return stored && stored.data_available_to ? stored : null;
+  }
+
+  function mergeOnDemandScopeIntoCaps(capsRoot, b, poolTf) {
+    if (!capsRoot || !b || !b.data_available_to) return;
+    const key = ON_DEMAND_BOUNDS_STORAGE_KEY[poolTf];
+    if (!key) return;
+    capsRoot[key] = {
+      data_available_from: b.data_available_from,
+      data_available_to: b.data_available_to,
+      pipeline_line_id: b.pipeline_line_id,
+      config_hash: b.config_hash,
+      release_source: b.release_source || "on_demand_ch1m",
+    };
+    const scopes = capsRoot.supported_viewer_scopes || [];
+    const idx = scopes.findIndex(function (s) {
+      return s && s.timeframe === poolTf && Number(s.pool_detail) === 1;
+    });
+    const patch = {
+      symbol: b.symbol || "DOGEUSDT",
+      timeframe: poolTf,
+      pool_detail: 1,
+      pipeline_line_id: b.pipeline_line_id,
+      config_hash: b.config_hash,
+      data_available_from: b.data_available_from,
+      data_available_to: b.data_available_to,
+      release_source: b.release_source || "on_demand_ch1m",
+    };
+    if (idx >= 0) scopes[idx] = Object.assign({}, scopes[idx], patch);
+    else scopes.push(patch);
+    capsRoot.supported_viewer_scopes = scopes;
+  }
+
+  function doge5mPd1BoundsPatch(c) {
+    if (!c) return null;
+    const stored = c._doge5mPd1ViewerBounds;
+    if (stored && stored.data_available_to) {
+      const T = eoTr();
+      if (T && T.enabled()) {
+        T.event(null, "doge5mPd1BoundsPatch", {
+          path: "caps_stored",
+          from: T.shortIso(stored.data_available_from),
+          to: T.shortIso(stored.data_available_to),
+        });
+      }
+      return stored;
+    }
+    if (
+      deps &&
+      deps.SC_HELPERS &&
+      deps.SC_HELPERS.doge5mPd1ViewerBoundsActive &&
+      deps.SC_HELPERS.doge5mPd1ViewerBoundsActive() &&
+      deps.SC_HELPERS.doge5mPd1ViewerBoundsIso
+    ) {
+      const iso = deps.SC_HELPERS.doge5mPd1ViewerBoundsIso();
+      const T = eoTr();
+      if (T && T.enabled() && iso) {
+        T.event(null, "doge5mPd1BoundsPatch", {
+          path: "sc_helpers_active",
+          from: T.shortIso(iso.data_available_from),
+          to: T.shortIso(iso.data_available_to),
+        });
+      }
+      return iso;
+    }
+    const T0 = eoTr();
+    if (T0 && T0.enabled()) {
+      T0.event(null, "doge5mPd1BoundsPatch", { path: "none", result: "null" });
+    }
+    return null;
+  }
+
   function scopeCaps(c, sc) {
     if (!sc) return c;
-    const scopes = (c && c.supported_viewer_scopes) || [];
-    const match = scopes.find(function (s) {
-      return s && s.timeframe === sc.timeframe && Number(s.pool_detail) === sc.pool_detail;
-    });
-    if (!match) return c;
-    return Object.assign({}, c, {
-      data_available_from: match.data_available_from,
-      data_available_to: match.data_available_to,
-      pipeline_line_id: match.pipeline_line_id,
-      config_hash: match.config_hash,
-      timeframe: match.timeframe,
-      pool_detail: match.pool_detail,
-    });
+    let path = "root";
+    let out = c;
+    if (sc.timeframe === "5m" && Number(sc.pool_detail) === 1) {
+      const dogeIso = doge5mPd1BoundsPatch(c);
+      if (dogeIso && dogeIso.data_available_to) {
+        path = "doge_5m_pd1_patch";
+        out = Object.assign({}, c, {
+          data_available_from: dogeIso.data_available_from,
+          data_available_to: dogeIso.data_available_to,
+          timeframe: "5m",
+          pool_detail: 1,
+          pipeline_line_id: dogeIso.pipeline_line_id || (c && c.pipeline_line_id),
+          config_hash: dogeIso.config_hash || (c && c.config_hash),
+        });
+      }
+    }
+    if (
+      path === "root" &&
+      ON_DEMAND_POOL_TIMEFRAMES.indexOf(sc.timeframe) >= 0 &&
+      Number(sc.pool_detail) === 1
+    ) {
+      const odIso = onDemandPd1BoundsPatch(c, sc.timeframe);
+      if (odIso && odIso.data_available_to) {
+        path = "on_demand_" + sc.timeframe + "_pd1_patch";
+        out = Object.assign({}, c, {
+          data_available_from: odIso.data_available_from,
+          data_available_to: odIso.data_available_to,
+          timeframe: sc.timeframe,
+          pool_detail: 1,
+          pipeline_line_id: odIso.pipeline_line_id,
+          config_hash: odIso.config_hash,
+        });
+      }
+    }
+    if (path === "root") {
+      const scopes = (c && c.supported_viewer_scopes) || [];
+      const match = scopes.find(function (s) {
+        return s && s.timeframe === sc.timeframe && Number(s.pool_detail) === sc.pool_detail;
+      });
+      if (!match) {
+        path = "capabilities_root_fallback";
+        out = c;
+      } else {
+        path = "capabilities_scope_match";
+        out = Object.assign({}, c, {
+          data_available_from: match.data_available_from,
+          data_available_to: match.data_available_to,
+          pipeline_line_id: match.pipeline_line_id,
+          config_hash: match.config_hash,
+          timeframe: match.timeframe,
+          pool_detail: match.pool_detail,
+        });
+      }
+    }
+    const T = eoTr();
+    if (T && T.enabled()) {
+      const fromIso = out && out.data_available_from;
+      const toIso = out && out.data_available_to;
+      let boundHint = "dynamic";
+      if (T.isAprSepStaticBound && (T.isAprSepStaticBound(fromIso) || T.isAprSepStaticBound(toIso))) {
+        boundHint =
+          path === "capabilities_scope_match"
+            ? "apr_sep_from_capabilities_api"
+            : path === "capabilities_root_fallback"
+              ? "apr_sep_from_capabilities_root"
+              : "apr_sep_like_dates";
+      }
+      T.event(null, "scopeCaps", {
+        path: path,
+        pool_tf: sc.timeframe,
+        pd: sc.pool_detail,
+        pipeline: (out && out.pipeline_line_id) || null,
+        from: T.shortIso(fromIso),
+        to: T.shortIso(toIso),
+        bound_hint: boundHint,
+        caps_cache: caps ? "warm" : "null",
+      });
+    }
+    return out;
   }
 
   function referencePaneForPdUi() {
@@ -183,7 +401,7 @@
     if (hint && isEnabled() && !hasPoolTimeframeSelector() && chartTf === "1h") {
       hint.hidden = false;
       hint.textContent =
-        "B – Exact Origin: Seite neu laden (Strg+Shift+R) — Pool-TF 5m/1h fehlt in geladener UI.";
+        "B – Exact Origin: Seite neu laden (Strg+Shift+R) — Pool-TF 5m/30m/1h fehlt in geladener UI.";
     }
     POOL_DETAIL_VALUES.forEach(function (pd) {
       const el = document.querySelector(
@@ -236,9 +454,14 @@
     }
   }
 
-  /** 1h on-demand: stable UTC 72h tiles (same span as API max chunk; better cache on pan). 5m unchanged. */
+  /** 30m/1h/4h on-demand: stable UTC 72h tiles (API max chunk; better cache on pan). 5m unchanged. */
   function exactOriginWindowPlannerForScope(sc) {
-    if (sc && String(sc.timeframe) === "1h") {
+    if (
+      sc &&
+      (String(sc.timeframe) === "1h" ||
+        String(sc.timeframe) === "30m" ||
+        String(sc.timeframe) === "4h")
+    ) {
       return { mode: "fixed48h", tileHours: 72 };
     }
     if (isFixedTile48hEnabled()) {
@@ -281,7 +504,13 @@
   function maxConcurrentWindowFetch(scopes) {
     if (!scopes || !scopes.length) return MAX_CONCURRENT_WINDOW_FETCH;
     for (let i = 0; i < scopes.length; i += 1) {
-      if (scopes[i].timeframe === "1h") return MAX_CONCURRENT_WINDOW_FETCH_1H;
+      if (
+        scopes[i].timeframe === "1h" ||
+        scopes[i].timeframe === "30m" ||
+        scopes[i].timeframe === "4h"
+      ) {
+        return MAX_CONCURRENT_WINDOW_FETCH_1H;
+      }
     }
     return MAX_CONCURRENT_WINDOW_FETCH;
   }
@@ -420,10 +649,163 @@
   }
 
   async function loadCaps() {
-    if (caps) return caps;
+    if (caps && caps._loadCapsReady) {
+      const T = eoTr();
+      const tid = traceIdForPane(referencePaneForPdUi()) || ensureEoTrace(referencePaneForPdUi());
+      if (T && T.enabled()) {
+        T.event(tid, "loadCaps", { cache: "HIT", caps_key: "module_caps_singleton" });
+      }
+      return caps;
+    }
+    if (capsLoadInflight) {
+      return capsLoadInflight;
+    }
+    capsLoadInflight = loadCapsOnce();
+    try {
+      return await capsLoadInflight;
+    } finally {
+      capsLoadInflight = null;
+    }
+  }
+
+  async function loadCapsOnce() {
+    const T = eoTr();
+    const tid = traceIdForPane(referencePaneForPdUi()) || ensureEoTrace(referencePaneForPdUi());
+    if (T && T.enabled()) {
+      T.event(tid, "loadCaps", { cache: "MISS", fetch: VIEWER_CAP });
+    }
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
     const res = await fetch(VIEWER_CAP, { credentials: "same-origin" });
-    caps = await res.json().catch(() => ({}));
+    const nextCaps = await res.json().catch(() => ({}));
+    caps = nextCaps;
+    if (T && T.enabled()) {
+      T.event(tid, "loadCaps", {
+        capabilities_http: res.status,
+        caps_source: "viewer_api",
+        ms: typeof performance !== "undefined" ? Math.round(performance.now() - t0) : null,
+      });
+    }
+  try {
+    const bRes = await fetch("/api/research/doge-5m-pd1-viewer-bounds", {
+      credentials: "same-origin",
+    });
+    if (T && T.enabled()) {
+      T.event(tid, "loadCaps", {
+        doge_bounds_http: bRes.status,
+        doge_bounds_ok: bRes.ok,
+      });
+    }
+    if (bRes.ok) {
+      const b = await bRes.json().catch(function () {
+        return null;
+      });
+      if (b && b.data_available_to) {
+        if (deps.SC_HELPERS && deps.SC_HELPERS.applyDoge5mPd1ViewerBounds) {
+          deps.SC_HELPERS.applyDoge5mPd1ViewerBounds(b);
+        }
+        caps._doge5mPd1ViewerBounds = {
+          data_available_from: b.data_available_from,
+          data_available_to: b.data_available_to,
+          pipeline_line_id: b.pipeline_line_id,
+          config_hash: b.config_hash,
+        };
+        const scopes = caps.supported_viewer_scopes || [];
+        const idx = scopes.findIndex(function (s) {
+          return s && s.timeframe === "5m" && Number(s.pool_detail) === 1;
+        });
+        const patch = {
+          symbol: b.symbol || "DOGEUSDT",
+          timeframe: "5m",
+          pool_detail: 1,
+          pipeline_line_id: b.pipeline_line_id,
+          config_hash: b.config_hash,
+          data_available_from: b.data_available_from,
+          data_available_to: b.data_available_to,
+        };
+        if (idx >= 0) scopes[idx] = Object.assign({}, scopes[idx], patch);
+        else scopes.push(patch);
+        caps.supported_viewer_scopes = scopes;
+        if (
+          caps.timeframe === "5m" &&
+          Number(caps.pool_detail) === 1 &&
+          String(caps.symbol || "").toUpperCase() === "DOGEUSDT"
+        ) {
+          caps.data_available_from = b.data_available_from;
+          caps.data_available_to = b.data_available_to;
+        }
+      }
+    }
+  } catch (e) {
+    /* fail-closed: viewer caps only */
+    if (T && T.enabled()) {
+      T.event(tid, "loadCaps", { doge_bounds_error: String(e && e.message ? e.message : e) });
+    }
+  }
+    for (let odi = 0; odi < ON_DEMAND_POOL_TIMEFRAMES.length; odi += 1) {
+      const odTf = ON_DEMAND_POOL_TIMEFRAMES[odi];
+      const storeKey = ON_DEMAND_BOUNDS_STORAGE_KEY[odTf];
+      try {
+        const odRes = await fetch(
+          "/api/research/doge-pd1-on-demand-viewer-bounds?timeframe=" +
+            encodeURIComponent(odTf) +
+            "&pool_detail=1",
+          { credentials: "same-origin" }
+        );
+        if (T && T.enabled()) {
+          T.event(tid, "loadCaps", {
+            on_demand_tf: odTf,
+            on_demand_http: odRes.status,
+            on_demand_ok: odRes.ok,
+          });
+        }
+        if (odRes.ok) {
+          const odBody = await odRes.json().catch(function () {
+            return null;
+          });
+          if (odBody && odBody.data_available_to) {
+            mergeOnDemandScopeIntoCaps(caps, odBody, odTf);
+          }
+        } else if (odRes.status === 422) {
+          caps[storeKey] = { unavailable: true };
+        }
+      } catch (odErr) {
+        if (T && T.enabled()) {
+          T.event(tid, "loadCaps", {
+            on_demand_tf: odTf,
+            on_demand_error: String(odErr && odErr.message ? odErr.message : odErr),
+          });
+        }
+      }
+    }
+    if (T && T.enabled() && caps) {
+      const sc0 =
+        caps.supported_viewer_scopes && caps.supported_viewer_scopes.length
+          ? caps.supported_viewer_scopes[0]
+          : null;
+      T.event(tid, "loadCaps", {
+        done: true,
+        root_from: T.shortIso(caps.data_available_from),
+        root_to: T.shortIso(caps.data_available_to),
+        doge_stored: caps._doge5mPd1ViewerBounds
+          ? T.shortIso(caps._doge5mPd1ViewerBounds.data_available_to)
+          : "none",
+        scopes_n: (caps.supported_viewer_scopes || []).length,
+        sample_scope: sc0
+          ? sc0.timeframe + "/pd" + sc0.pool_detail + "@" + T.shortIso(sc0.data_available_to)
+          : "none",
+      });
+    }
+    caps._loadCapsReady = true;
     return caps;
+  }
+
+  function invalidateCapsCache() {
+    const T = eoTr();
+  if (T && T.enabled()) {
+      T.event(traceIdForPane(referencePaneForPdUi()), "invalidateCapsCache", { caps: "cleared" });
+    }
+    caps = null;
+    capsLoadInflight = null;
   }
 
   function candleBoundsSec(pane) {
@@ -463,7 +845,8 @@
       return { from: g - pad, to: g + pad, source: "replay_window" };
     }
     const chart = deps.api(pane);
-    if (deps.SC_HELPERS && deps.decisionContext && chart) {
+    const crossTf = chartTfDiffersFromPool(pane);
+    if (!crossTf && deps.SC_HELPERS && deps.decisionContext && chart) {
       const ctx = deps.decisionContext(pane);
       const vp = deps.SC_HELPERS.resolveHistoricalLmv2ViewportCloseWindow(
         pane,
@@ -483,6 +866,16 @@
         }
       }
     }
+    if (crossTf && chart && chart.getVisibleTimeRange) {
+      const vr = chart.getVisibleTimeRange();
+      if (vr && vr.from != null && vr.to != null && Number(vr.from) < Number(vr.to)) {
+        return {
+          from: Math.floor(Number(vr.from)),
+          to: Math.floor(Number(vr.to)),
+          source: "chart_visible_cross_pool_tf",
+        };
+      }
+    }
     const candles = candleBoundsSec(pane);
     if (candles) return candles;
     const chart2 = deps.api(pane);
@@ -495,6 +888,10 @@
           source: "chart_visible_range",
         };
       }
+    }
+    const T = eoTr();
+    if (T && T.enabled()) {
+      T.event(null, "resolveViewSec", { result: "null", chart_pool_cross: chartTfDiffersFromPool(pane) });
     }
     return null;
   }
@@ -533,9 +930,21 @@
     return { apiFrom: from, apiTo: to };
   }
 
-  function buildWindows(viewSec, loMs, hiMs) {
+  function buildWindows(viewSec, loMs, hiMs, traceId) {
+    const T = eoTr();
     const hit = intersectViewWithData(viewSec, loMs, hiMs);
     if (!hit) {
+      if (T && T.enabled()) {
+        T.event(traceId, "buildWindows", {
+          result: "NO_INTERSECTION",
+          reason: "view_outside_data",
+          view_from: T.isoFromUnix(viewSec && viewSec.from),
+          view_to: T.isoFromUnix(viewSec && viewSec.to),
+          bounds_from: T.isoFromMs(loMs),
+          bounds_to: T.isoFromMs(hiMs),
+          view_source: viewSec && viewSec.source,
+        });
+      }
       return {
         ok: false,
         reason: "view_outside_data",
@@ -558,6 +967,14 @@
     sweep0 = Math.max(sweep0, floor5mMs(loMs));
     sweep1 = Math.min(sweep1, ceil5mMs(hiMs));
     if (apiFrom >= apiTo || sweep0 >= sweep1) {
+      if (T && T.enabled()) {
+        T.event(traceId, "buildWindows", {
+          result: "NO_INTERSECTION",
+          reason: "empty_intersection",
+          api_from: T.isoFromMs(apiFrom),
+          api_to: T.isoFromMs(apiTo),
+        });
+      }
       return {
         ok: false,
         reason: "empty_intersection",
@@ -568,6 +985,15 @@
         loMs,
         hiMs,
       };
+    }
+    if (T && T.enabled()) {
+      T.event(traceId, "buildWindows", {
+        result: "OK",
+        api_from: T.isoFromMs(apiFrom),
+        api_to: T.isoFromMs(apiTo),
+        hit_from: T.isoFromUnix(hit.from),
+        hit_to: T.isoFromUnix(hit.to),
+      });
     }
     return {
       ok: true,
@@ -596,7 +1022,7 @@
       const w = planned[i];
       const ck = AD.exactOriginCacheKeyForWindow(w);
       const ent = store.chunks[ck];
-      if (ent && ent.status === "ok" && ent.pools) continue;
+      if (AD.exactOriginChunkSatisfiesWindow && AD.exactOriginChunkSatisfiesWindow(ent, w)) continue;
       if (ent && ent.status === "error" && !retryErrors) continue;
       missing.push(w);
     }
@@ -613,7 +1039,7 @@
         const w = missing[idx];
         const ck = AD.exactOriginCacheKeyForWindow(w);
         try {
-          const data = await fetchWindow(w.fromMs, w.toMs, scope);
+          const data = await fetchWindow(w.fromMs, w.toMs, scope, traceIdForPane(pane));
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
           AD.touchExactOriginWindowCache(store, ck, {
             status: "ok",
@@ -659,11 +1085,58 @@
     return AD.mergeDensityPools(lists);
   }
 
-  async function fetchWindow(fromMs, toMs, scope) {
+  function clipWindowMsToScopeDataBounds(fromMs, toMs, scope) {
+    const c = scopeCaps(caps, scope);
+    if (!c) return { ok: true, fromMs: fromMs, toMs: toMs, clipped: false };
+    let from = fromMs;
+    let to = toMs;
+    let clipped = false;
+    if (c.data_available_from) {
+      const lo = Date.parse(c.data_available_from);
+      if (Number.isFinite(lo) && from < lo) {
+        from = lo;
+        clipped = true;
+      }
+    }
+    if (c.data_available_to) {
+      const hi = Date.parse(c.data_available_to);
+      if (Number.isFinite(hi) && to > hi) {
+        to = hi;
+        clipped = true;
+      }
+    }
+    if (from >= to) return { ok: false, clipped: clipped, reason: "empty_after_data_bounds_clip" };
+    return { ok: true, fromMs: from, toMs: to, clipped: clipped };
+  }
+
+  async function fetchWindow(fromMs, toMs, scope, traceId) {
     const sc = scope;
     if (!sc) throw new Error("fetchWindow requires scope");
+    const clip = clipWindowMsToScopeDataBounds(fromMs, toMs, sc);
+    if (!clip.ok) throw new Error(clip.reason || "window empty after data bounds clip");
+    fromMs = clip.fromMs;
+    toMs = clip.toMs;
     const key = exactOriginScopeKeyForScope(sc) + "-" + fromMs + "-" + toMs;
     if (inflight.has(key)) return inflight.get(key);
+    const clientTraceId = traceId || ensureEoTrace(referencePaneForPdUi());
+    const T = eoTr();
+    const t0 = typeof performance !== "undefined" ? performance.now() : 0;
+    if (T && T.enabled()) {
+      if (clip.clipped) {
+        T.event(clientTraceId, "window_http_clip", {
+          from: isoFromMs(fromMs),
+          to: isoFromMs(toMs),
+          pool_tf: sc.timeframe,
+        });
+      }
+      T.event(clientTraceId, "window_http_request", {
+        cache_key: key,
+        from: isoFromMs(fromMs),
+        to: isoFromMs(toMs),
+        pool_tf: sc.timeframe,
+        pd: sc.pool_detail,
+      });
+    }
     const run = fetch(API_WINDOW, {
       method: "POST",
       credentials: "same-origin",
@@ -674,12 +1147,34 @@
         timeframe: sc.timeframe,
         pool_detail: sc.pool_detail,
         response_mode: "exact_origin_v1",
+        trace_id: clientTraceId,
       }),
     })
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
+        if (T && T.enabled()) {
+          const pools = (data && data.pools) || [];
+          T.event(clientTraceId, "window_http_response", {
+            http: res.status,
+            ms: typeof performance !== "undefined" ? Math.round(performance.now() - t0) : null,
+            pools_n: pools.length,
+            server_trace: data.request_id || data.trace_id || null,
+          });
+        }
         if (!res.ok) throw new Error(data.message || data.detail || "window " + res.status);
         return data;
+      })
+      .catch(function (err) {
+        if (T && T.enabled()) {
+          T.event(clientTraceId, "window_http_error", {
+            cache_key: key,
+            from: isoFromMs(fromMs),
+            to: isoFromMs(toMs),
+            ms: typeof performance !== "undefined" ? Math.round(performance.now() - t0) : null,
+            message: String(err && err.message ? err.message : err),
+          });
+        }
+        throw err;
       })
       .finally(() => {
         inflight.delete(key);
@@ -712,8 +1207,58 @@
     return { loMs: loMs || 0, hiMs: hiMs };
   }
 
+  function mergeEoRefreshOpts(prev, next) {
+    const a = prev || {};
+    const b = next || {};
+    const merged = {
+      force: !!(a.force || b.force),
+      viewport: !!(a.viewport || b.viewport),
+    };
+    if (b.fromUnix != null) merged.fromUnix = b.fromUnix;
+    else if (a.fromUnix != null) merged.fromUnix = a.fromUnix;
+    if (b.toUnix != null) merged.toUnix = b.toUnix;
+    else if (a.toUnix != null) merged.toUnix = a.toUnix;
+    return merged;
+  }
+
   async function refreshPane(pane, opts) {
+    if (!pane) return;
+    if (!pane._eoRefreshGate) {
+      pane._eoRefreshGate = { pending: null, inflight: null };
+    }
+    const gate = pane._eoRefreshGate;
+    gate.pending = mergeEoRefreshOpts(gate.pending, opts);
+    if (gate.inflight) {
+      const Tc = eoTr();
+      if (Tc && Tc.enabled()) {
+        Tc.event(traceIdForPane(pane), "refreshPane_coalesced", {
+          pending_force: !!(gate.pending && gate.pending.force),
+          pending_viewport: !!(gate.pending && gate.pending.viewport),
+        });
+      }
+      return gate.inflight;
+    }
+    const runOpts = gate.pending || {};
+    gate.pending = null;
+    gate.inflight = refreshPaneImpl(pane, runOpts).finally(function () {
+      gate.inflight = null;
+      if (gate.pending) {
+        const nextOpts = gate.pending;
+        gate.pending = null;
+        return refreshPane(pane, nextOpts);
+      }
+    });
+    return gate.inflight;
+  }
+
+  async function refreshPaneImpl(pane, opts) {
     if (!isEnabled()) return;
+    const T = eoTr();
+    const tid = ensureEoTrace(pane);
+    if (T && T.enabled() && tid === pane._eoTraceId) {
+      T.activationHelp();
+      T.event(tid, "refreshPane_start", traceContext(pane));
+    }
     syncPoolDetailUi(pane);
     const scopes = activeScopesForPane(pane);
     if (!scopes.length) {
@@ -740,10 +1285,27 @@
 
     const tAdapter0 = typeof performance !== "undefined" ? performance.now() : 0;
     const viewSec = resolveViewSec(pane, opts);
+    if (T && T.enabled()) {
+      T.event(tid, "resolveViewSec", {
+        cross_tf: chartTfDiffersFromPool(pane),
+        source: viewSec ? viewSec.source : "null",
+        from: viewSec ? T.isoFromUnix(viewSec.from) : null,
+        to: viewSec ? T.isoFromUnix(viewSec.to) : null,
+      });
+    }
     const capsRoot = await loadCaps();
     const bounds = dataBoundsMsForScopes(capsRoot, scopes);
     const loMs = bounds.loMs;
     const hiMs = bounds.hiMs;
+    if (T && T.enabled()) {
+      T.event(tid, "scope_bounds", {
+        lo: T.isoFromMs(loMs),
+        hi: T.isoFromMs(hiMs),
+        scopes: scopes.map(function (s) {
+          return s.timeframe + "/pd" + s.pool_detail;
+        }).join(","),
+      });
+    }
 
     if (!viewSec) {
       const hint = deps.$("researchExactOriginDensityHint");
@@ -756,7 +1318,7 @@
       return;
     }
 
-    const win = buildWindows(viewSec, loMs, hiMs);
+    const win = buildWindows(viewSec, loMs, hiMs, tid);
     if (!win.ok) {
       const hint = deps.$("researchExactOriginDensityHint");
       if (hint) {
@@ -771,6 +1333,33 @@
           hiIso +
           ") · Quelle " +
           viewSec.source;
+        if (T && T.enabled()) {
+          T.event(tid, "ui_hint_no_intersection", {
+            result: "NO_INTERSECTION",
+            hint_caps_from: loIso,
+            hint_caps_to: hiIso,
+            win_reason: win.reason,
+            chart: traceContext(pane).chart,
+            pool: traceContext(pane).pool,
+          });
+        }
+        const poolTfHint = selectedPoolTimeframe();
+        const odKey = ON_DEMAND_BOUNDS_STORAGE_KEY[poolTfHint];
+        if (odKey && capsRoot && capsRoot[odKey] && capsRoot[odKey].unavailable) {
+          hint.textContent =
+            "B – Exact Origin: " +
+            poolTfHint +
+            " On-Demand Bounds nicht verfügbar (API) — kein 15m-Fallback";
+        } else if (
+          ON_DEMAND_POOL_TIMEFRAMES.indexOf(poolTfHint) >= 0 &&
+          loIso === "2026-04-01" &&
+          hiIso.indexOf("2026-09") === 0
+        ) {
+          hint.textContent =
+            "B – Exact Origin: " +
+            poolTfHint +
+            " — veraltete Caps (Apr–Sep); On-Demand-Bounds nicht geladen · Hard-Refresh";
+        }
       }
       clearCanvasOnPane(pane);
       mergeOverlays(pane, []);
@@ -794,18 +1383,20 @@
     const loadSpan = AD.computeDensityLoadSpanMs(hitFromMs, hitToMs, loMs, hiMs);
     const scopePlans = scopes.map(function (sc) {
       const scopeKey = exactOriginScopeKeyForScope(sc);
-      const windowPlanner = exactOriginWindowPlannerForScope(sc);
+      const planner = exactOriginWindowPlannerForScope(sc);
       return {
         scope: sc,
         scopeKey: scopeKey,
         store: windowStoreForScope(pane, sc),
         planned: AD.planExactOriginLoadWindows(loadSpan.fromMs, loadSpan.toMs, loMs, hiMs, {
-          mode: windowPlanner.mode,
-          tileHours: windowPlanner.tileHours,
+          mode: planner.mode,
+          tileHours: planner.tileHours,
           scopeKey: scopeKey,
         }),
       };
     });
+    const metricsWindowPlanner = exactOriginWindowPlannerForScope(scopes[0]);
+    const metricsFixedTile48h = isFixedTile48hEnabled();
     const renderKey = viewportRenderKey(win.hit) + "|" + exactOriginScopeKeyForPane(pane);
     const fullyCached =
       !(opts && opts.force) &&
@@ -853,6 +1444,15 @@
       fetchStats.failed += one.failed;
       fetchStats.cacheHits += one.cacheHits;
       if (loadSerial !== pane.exactOriginLoadSerial) {
+        const Tsup = eoTr();
+        if (Tsup && Tsup.enabled()) {
+          Tsup.event(traceIdForPane(pane), "async_superseded", {
+            reason: "loadSerial_mismatch_after_fetch",
+            load_serial: loadSerial,
+            pane_serial: pane.exactOriginLoadSerial,
+            p5k_case: traceContext(pane).p5k_case,
+          });
+        }
         scheduleSupersededDensityRefresh(pane, opts);
         return;
       }
@@ -987,6 +1587,15 @@
     }
 
     if (loadSerial !== pane.exactOriginLoadSerial) {
+      const Tsup2 = eoTr();
+      if (Tsup2 && Tsup2.enabled()) {
+        Tsup2.event(traceIdForPane(pane), "async_superseded", {
+          reason: "loadSerial_mismatch_before_render",
+          load_serial: loadSerial,
+          pane_serial: pane.exactOriginLoadSerial,
+          p5k_case: traceContext(pane).p5k_case,
+        });
+      }
       scheduleSupersededDensityRefresh(pane, opts);
       return;
     }
@@ -1027,8 +1636,8 @@
       canvasPath: canvasOn,
       sweepCacheHit: sweepCacheHit,
       version: VERSION,
-      windowPlanner: windowPlanner,
-      fixedTile48h: fixedTile48h,
+      windowPlanner: metricsWindowPlanner,
+      fixedTile48h: metricsFixedTile48h,
       windowsPlanned: scopePlans.reduce(function (sum, sp) {
         return sum + (sp.planned ? sp.planned.length : 0);
       }, 0),
@@ -1060,6 +1669,28 @@
       };
     }
     pane.exactOriginLastMetrics = lastMetrics;
+    const minN = getMinOrigins();
+    const beforeFilter = canvasOn ? mergedSegments.length : zones.length;
+    if (T && T.enabled()) {
+      T.event(tid, "refreshPane_render", {
+        result: "OK",
+        p5k_case: traceContext(pane).p5k_case,
+        pools_raw: allPools.length,
+        segments_before_min_depth: beforeFilter,
+        segments_merged: canvasOn ? registeredZones : null,
+        zones_overlay: canvasOn ? null : registeredZones,
+        min_origins: minN,
+        fetch_fetched: fetchStats.fetched,
+        fetch_failed: fetchStats.failed,
+        fetch_cache_hits: fetchStats.cacheHits,
+        windows_planned: lastMetrics.windowsPlanned,
+        api_from: lastMetrics.apiFromIso,
+        api_to: lastMetrics.apiToIso,
+        canvas: canvasOn,
+        canvas_drawn: lastMetrics.canvasSegmentsDrawn,
+        canvas_segments_total: lastMetrics.canvasSegmentsTotal,
+      });
+    }
 
     const hint = deps.$("researchExactOriginDensityHint");
     if (hint) {
@@ -1122,6 +1753,13 @@
 
   function scheduleSupersededDensityRefresh(pane, opts) {
     if (!pane) return;
+    const T = eoTr();
+    if (T && T.enabled()) {
+      T.event(traceIdForPane(pane), "scheduleSupersededDensityRefresh", {
+        p5k_case: traceContext(pane).p5k_case,
+        delay_ms: 48,
+      });
+    }
     if (pane.exactOriginSupersedeTimer) clearTimeout(pane.exactOriginSupersedeTimer);
     pane.exactOriginSupersedeTimer = setTimeout(function () {
       pane.exactOriginSupersedeTimer = null;
@@ -1291,6 +1929,7 @@
       .forEach(function (el) {
         el.addEventListener("change", async function () {
           if (!isEnabled()) return;
+          if (deps && deps.state) deps.state.exactOriginLastPoolBucketOpen = null;
           invalidateScopeCaches();
           stripAllPanes();
           syncPoolDetailUi(referencePaneForPdUi());
@@ -1306,7 +1945,14 @@
 
   function onPaneTimeframeChange(pane) {
     if (!isEnabled()) return;
+    const T = eoTr();
+    if (pane) pane._eoTraceId = null;
+    const tid = ensureEoTrace(pane);
+    if (T && T.enabled()) {
+      T.event(tid, "onPaneTimeframeChange", traceContext(pane));
+    }
     syncPoolDetailUi(pane);
+    invalidateCapsCache();
     invalidateScopeCaches();
     stripAllPanes();
     if (paneSupports(pane)) {
@@ -1363,5 +2009,7 @@
     onPaneTimeframeChange: onPaneTimeframeChange,
     isScopeReleased: isScopeReleased,
     activeScopesForPane: activeScopesForPane,
+    invalidateCapsCache: invalidateCapsCache,
+    selectedPoolTimeframe: selectedPoolTimeframe,
   };
 })();

@@ -321,6 +321,7 @@
   let lastSetDataError = null;
   let lastCandleSetCount = 0;
   let lastAppliedSize = { w: 0, h: 0 };
+  let candlePaintPending = false;
   const overlayRegistry = new Map();
   /** EZM / research point markers — canvas layer (DOM overlays freeze with 1k+ markers). */
   const researchMarkers = new Map();
@@ -1039,14 +1040,25 @@
     const size = chartSize();
     if (size.w < 16 || size.h < 16) return;
     const wasInvalid = lastAppliedSize.w < 16 || lastAppliedSize.h < 16;
+    const grewEnough =
+      size.w >= 48 &&
+      size.h >= 48 &&
+      (size.w > lastAppliedSize.w + 24 || size.h > lastAppliedSize.h + 24);
     chart.applyOptions({ width: size.w, height: size.h });
     lastAppliedSize = size;
     // Candlestick series set at 0×0 often never paints; line series still does.
     // Re-apply once the pane has a real size. Do not do this on every resize
     // (that would reset the user's zoom via applyDefaultView).
-    if (wasInvalid && lastPayload && lastPayload.candles && lastPayload.candles.length) {
+    const needsCandleRepaint =
+      candlePaintPending ||
+      wasInvalid ||
+      (grewEnough && lastCandleSetCount > 0 && lastPayload && lastPayload.candles && lastPayload.candles.length);
+    if (needsCandleRepaint && lastPayload && lastPayload.candles && lastPayload.candles.length) {
       applySeriesData(lastPayload);
-      if (!(replayViewLock && replayViewLock.soft)) applyDefaultView();
+      if (!(replayViewLock && replayViewLock.soft) && (wasInvalid || candlePaintPending)) {
+        applyDefaultView();
+      }
+      candlePaintPending = false;
     }
     if (wasInvalid) {
       recreateNativeOverlays();
@@ -1510,6 +1522,10 @@
       return;
     }
     applySeriesData(lastPayload);
+    const szAfterSet = chartSize();
+    if (szAfterSet.w < 48 || szAfterSet.h < 48) {
+      candlePaintPending = true;
+    }
     applyTimeScaleForTimeframe(lastPayload);
     const tip = candles[candles.length - 1];
     if (tip && tip.close != null) ensureLivePriceLine(Number(tip.close));
@@ -7629,6 +7645,9 @@
       defaultRightOffset: DEFAULT_RIGHT_OFFSET,
       resetViewCount: resetViewCount,
       lastReset: lastResetResult,
+      candlePaintPending: candlePaintPending,
+      lastAppliedSize: lastAppliedSize,
+      visibleTime: getVisibleTimeRange(),
       shiftMeasure: snapshotShiftMeasure(),
       shiftMeasureVisible: !!(shiftMeasure && $("shift-measure") && $("shift-measure").style.display !== "none"),
       shiftMeasureDragging: !!(shiftMeasure && shiftMeasure.dragging),

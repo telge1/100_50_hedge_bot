@@ -525,39 +525,54 @@ _START_GATE_LOCK = threading.Lock()
 _BOT_START_IN_PROGRESS: Set[str] = set()
 _BOT_START_LOCK = threading.Lock()
 
-# Setup logging with DEBUG level and file handler
+# Setup logging with DEBUG level and rotating file handlers (active on next process start).
+from logging.handlers import RotatingFileHandler
+
 log_dir = Path("logs")
 log_dir.mkdir(parents=True, exist_ok=True)
 dashboard_log_file = log_dir / "dashboard.log"
 master_log_file = log_dir / "master.log"
 
-# Beim Neustart: Dashboard-Log leeren (frischer Lauf)
-if dashboard_log_file.exists():
-    dashboard_log_file.write_text("", encoding="utf-8")
+_LOG_ROTATE_BYTES = 100 * 1024 * 1024
+_LOG_ROTATE_BACKUPS = 5
 
 # Create formatter
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-# Dashboard file handler (DEBUG level - all details)
-dashboard_handler = logging.FileHandler(dashboard_log_file, mode="a", encoding="utf-8")
-dashboard_handler.setLevel(logging.DEBUG)
-dashboard_handler.setFormatter(formatter)
 
-# Master file handler (INFO level, keeps growing)
-master_handler = logging.FileHandler(master_log_file, mode="a", encoding="utf-8")
-master_handler.setLevel(logging.INFO)
-master_handler.setFormatter(formatter)
+def _rotating_handler(path: Path, level: int) -> RotatingFileHandler:
+    handler = RotatingFileHandler(
+        path,
+        maxBytes=_LOG_ROTATE_BYTES,
+        backupCount=_LOG_ROTATE_BACKUPS,
+        encoding="utf-8",
+    )
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+    return handler
+
+
+# Dashboard file handler (DEBUG level - all details)
+dashboard_handler = _rotating_handler(dashboard_log_file, logging.DEBUG)
+
+# Master file handler (INFO level)
+master_handler = _rotating_handler(master_log_file, logging.INFO)
 
 # Console handler (INFO level - less verbose)
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(formatter)
 
-# Configure root logger
-logging.basicConfig(
-    level=logging.DEBUG,
-    handlers=[dashboard_handler, master_handler, console_handler],
-)
+# Configure root logger (single process per dashboard instance; no duplicate handlers)
+if not logging.root.handlers:
+    logging.basicConfig(
+        level=logging.DEBUG,
+        handlers=[dashboard_handler, master_handler, console_handler],
+    )
+
+# High-volume HTTP client diagnostics → WARNING (polling stays in dashboard.log at DEBUG).
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 logger.debug("=" * 80)
@@ -14910,7 +14925,12 @@ async def api_get_system_status(
         try:
             project_root = Path(__file__).parent.parent
             bots_log_dir = project_root / "data" / "logs"
-            logger.info(f"[SYSTEM-STATUS] START Log-Dateien-Extraktion: project_root={project_root}, bots_log_dir={bots_log_dir}, exists={bots_log_dir.exists()}")
+            logger.debug(
+                "[SYSTEM-STATUS] START Log-Dateien-Extraktion: project_root=%s, bots_log_dir=%s, exists=%s",
+                project_root,
+                bots_log_dir,
+                bots_log_dir.exists(),
+            )
             
             # Check log files in bots/logs for symbols
             if bots_log_dir.exists():
@@ -14939,7 +14959,10 @@ async def api_get_system_status(
                                     "service_name": f"hedgebot-{bot_type_key}@{symbol}"
                                 }
                             logger.debug(f"[SYSTEM-STATUS] Bot hinzugefügt: {bot_type_key}@{symbol}, running={bots_by_symbol[symbol][bot_type_key]['running']}")
-                logger.info(f"[SYSTEM-STATUS] Nach Log-Dateien: {len(bots_by_symbol)} Symbole mit Bots")
+                logger.debug(
+                    "[SYSTEM-STATUS] Nach Log-Dateien: %s Symbole mit Bots",
+                    len(bots_by_symbol),
+                )
             
             # Check state files for symbols
             for state_file in project_root.glob("*bot_state_*.json"):
@@ -15071,7 +15094,12 @@ async def api_get_system_status(
             "profile_short_bot_status": profile_short_bot_status,
         }
         
-        logger.info(f"[SYSTEM-STATUS] Status-Abfrage erfolgreich: {len(result.get('services', {}))} Services, {len(bots_by_symbol)} Symbole mit Bots, {result.get('total_bots', 0)} laufende Bots")
+        logger.debug(
+            "[SYSTEM-STATUS] Status-Abfrage erfolgreich: %s Services, %s Symbole mit Bots, %s laufende Bots",
+            len(result.get("services", {})),
+            len(bots_by_symbol),
+            result.get("total_bots", 0),
+        )
         logger.info(f"[SYSTEM-STATUS] Bots by symbol (Details): {bots_by_symbol}")
         
         # Reset circuit breaker on success

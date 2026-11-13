@@ -10,8 +10,13 @@ _LAST_MTIMES: dict[str, float] = {}
 
 # Order: dependents after dependencies.
 _LANDSCAPE_MODULE_NAMES: tuple[str, ...] = (
+    "pd1_landscape_viewer_v1.on_demand_ch1m_pd1_v1",
     "pd1_landscape_viewer_v1.on_demand_1hpd1_v1",
+    "pd1_landscape_viewer_v1.on_demand_30mpd1_v1",
+    "pd1_landscape_viewer_v1.on_demand_4hpd1_v1",
     "pd1_landscape_viewer_v1.historical_window_v1",
+    # P5J: reload trace helpers before window_service (service imports symbols from here).
+    "pd1_landscape_viewer_v1.window_request_trace_v1",
     "pd1_landscape_viewer_v1.window_service_v1",
 )
 

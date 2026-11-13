@@ -30,22 +30,32 @@ def test_module_wiring():
     ad = (DASH / "static/js/research/pd1_exact_density_trp_adapter.js").read_text(encoding="utf-8")
     html = (DASH / "templates/research_charts.html").read_text(encoding="utf-8")
     rc = (DASH / "static/js/research/research_charts.js").read_text(encoding="utf-8")
-    assert "pd1-1h-fixed-tile-v2" in js
+    assert "pd1-30m-1h-fixed-tile-v1" in js
     assert "phase6xt_eod_fixed_tile_48h_v1" in js
     assert "isFixedTile48hEnabled" in js
     assert "planExactOriginLoadWindows" in ad
     assert "planExactOriginFixedTiles" in ad
     assert "exactOriginCacheKeyForWindow" in ad
     assert "EOD_MAX_API_CHUNK_MS" in ad
-    assert "pd1-1h-fixed-tile-v2" in html
+    assert "pd1-30m-1h-fixed-tile-v1" in html
     assert "PD1ExactOriginResearch" in rc
     assert "drawEodDensity" not in js
+
+
+def test_exact_origin_last_metrics_planner_in_refresh_scope():
+    """Regression: metrics must not reference map-local windowPlanner (ReferenceError)."""
+    js = (DASH / "static/js/research/pd1_exact_origin_density_research_v1.js").read_text(encoding="utf-8")
+    assert "metricsWindowPlanner" in js
+    assert "metricsFixedTile48h" in js
+    assert "windowPlanner: windowPlanner" not in js
+    assert "fixedTile48h: fixedTile48h," not in js
+    assert 'value="30m"' in (DASH / "templates/research_charts.html").read_text(encoding="utf-8")
 
 
 def test_sliding_fallback_when_flag_off():
     js = (DASH / "static/js/research/pd1_exact_origin_density_research_v1.js").read_text(encoding="utf-8")
     assert 'localStorage.getItem(EOD_FIXED_TILE_48H_FLAG_KEY) === "1"' in js
     assert "exactOriginWindowPlannerForScope" in js
-    assert 'String(sc.timeframe) === "1h"' in js
+    assert 'String(sc.timeframe) === "1h" || String(sc.timeframe) === "30m"' in js
     assert '"fixed48h"' in js
     assert '"sliding"' in js

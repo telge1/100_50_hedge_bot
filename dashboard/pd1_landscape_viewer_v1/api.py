@@ -121,6 +121,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             pool_detail_raw = body.get("pool_detail")
             pool_detail = int(pool_detail_raw) if pool_detail_raw is not None else 1
             response_mode = body.get("response_mode") or body.get("compute_mode")
+            client_trace_id = body.get("trace_id") or body.get("client_trace_id")
             return await asyncio.to_thread(
                 get_landscape_window_response,
                 from_utc=str(from_utc),
@@ -128,11 +129,49 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 timeframe=str(timeframe or "15m"),
                 pool_detail=pool_detail,
                 response_mode=response_mode,
+                request_id=str(client_trace_id) if client_trace_id else None,
+                client_trace_id=str(client_trace_id) if client_trace_id else None,
             )
         except LandscapeWindowError as exc:
+            from .window_request_trace_v1 import log_doge_exact_origin_window_complete
+
+            client_trace_id = (body or {}).get("trace_id") or (body or {}).get("client_trace_id")
+            log_doge_exact_origin_window_complete(
+                client_trace_id=str(client_trace_id) if client_trace_id else None,
+                request_id=str(client_trace_id) if client_trace_id else "error",
+                from_utc=str((body or {}).get("from_utc") or (body or {}).get("from") or ""),
+                to_utc=str((body or {}).get("to_utc") or (body or {}).get("to") or ""),
+                timeframe=str((body or {}).get("timeframe") or "15m"),
+                pool_detail=int((body or {}).get("pool_detail") or 1),
+                compute_mode=str((body or {}).get("response_mode") or "exact_origin_v1"),
+                cache_hit=False,
+                http_status=422,
+                wall_ms=0.0,
+                payload=None,
+                error_code=exc.code,
+                error_message=exc.message,
+            )
             return _window_error(exc.code, exc.message, exc.details)
         except HistoricalPoolStateError as exc:
             err = landscape_window_from_state_err(exc)
+            from .window_request_trace_v1 import log_doge_exact_origin_window_complete
+
+            client_trace_id = (body or {}).get("trace_id") or (body or {}).get("client_trace_id")
+            log_doge_exact_origin_window_complete(
+                client_trace_id=str(client_trace_id) if client_trace_id else None,
+                request_id=str(client_trace_id) if client_trace_id else "error",
+                from_utc=str((body or {}).get("from_utc") or (body or {}).get("from") or ""),
+                to_utc=str((body or {}).get("to_utc") or (body or {}).get("to") or ""),
+                timeframe=str((body or {}).get("timeframe") or "15m"),
+                pool_detail=int((body or {}).get("pool_detail") or 1),
+                compute_mode=str((body or {}).get("response_mode") or "exact_origin_v1"),
+                cache_hit=False,
+                http_status=422,
+                wall_ms=0.0,
+                payload=None,
+                error_code=err.code,
+                error_message=err.message,
+            )
             return _window_error(err.code, err.message, err.details)
 
     @router.get("/live-charts/viewer/api/membership")

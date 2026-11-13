@@ -164,6 +164,34 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             "poll_interval_ms": POLL_INTERVAL_MS,
         }
 
+    @router.get("/api/research/doge-5m-pd1-viewer-bounds")
+    async def api_research_doge_5m_pd1_viewer_bounds(user: dict = Depends(require_auth)):
+        from .historical_pool_state_v1 import HistoricalPoolStateError, doge_5m_pd1_viewer_bounds
+
+        try:
+            bounds = await asyncio.to_thread(doge_5m_pd1_viewer_bounds)
+            return {"success": True, **bounds}
+        except HistoricalPoolStateError as exc:
+            return _error(422, exc.code, exc.message)
+
+    @router.get("/api/research/doge-pd1-on-demand-viewer-bounds")
+    async def api_research_doge_pd1_on_demand_viewer_bounds(
+        user: dict = Depends(require_auth),
+        timeframe: str = Query(..., description="Pool TF: 30m or 1h"),
+        pool_detail: int = Query(1, ge=1, le=10),
+    ):
+        from .historical_pool_state_v1 import HistoricalPoolStateError, doge_pd1_on_demand_viewer_bounds
+
+        try:
+            bounds = await asyncio.to_thread(
+                doge_pd1_on_demand_viewer_bounds,
+                timeframe=str(timeframe).strip(),
+                pool_detail=int(pool_detail),
+            )
+            return {"success": True, **bounds}
+        except HistoricalPoolStateError as exc:
+            return _error(422, exc.code, exc.message)
+
     @router.get("/api/research/candles")
     async def api_research_candles(
         user: dict = Depends(require_auth),

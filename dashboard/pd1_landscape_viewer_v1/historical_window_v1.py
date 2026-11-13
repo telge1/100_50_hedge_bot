@@ -4,11 +4,8 @@ from __future__ import annotations
 
 import inspect
 import json
-import logging
 import os
 import time
-
-logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -24,11 +21,16 @@ from research_charts.historical_lmv2_pd_contract_v1 import (
     membership_slot_minutes,
     resolve_viewer_historical_scope,
 )
+from research_charts.viewer_scope_v1 import resolve_landscape_viewer_config
+from research_charts.historical_pool_state_batch_reader_v1 import (
+    historical_lmv2_batch_reader_enabled,
+)
 from research_charts.historical_pool_state_v1 import (
     HistoricalPoolStateError,
     get_published_decision_closes,
     load_historical_pool_state_at_close,
     static_timeline_import_bounds,
+    viewer_timeline_import_bounds,
 )
 from research_charts.live_micro_lld_v2_ch_test.active_snapshot.published_reader import PublishedActiveReader
 from collections import defaultdict
@@ -39,16 +41,6 @@ TIMEFRAME_5M = "5m"
 WARMUP_HOURS = 168
 MAX_EXPORT_HOURS = 72
 MAX_5M_BARS = MAX_EXPORT_HOURS * 12
-LANDSCAPE_LIFETIME_BUILDER_VERSION = "pd1_landscape_lifetime_v1_phase5s_batch_default"
-
-
-def _landscape_phase5s_prefill_enabled() -> bool:
-    """BT-D35: Phase 5S batch prefill on by default for landscape window (opt-out only)."""
-    if os.environ.get("PD1_LANDSCAPE_BATCH_READER", "").strip().lower() in ("0", "false", "no"):
-        return False
-    if os.environ.get("HISTORICAL_LMV2_BATCH_READER", "").strip().lower() in ("0", "false", "no"):
-        return False
-    return True
 
 _PROFILE = os.environ.get("PD1_LANDSCAPE_WINDOW_PROFILE") == "1"
 _LAST_PROFILE: dict[str, Any] | None = None
@@ -161,34 +153,70 @@ def _published_for(hcfg: HistoricalPdConfig) -> list[datetime]:
 
 def _scope_bounds(hcfg: HistoricalPdConfig) -> tuple[datetime, datetime]:
     published = _published_for(hcfg)
-    return static_timeline_import_bounds(published)
+    if hcfg.symbol != SYMBOL:
+        if not published:
+            raise HistoricalPoolStateError(
+                "NO_PUBLICATIONS",
+                f"no publishes for viewer line {hcfg.pipeline_line_id!r}",
+                {"symbol": hcfg.symbol, "pipeline_line_id": hcfg.pipeline_line_id},
+            )
+        return published[0], published[-1]
+    return viewer_timeline_import_bounds(
+        published,
+        timeframe=hcfg.timeframe,
+        pool_detail=hcfg.pool_detail,
+        symbol=hcfg.symbol,
+    )
 
 
-def landscape_capabilities() -> dict[str, Any]:
-    default = resolve_viewer_historical_scope(timeframe="15m", pool_detail=PD1_POOL_DETAIL)
+def landscape_capabilities(
+    *,
+    symbol: str | None = None,
+    pipeline_line_id: str | None = None,
+) -> dict[str, Any]:
+    sym = (symbol or SYMBOL).strip().upper()
+    if symbol or pipeline_line_id:
+        tf_default = "5m" if sym != SYMBOL else "15m"
+        default = resolve_landscape_viewer_config(
+            symbol=sym,
+            timeframe=tf_default,
+            pool_detail=PD1_POOL_DETAIL,
+            pipeline_line_id=pipeline_line_id,
+        )
+    else:
+        default = resolve_viewer_historical_scope(timeframe="15m", pool_detail=PD1_POOL_DETAIL)
     lo, hi = _scope_bounds(default)
     fill, borders = _load_style()
     supported: list[dict[str, Any]] = []
     for tf, pd in sorted(ALLOWED_VIEWER_SCOPES):
-        hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
-        slo, shi = _scope_bounds(hcfg)
-        supported.append(
-            {
-                **hcfg.to_api_dict(),
-                "data_available_from": _iso(slo),
-                "data_available_to": _iso(shi),
-                "membership_slot_minutes": membership_slot_minutes(tf),
-            }
-        )
-    try:
-        from .on_demand_1hpd1_v1 import on_demand_1hpd1_capabilities_scope
-
-        supported.append(on_demand_1hpd1_capabilities_scope())
-    except Exception:
-        logger.warning("[landscape_capabilities] on_demand_1hpd1 scope unavailable", exc_info=True)
+        try:
+            hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
+            slo, shi = _scope_bounds(hcfg)
+            supported.append(
+                {
+                    **hcfg.to_api_dict(),
+                    "data_available_from": _iso(slo),
+                    "data_available_to": _iso(shi),
+                    "membership_slot_minutes": membership_slot_minutes(tf),
+                }
+            )
+        except HistoricalPoolStateError as exc:
+            try:
+                hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
+                base = hcfg.to_api_dict()
+            except HistoricalPoolStateError:
+                base = {"timeframe": tf, "pool_detail": pd, "symbol": sym}
+            supported.append(
+                {
+                    **base,
+                    "scope_error": exc.code,
+                    "scope_error_message": exc.message,
+                }
+            )
     return {
         "version": "pd1_landscape_historical_window_v1",
-        "symbol": SYMBOL,
+        "symbol": default.symbol,
+        "viewer_symbol_param": sym,
         "pool_detail": PD1_POOL_DETAIL,
         "timeframe": default.timeframe,
         "timeframe_5m": TIMEFRAME_5M,
@@ -207,12 +235,6 @@ def landscape_capabilities() -> dict[str, Any]:
         "FILL_BY_CLASS": fill,
         "side_borders": borders,
         "dynamic_historical": True,
-        "runtime": {
-            "batch_prefill_gate_enabled": _landscape_phase5s_prefill_enabled(),
-            "lifetime_builder_version": LANDSCAPE_LIFETIME_BUILDER_VERSION,
-            "builder_module_file": __file__,
-            "window_response_cache_contract": "bt_d34_pd1_window_response_cache_v1",
-        },
     }
 
 
@@ -422,15 +444,27 @@ def build_landscape_window(
     from_utc: str | datetime,
     to_utc: str | datetime,
     *,
+    symbol: str | None = None,
+    pipeline_line_id: str | None = None,
     timeframe: str = "15m",
     pool_detail: int = PD1_POOL_DETAIL,
-    compute_mode: str = "full",
     client: Any | None = None,
     database: str | None = None,
+    member_cache: dict[str, list[dict]] | None = None,
+    density_only: bool = False,
+    expose_pools_full: bool = False,
 ) -> dict[str, Any]:
     global _LAST_PROFILE, _profile_ctx
     try:
-        hcfg = resolve_viewer_historical_scope(timeframe=timeframe, pool_detail=pool_detail)
+        if symbol or pipeline_line_id:
+            hcfg = resolve_landscape_viewer_config(
+                symbol=(symbol or SYMBOL).strip().upper(),
+                timeframe=timeframe,
+                pool_detail=pool_detail,
+                pipeline_line_id=pipeline_line_id,
+            )
+        else:
+            hcfg = resolve_viewer_historical_scope(timeframe=timeframe, pool_detail=pool_detail)
     except HistoricalPoolStateError as exc:
         raise LandscapeWindowError(exc.code, exc.message, exc.details) from exc
     slot_minutes = membership_slot_minutes(hcfg.timeframe)
@@ -450,14 +484,21 @@ def build_landscape_window(
         )
 
     published = _published_for(hcfg)
-    data_lo, data_hi = static_timeline_import_bounds(published)
-    if vis_from < data_lo or vis_to > data_hi:
+    data_lo, data_hi = viewer_timeline_import_bounds(
+        published,
+        timeframe=hcfg.timeframe,
+        pool_detail=hcfg.pool_detail,
+        symbol=hcfg.symbol,
+    )
+    export_hi = data_hi + timedelta(minutes=slot_minutes)
+    if vis_from < data_lo or vis_to > export_hi:
         raise LandscapeWindowError(
             "OUT_OF_SCOPE",
-            "request outside Apr–Sep imported publications",
+            "request outside published chart data window",
             {
                 "data_available_from": _iso(data_lo),
                 "data_available_to": _iso(data_hi),
+                "data_export_to_inclusive": _iso(export_hi),
                 "requested_from": _iso(vis_from),
                 "requested_to": _iso(vis_to),
             },
@@ -487,15 +528,19 @@ def build_landscape_window(
     db = database or cfg.database
 
     t_ch = time.perf_counter()
-    src = ClickHouseResearchCandleSource()
-    bars_list = src.get_candles(SYMBOL, TIMEFRAME_5M, start=context_from, end=vis_to + timedelta(minutes=5))
-    bars = _resample_5m_from_candles(bars_list)
+    bars: dict[datetime, dict] = {}
+    if not density_only:
+        src = ClickHouseResearchCandleSource()
+        bars_list = src.get_candles(
+            hcfg.symbol, TIMEFRAME_5M, start=context_from, end=vis_to + timedelta(minutes=5)
+        )
+        bars = _resample_5m_from_candles(bars_list)
     t_ch_done = time.perf_counter()
 
-    cache: dict[str, list[dict]] = {}
+    cache: dict[str, list[dict]] = member_cache if member_cache is not None else {}
     phase5s_prefill: dict[str, Any] | None = None
     t_prefill = time.perf_counter()
-    if _landscape_phase5s_prefill_enabled():
+    if historical_lmv2_batch_reader_enabled():
         from .historical_window_batch_v1 import prefill_member_cache_phase5s
 
         pre = prefill_member_cache_phase5s(
@@ -521,27 +566,28 @@ def build_landscape_window(
     pools = _clip_segments_to_window(pools_full, vis_from, vis_to)
 
     vis_grid = [t for t in grid if vis_from <= t <= vis_to]
-    price_rows = [
-        {
-            "t": _iso(t),
-            "o": float(bars[t]["open"]),
-            "h": float(bars[t]["high"]),
-            "l": float(bars[t]["low"]),
-            "c": float(bars[t]["close"]),
-        }
-        for t in vis_grid
-        if t in bars
-    ]
-    mode = str(compute_mode or "full").strip().lower()
-    skip_clusters = mode in ("exact_origin_v1", "exact_origin", "b_layer", "b-layer")
+    price_rows = (
+        []
+        if density_only
+        else [
+            {
+                "t": _iso(t),
+                "o": float(bars[t]["open"]),
+                "h": float(bars[t]["high"]),
+                "l": float(bars[t]["low"]),
+                "c": float(bars[t]["close"]),
+            }
+            for t in vis_grid
+            if t in bars
+        ]
+    )
     t_cl = time.perf_counter()
-    if skip_clusters:
+    if density_only:
         clusters_by_dc = {}
         t_cl_done = t_cl
     else:
         clusters_by_dc = _build_clusters_by_dc(grid, cache, client, db, bars, hcfg, slot_minutes)
         t_cl_done = time.perf_counter()
-        # Keep only DC keys overlapping visible window
         clusters_by_dc = {
             k: v for k, v in clusters_by_dc.items() if vis_from <= parse_decision_iso(k) <= vis_to
         }
@@ -567,22 +613,19 @@ def build_landscape_window(
             "timeframe": hcfg.timeframe,
             "membership_slot_minutes": slot_minutes,
             "context_from": _iso(context_from),
-            "batch_prefill_gate_enabled": _landscape_phase5s_prefill_enabled(),
-            "builder_module_file": __file__,
             "membership_loader": (
                 "phase5s_episode_walk_batch_cache"
                 if phase5s_prefill
                 else "load_historical_pool_state_at_close"
             ),
-            "lifetime_builder_version": LANDSCAPE_LIFETIME_BUILDER_VERSION,
             "remaining": False,
+            "density_only": density_only,
             "phase5s_batch_reader_active": phase5s_prefill is not None,
             **(
                 {"phase5s_batch_stats": phase5s_prefill}
                 if phase5s_prefill
                 else {}
             ),
-            "compute_mode": "full" if not skip_clusters else "exact_origin_v1",
         },
         "window": {
             "from_utc": _iso(vis_from),
@@ -603,34 +646,14 @@ def build_landscape_window(
 
     timing = {
         "clickhouse_candles": round((t_ch_done - t_ch) * 1000, 1),
-        "phase5s_prefill": round((t_life - t_prefill) * 1000, 1),
         "build_lifetimes": round((t_life_done - t_life) * 1000, 1),
         "build_clusters_by_dc": round((t_cl_done - t_cl) * 1000, 1),
         "json_serialize": round((t_json_done - t_json) * 1000, 1),
         "total": round((t_done - t0) * 1000, 1),
     }
     payload["timing_ms"] = timing
-    logger.info(
-        "[landscape_window] tf=%s pd=%s mode=%s batch_gate=%s batch_active=%s "
-        "prefill_ms=%s lifetimes_ms=%s total_ms=%s pools=%s module=%s",
-        hcfg.timeframe,
-        hcfg.pool_detail,
-        compute_mode,
-        _landscape_phase5s_prefill_enabled(),
-        phase5s_prefill is not None,
-        timing.get("phase5s_prefill"),
-        timing.get("build_lifetimes"),
-        timing.get("total"),
-        len(pools),
-        __file__,
-    )
-    if float(timing.get("build_lifetimes") or 0) > 30_000:
-        logger.warning(
-            "[landscape_window] LEGACY_SLOW_PATH lifetimes_ms=%s batch_gate=%s batch_active=%s",
-            timing.get("build_lifetimes"),
-            _landscape_phase5s_prefill_enabled(),
-            phase5s_prefill is not None,
-        )
+    if expose_pools_full:
+        payload["_research_pools_full"] = pools_full
     if _PROFILE:
         _profile_ctx["timing_ms"] = timing
         _profile_ctx["pools_out"] = len(pools)

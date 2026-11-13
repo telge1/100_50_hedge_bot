@@ -35,7 +35,58 @@
   const ASSET_V = "tf-1d-local-v1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
+  const PANE_CHART_DATA_RETRY_MS = 200;
+  const PANE_CHART_DATA_RETRY_MAX = 150;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
+
+  function scheduleRenderDiagnosis(pane) {
+    const T = typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
+    if (!T || !T.enabled()) return;
+    [1000, 3000, 10000].forEach(function (delayMs) {
+      setTimeout(function () {
+        const chart = api(pane);
+        const dbg = chart && chart.debugInfo ? chart.debugInfo() : null;
+        const frame = pane && pane.iframe;
+        let emptyVisible = null;
+        try {
+          const doc = frame && frame.contentDocument;
+          const emptyEl = doc && doc.getElementById("empty");
+          emptyVisible = !!(emptyEl && emptyEl.classList && emptyEl.classList.contains("visible"));
+        } catch (e) {
+          emptyVisible = null;
+        }
+        const st = paneStatusEl(pane);
+        T.event("render_diag", {
+          pane: pane && pane.id,
+          delay_ms: delayMs,
+          frame_w: frame ? frame.clientWidth : null,
+          frame_h: frame ? frame.clientHeight : null,
+          pane_status: st ? st.textContent : null,
+          empty_overlay: emptyVisible,
+          payload_count: dbg && dbg.payloadCount,
+          candle_set_count: dbg && dbg.candleSetCount,
+          chart_w: dbg && dbg.size ? dbg.size.w : null,
+          chart_h: dbg && dbg.size ? dbg.size.h : null,
+          candle_paint_pending: dbg && dbg.candlePaintPending,
+          bars_in_view: dbg && dbg.barsInfo ? dbg.barsInfo.bars : null,
+          logical: dbg && dbg.logical ? JSON.stringify(dbg.logical) : null,
+          visible_time: dbg && dbg.visibleTime ? JSON.stringify(dbg.visibleTime) : null,
+          set_data_error: dbg && dbg.setDataError,
+        });
+      }, delayMs);
+    });
+  }
+
+  function bootTrace(stage, fields) {
+    const T = typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
+    if (!T || !T.enabled()) return;
+    const f = fields || {};
+    if (typeof performance !== "undefined" && f.ms == null && f.t0 != null) {
+      f.ms = Math.round(performance.now() - f.t0);
+      delete f.t0;
+    }
+    T.event(stage, f);
+  }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const SCANNER_COMMON_NS = "SCANNER_COMMON";
@@ -141,6 +192,7 @@
     paneSendJsonDiagLog: [],
     paneSendJsonDiagSeq: 0,
     liveStatus: null,
+    exactOriginLastPoolBucketOpen: null,
     workspace: null,
     hoverUnix: null,
     hoverPane: null,
@@ -744,12 +796,63 @@
     if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
   }
 
+  function clearPaneChartDataRetry(pane) {
+    if (pane && pane._chartDataRetryTimer) {
+      clearInterval(pane._chartDataRetryTimer);
+      pane._chartDataRetryTimer = null;
+    }
+  }
+
+  function schedulePaneChartDataRetry(pane, packed) {
+    if (!pane || !pane.pendingData || !(pane.pendingData.candles || []).length) return;
+    if (api(pane)) return;
+    clearPaneChartDataRetry(pane);
+    let attempts = 0;
+    pane._chartDataRetryTimer = setInterval(function () {
+      attempts += 1;
+      const chart = api(pane);
+      if (chart && pane.pendingData) {
+        clearPaneChartDataRetry(pane);
+        try {
+          chart.setData(pane.pendingData, { preserveView: false, skipDefaultView: false });
+          pane.phase = "DATA_READY";
+          if (chart.resize) chart.resize();
+          updatePaneLoadStatusFromBundle(pane, packed || { candles: pane.pendingData.candles, cache: "bridge-retry" }, false);
+          bootTrace("loadPane_setData_retry_ok", {
+            pane: pane.id,
+            n: (pane.pendingData.candles || []).length,
+            attempts: attempts,
+          });
+        } catch (retryErr) {
+          bootTrace("loadPane_setData_retry_err", {
+            pane: pane.id,
+            message: retryErr && retryErr.message ? String(retryErr.message).slice(0, 120) : "error",
+          });
+        }
+        return;
+      }
+      if (attempts >= PANE_CHART_DATA_RETRY_MAX) {
+        clearPaneChartDataRetry(pane);
+        const st = paneStatusEl(pane);
+        if (st && st.textContent === "loading…") {
+          st.textContent = paneStatusFromPendingData(pane);
+        }
+        bootTrace("loadPane_setData_retry_exhausted", { pane: pane.id, attempts: attempts });
+      }
+    }, PANE_CHART_DATA_RETRY_MS);
+  }
+
   function releasePaneLoadOwner(pane, owner) {
     if (!paneLoadOwnerIsCurrent(pane, owner)) return;
     if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
     pane._paneLoadOwner = null;
     clearPaneLoadRecoveryTimer(pane);
     resetPaneLoadRecoveryCount(pane);
+    const st = paneStatusEl(pane);
+    if (st && st.textContent === "loading…") {
+      const rows = (pane.pendingData && pane.pendingData.candles) || [];
+      if (rows.length) st.textContent = paneStatusFromPendingData(pane);
+    }
   }
 
   function exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen) {
@@ -4733,6 +4836,64 @@
     });
   }
 
+  function lastCompletePoolBarOpenSec(poolSec, nowSec) {
+    if (!poolSec || !Number.isFinite(nowSec)) return null;
+    return Math.floor((nowSec - poolSec) / poolSec) * poolSec;
+  }
+
+  function refreshExactOriginPanesOnNewPoolBucket(bucketOpenSec, reason) {
+    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return false;
+    if (isHistoricalReplay() || historyBlocksLive()) return false;
+    if (bucketOpenSec == null || !Number.isFinite(bucketOpenSec)) return false;
+    const prev = state.exactOriginLastPoolBucketOpen;
+    if (prev != null && bucketOpenSec <= prev) return false;
+    state.exactOriginLastPoolBucketOpen = bucketOpenSec;
+    if (prev == null) return false;
+    if (PD1ExactOriginResearch.invalidateCapsCache) {
+      PD1ExactOriginResearch.invalidateCapsCache();
+    }
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane || !PD1ExactOriginResearch.paneSupports(pane)) return;
+      void PD1ExactOriginResearch.refreshPane(pane, { viewport: true }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try {
+            console.warn("[research] exact-origin pool-bucket refresh", reason || "", err);
+          } catch (e) { /* ignore */ }
+        }
+      });
+    });
+    return true;
+  }
+
+  function tickExactOriginPoolTimeframeRefresh() {
+    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
+    if (isHistoricalReplay() || historyBlocksLive()) return;
+    const poolTf =
+      PD1ExactOriginResearch.selectedPoolTimeframe && PD1ExactOriginResearch.selectedPoolTimeframe();
+    const poolSec = TF_SEC[poolTf] || 0;
+    if (!poolSec) return;
+    const nowSec = Math.floor(Date.now() / 1000);
+    const bucket = lastCompletePoolBarOpenSec(poolSec, nowSec);
+    refreshExactOriginPanesOnNewPoolBucket(bucket, "wall_clock");
+  }
+
+  function scheduleExactOriginRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
+    if (!pane || !exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
+    if (!PD1ExactOriginResearch.paneSupports(pane)) return;
+    if (isHistoricalReplay() || historyBlocksLive()) return;
+    if (prevClosedOpen == null || nextClosedOpen == null) return;
+    if (Number(prevClosedOpen) === Number(nextClosedOpen)) return;
+    const poolTf =
+      PD1ExactOriginResearch.selectedPoolTimeframe && PD1ExactOriginResearch.selectedPoolTimeframe();
+    const poolSec = TF_SEC[poolTf] || 0;
+    if (!poolSec) return;
+    const prevBucket = Math.floor(Number(prevClosedOpen) / poolSec) * poolSec;
+    const nextBucket = Math.floor(Number(nextClosedOpen) / poolSec) * poolSec;
+    if (nextBucket <= prevBucket) return;
+    refreshExactOriginPanesOnNewPoolBucket(nextBucket, "chart_closed_bar");
+  }
+
   function scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
     if (!pane || !SC_HELPERS) return;
     if (isHistoricalReplay()) return;
@@ -7823,6 +7984,7 @@
     const nextClosedOpen = lastClosedBarTime(pane);
     scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
     scheduleLiveMicroLldV2RefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
+    scheduleExactOriginRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
     const chart = api(pane);
     if (chart) {
       chart.setData(pane.pendingData, {
@@ -8065,6 +8227,11 @@
           skipDefaultView: skipDefaultView,
         });
         pane.phase = "DATA_READY";
+        bootTrace("loadPane_setData_ok", {
+          pane: pane.id,
+          payload_n: (packed.candles || []).length,
+          candle_set_count: chart.debugInfo ? (chart.debugInfo().candleSetCount || null) : null,
+        });
       }
       if (!preserveView && chart.resize) chart.resize();
       chart.setEmaOverlays(pane.pendingEma, {
@@ -8076,6 +8243,8 @@
       chart.setInteractionMode(toolMode());
       if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
       pane.phase = "INTERACTION_READY";
+    } else if (!skipCandles && (packed.candles || []).length) {
+      schedulePaneChartDataRetry(pane, packed);
     }
     syncOverlays(pane, pane.pendingOverlays);
     repaintExactOriginDensityFromCache(pane);
@@ -8118,6 +8287,14 @@
     }
     const statusEl = paneStatusEl(pane);
     if (statusEl) statusEl.textContent = "loading…";
+    const loadPaneT0 = typeof performance !== "undefined" ? performance.now() : 0;
+    bootTrace("loadPane_start", {
+      pane: paneId,
+      tf: pane.tf,
+      gen: gen,
+      paneGen: paneGen,
+      owner_seq: owner && owner.seq,
+    });
     let packed;
     try {
       packed = await sendJson("/api/research/pane", "POST", reqBody, {
@@ -8132,15 +8309,35 @@
         return;
       }
       setPaneLoadHttpError(pane, paneGen, gen, owner, err);
+      bootTrace("loadPane_error", {
+        pane: paneId,
+        phase: "pane_api",
+        message: err && err.message ? String(err.message).slice(0, 160) : "error",
+        t0: loadPaneT0,
+      });
       throw err;
     }
-    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
+    bootTrace("loadPane_pane_api_ok", {
+      pane: paneId,
+      n: packed && Array.isArray(packed.candles) ? packed.candles.length : 0,
+      t0: loadPaneT0,
+    });
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
+      bootTrace("loadPane_superseded", { pane: paneId, phase: "post_pane_api", paneGen: paneGen, gen: gen });
+      if (!pane._paneLoadOwner) scheduleOrphanPaneLoadRecovery(paneId);
+      return;
+    }
     if (packed.timeframe && packed.timeframe !== pane.tf) {
       discardPaneLoadResult(pane, paneId, owner);
       return;
     }
     await whenReady(pane, 8000);
-    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
+    await waitPaneSize(pane, 5000);
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
+      bootTrace("loadPane_superseded", { pane: paneId, phase: "post_whenReady", paneGen: paneGen, gen: gen });
+      if (!pane._paneLoadOwner) scheduleOrphanPaneLoadRecovery(paneId);
+      return;
+    }
     const bundleOpts = {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
       // GO TO: never restore the previous live logical range onto a much longer
@@ -8151,6 +8348,23 @@
     };
     try {
       applyPaneBundle(pane, packed, bundleOpts);
+      const chartAfter = api(pane);
+      const dbg = chartAfter && chartAfter.debugInfo ? chartAfter.debugInfo() : null;
+      bootTrace("loadPane_apply_ok", {
+        pane: paneId,
+        chart_ready: !!chartAfter,
+        candle_set_count: dbg ? dbg.candleSetCount : null,
+        chart_w: dbg && dbg.size ? dbg.size.w : null,
+        chart_h: dbg && dbg.size ? dbg.size.h : null,
+        candle_paint_pending: dbg ? dbg.candlePaintPending : null,
+        status: paneStatusEl(pane) ? paneStatusEl(pane).textContent : null,
+        t0: loadPaneT0,
+      });
+      scheduleRenderDiagnosis(pane);
+      requestAnimationFrame(function () {
+        const ch = api(pane);
+        if (ch && ch.resize) ch.resize();
+      });
     } catch (applyErr) {
       if (paneLoadOwnerIsCurrent(pane, owner) && !paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen)) {
         logPaneLoadFailure(paneId, pane, owner, applyErr, "applyPaneBundle");
@@ -8454,6 +8668,7 @@
       if (gen !== state.pollGen || !state.initialLoadDone) return;
       if (document.hidden) return;
       pollForming(gen);
+      tickExactOriginPoolTimeframeRefresh();
     }, FORMING_MS);
     // Immediate first tick so price moves without waiting for the interval.
     if (!document.hidden) {
@@ -8632,11 +8847,29 @@
     } else {
       emit("update_false", { detail: "unpainted_changed", unchanged: unchanged });
     }
+    const CLT = candleLiveTr();
+    if (CLT && CLT.enabled()) {
+      CLT.event(painted ? "forming_candle_applied" : unchanged ? "chart_last_price_unchanged" : "poll_error", {
+        tf: pane.tf,
+        bar_open_unix: bar.time,
+        bar_close: bar.close,
+        unchanged: unchanged,
+        update_ok: updateOk,
+        painted: painted,
+      });
+      if (painted || !unchanged) {
+        CLT.event("chart_last_price_updated", { tf: pane.tf, close: bar.close, open_unix: bar.time });
+      }
+    }
     if (painted || !unchanged) {
       const st = pane.el && pane.el.querySelector(".trp-pane-status");
       if (st) st.textContent = "live " + Number(bar.close);
     }
     return painted || !unchanged;
+  }
+
+  function candleLiveTr() {
+    return typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
   }
 
   let formingInflight = null;
@@ -8658,6 +8891,11 @@
       return;
     }
     formingInflight = true;
+    const CLT = candleLiveTr();
+    const pollT0 = typeof performance !== "undefined" ? performance.now() : 0;
+    if (CLT && CLT.enabled()) {
+      CLT.event("poll_start", { symbol: state.symbol, utc: new Date().toISOString() });
+    }
     try {
       do {
         formingWantRestart = false;
@@ -8681,9 +8919,26 @@
           continue;
         }
         const forming = body && body.forming;
+        if (CLT && CLT.enabled()) {
+          CLT.event("poll_http_response", {
+            http: formingStatus,
+            ms: typeof performance !== "undefined" ? Math.round(performance.now() - pollT0) : null,
+            forming_close: forming && forming.close,
+            forming_time_unix: forming && forming.time,
+            forming_open_utc: forming && CLT.isoFromUnix(forming.time),
+          });
+        }
         if (!forming) {
           postLiveDiag({ reason: "no_forming", symbol: state.symbol, status: formingStatus });
+          if (CLT && CLT.enabled()) CLT.event("poll_error", { detail: "no_forming", http: formingStatus });
           continue;
+        }
+        if (CLT && CLT.enabled()) {
+          CLT.event("forming_candle_received", {
+            close: forming.close,
+            open_utc: CLT.isoFromUnix(forming.time),
+            age_s: forming.time ? Math.max(0, Math.floor(Date.now() / 1000) - Number(forming.time)) : null,
+          });
         }
         visibleIds().forEach(function (pid) {
           applyFormingToPane(state.panes[pid], forming);
@@ -8701,6 +8956,7 @@
       await mapLimit(visibleIds(), PANE_HTTP_LIMIT, function (pid) {
         return pollPane(pid, gen);
       });
+      tickExactOriginPoolTimeframeRefresh();
     } catch (err) {
       if (gen !== state.pollGen) return;
       setStatus(String(err.message || err), "error");
@@ -11074,6 +11330,7 @@
         api: api,
         SC_HELPERS: SC_HELPERS,
         isHistoricalReplay: isHistoricalReplay,
+        historyBlocksLive: historyBlocksLive,
         decisionContext: liveMicroLldV2DecisionContext,
         historicalLmv2PoolsEnabled: historicalLmv2PoolsEnabled,
         historicalLmv2HistoricalPoolDetail: historicalLmv2HistoricalPoolDetail,
@@ -11345,6 +11602,8 @@
   }
 
   async function boot() {
+    const bootT0 = typeof performance !== "undefined" ? performance.now() : 0;
+    bootTrace("boot_start", {});
     try {
       const saved = localStorage.getItem(LAYOUT_KEY);
       if (saved && PANE_COUNT[saved]) state.layout = saved;
@@ -11355,6 +11614,20 @@
     restoreWorkspaceHeight();
     const symbols = await getJson("/api/research/symbols");
     state.symbols = symbols.symbols || [];
+    bootTrace("boot_symbols_ok", { n: (state.symbols || []).length, t0: bootT0 });
+    if (SC_HELPERS && SC_HELPERS.applyDoge5mPd1ViewerBounds) {
+      getJson("/api/research/doge-5m-pd1-viewer-bounds")
+        .then(function (dogeBounds) {
+          SC_HELPERS.applyDoge5mPd1ViewerBounds(dogeBounds);
+          bootTrace("boot_bounds_async_ok", { t0: bootT0 });
+        })
+        .catch(function (boundsErr) {
+          bootTrace("boot_bounds_async_err", {
+            message: boundsErr && boundsErr.message ? String(boundsErr.message).slice(0, 120) : "error",
+            t0: bootT0,
+          });
+        });
+    }
     const names = fillSymbolSelect(state.symbols);
     if (!names.length) {
       setStatus("No symbols from /api/research/symbols", "empty");
@@ -11362,8 +11635,13 @@
     }
     try {
       applyWorkspace(await getJson("/api/research/workspace"));
+      bootTrace("boot_workspace_ok", { t0: bootT0 });
     } catch (err) {
       setStatus(String(err.message || err), "error");
+      bootTrace("boot_workspace_err", {
+        message: err && err.message ? String(err.message).slice(0, 120) : "error",
+        t0: bootT0,
+      });
     }
     state.vp = Object.assign(
       defaultVolumeProfile(),
@@ -11393,7 +11671,9 @@
     }
     $("researchSymbol").value = start;
     applyResearchJobSourceNote();
+    bootTrace("boot_switch_symbol_start", { symbol: start, t0: bootT0 });
     await switchSymbol(start);
+    bootTrace("boot_switch_symbol_ok", { symbol: start, initialLoadDone: !!state.initialLoadDone, t0: bootT0 });
     if (liveMicroLldV2Enabled()) {
       try {
         await refreshLiveMicroLldV2(null, { force: true });

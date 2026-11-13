@@ -17,6 +17,7 @@
   function membershipSlotMinutesForTimeframe(tf) {
     const s = String(tf);
     if (s === "5m") return 5;
+    if (s === "30m") return 30;
     if (s === "1h") return 60;
     if (s === "4h") return 240;
     return 15;
@@ -297,7 +298,7 @@
   }
 
   const EOD_CANVAS_MAX_SEGMENTS = 8000;
-  const EOD_MAX_API_VISIBLE_MS = 72 * 3600 * 1000;
+  const EOD_MAX_API_VISIBLE_MS = (864 - 1) * STEP_MS;
   /** Inclusive 5m endpoints per request (864 bars); naive 72h wall clock → 865 steps. */
   const EOD_MAX_5M_STEPS = 864;
   const EOD_MAX_API_CHUNK_MS = (EOD_MAX_5M_STEPS - 1) * STEP_MS;
@@ -335,6 +336,12 @@
 
   function visible5mStepsInclusive(fromMs, toMs) {
     return Math.floor((toMs - fromMs) / STEP_MS) + 1;
+  }
+
+  /** Never round CH data_available_to upward past the actual 1m high-water mark. */
+  function capHiMsToDataBound(hiMs) {
+    if (!Number.isFinite(hiMs)) return hiMs;
+    return Math.floor(hiMs / STEP_MS) * STEP_MS;
   }
 
   function fixedTileSpec(tileHours) {
@@ -389,14 +396,15 @@
     const hours = tileHours == null ? EOD_FIXED_TILE_HOURS : tileHours;
     const spec = fixedTileSpec(hours);
     const grid = spec.tileMs;
+    const hiCap = capHiMsToDataBound(hiMs);
     const spanFrom = floor5mMs(Math.max(loadFromMs, loMs));
-    const spanTo = ceil5mMs(Math.min(loadToMs, hiMs));
+    const spanTo = Math.min(loadToMs, hiCap);
     if (spanFrom >= spanTo) return [];
     const t0 = Math.floor(spanFrom / grid) * grid;
     const out = [];
     for (let start = t0; start < spanTo; start += grid) {
       const fromMs = Math.max(start, floor5mMs(loMs));
-      const toMs = Math.min(start + spec.lastOffset, ceil5mMs(hiMs));
+      const toMs = Math.min(start + spec.lastOffset, hiCap);
       if (fromMs > toMs) continue;
       if (visible5mStepsInclusive(fromMs, toMs) > EOD_MAX_5M_STEPS) continue;
       out.push({
@@ -425,7 +433,7 @@
     let from = floor5mMs(hitFromMs - pad);
     let to = ceil5mMs(hitToMs + EOD_API_TAIL_PAD_MS + pad);
     from = Math.max(floor5mMs(loMs), from);
-    to = Math.min(ceil5mMs(hiMs), to);
+    to = Math.min(capHiMsToDataBound(hiMs), to);
     return { fromMs: from, toMs: to };
   }
 
@@ -481,12 +489,18 @@
     });
   }
 
+  function exactOriginChunkSatisfiesWindow(ent, w) {
+    if (!ent || ent.status !== "ok" || !ent.pools) return false;
+    if (w && w.toMs != null && ent.toMs != null && ent.toMs < w.toMs) return false;
+    return true;
+  }
+
   function exactOriginWindowsFullyCached(store, planned) {
     if (!store || !planned || !planned.length) return false;
     return planned.every(function (w) {
       const key = exactOriginCacheKeyForWindow(w);
       const ent = store.chunks[key];
-      return ent && ent.status === "ok" && ent.pools;
+      return exactOriginChunkSatisfiesWindow(ent, w);
     });
   }
 
@@ -517,6 +531,7 @@
     touchExactOriginWindowCache: touchExactOriginWindowCache,
     mergeDensityPools: mergeDensityPools,
     windowOverlapsSpan: windowOverlapsSpan,
+    exactOriginChunkSatisfiesWindow: exactOriginChunkSatisfiesWindow,
     exactOriginWindowsFullyCached: exactOriginWindowsFullyCached,
     EOD_MAX_API_VISIBLE_MS: EOD_MAX_API_VISIBLE_MS,
     EOD_DEFAULT_PREFETCH_MS: EOD_DEFAULT_PREFETCH_MS,

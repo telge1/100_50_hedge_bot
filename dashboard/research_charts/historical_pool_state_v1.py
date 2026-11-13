@@ -56,6 +56,9 @@ RESEARCH_CHART_OCTOBER_TO_NOMINAL = datetime(2026, 10, 31, 23, 45, tzinfo=timezo
 # Phase 5N — Apr–Sep imported catalog (static timeline loads; no October reconstruction).
 STATIC_TIMELINE_IMPORT_FROM = datetime(2026, 4, 1, 0, 0, tzinfo=timezone.utc)
 STATIC_TIMELINE_IMPORT_TO_NOMINAL = datetime(2026, 9, 30, 23, 45, tzinfo=timezone.utc)
+# DOGE-LIVE-P4-CHART-GATE: last manually validated cutoff before dynamic release (P5A).
+DOGE_5M_PD1_CHART_RELEASED_TO_NOMINAL = datetime(2026, 11, 11, 9, 15, tzinfo=timezone.utc)
+DOGE_5M_PD1_CHART_RELEASED_TO = DOGE_5M_PD1_CHART_RELEASED_TO_NOMINAL  # backwards compat alias
 STATIC_TIMELINE_MAX_DISPLAY_CLOSES = PILOT_MAX_CLOSES * 3  # 3 UTC days @ 15m
 EPISODE_MEMBERSHIP_WARMUP_CLOSES = PILOT_MAX_CLOSES - 1
 
@@ -249,6 +252,110 @@ def published_closes_apr_sep_import(published: Sequence[datetime]) -> list[datet
     ]
 
 
+def validated_doge_5m_pd1_publish_high_water(
+    published: Sequence[datetime],
+    *,
+    pipeline_line_id: str,
+    config_hash: str,
+    reader: PublishedActiveReader | None = None,
+    max_tail_probe: int = 8,
+) -> datetime:
+    """Fail-closed: last decision_close with a fully validated publish (SSOT reader)."""
+    pub = sorted(c.astimezone(timezone.utc) for c in published)
+    if not pub:
+        raise HistoricalPoolStateError(
+            "NO_PUBLICATIONS",
+            "no published 5m PD1 closes for chart release",
+            {"pipeline_line_id": pipeline_line_id},
+        )
+    rdr = reader or PublishedActiveReader()
+    errors: list[str] = []
+    for dc in reversed(pub[-max_tail_probe:]):
+        try:
+            rdr.load_published(pipeline_line_id, dc, config_hash=config_hash)
+            return dc
+        except Exception as exc:
+            errors.append(f"{_iso_z(dc)}: {exc!r}")
+    raise HistoricalPoolStateError(
+        "INCOMPLETE_PUBLISH_TAIL",
+        "no validated complete publish at tail of 5m PD1 line",
+        {"pipeline_line_id": pipeline_line_id, "probe_errors": errors},
+    )
+
+
+def doge_5m_pd1_viewer_bounds(
+    *,
+    reader: PublishedActiveReader | None = None,
+) -> dict[str, Any]:
+    """Public chart bound contract for DOGE 5m PD1 (publish SSOT only, not candles)."""
+    from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
+
+    pd_cfg = resolve_historical_pd_config(1, timeframe="5m")
+    rdr = reader or PublishedActiveReader()
+    published = get_published_decision_closes(
+        rdr, pd_cfg.config_hash, pipeline_line_id=pd_cfg.pipeline_line_id
+    )
+    lo, hi = viewer_timeline_import_bounds(
+        published,
+        timeframe="5m",
+        pool_detail=1,
+        symbol=PILOT_SYMBOL,
+    )
+    return {
+        "symbol": PILOT_SYMBOL,
+        "timeframe": "5m",
+        "pool_detail": 1,
+        "pipeline_line_id": pd_cfg.pipeline_line_id,
+        "config_hash": pd_cfg.config_hash,
+        "data_available_from": _iso_z(lo),
+        "data_available_to": _iso_z(hi),
+        "release_source": "validated_publish_ssot",
+        "nominal_floor": _iso_z(DOGE_5M_PD1_CHART_RELEASED_TO_NOMINAL),
+    }
+
+
+def doge_pd1_on_demand_viewer_bounds(*, timeframe: str, pool_detail: int = 1) -> dict[str, Any]:
+    """Chart bounds for on-demand PD1 pool TFs (30m/1h/4h), not publish SSOT."""
+    tf = str(timeframe or "").strip()
+    pd = int(pool_detail)
+    if pd != 1:
+        raise HistoricalPoolStateError(
+            "INVALID_SCOPE",
+            "on-demand viewer bounds support PD1 only",
+            {"timeframe": tf, "pool_detail": pd},
+        )
+    if tf == "30m":
+        from pd1_landscape_viewer_v1.on_demand_30mpd1_v1 import on_demand_30mpd1_capabilities_scope
+
+        row = on_demand_30mpd1_capabilities_scope()
+    elif tf == "1h":
+        from pd1_landscape_viewer_v1.on_demand_1hpd1_v1 import on_demand_1hpd1_capabilities_scope
+
+        row = on_demand_1hpd1_capabilities_scope()
+    elif tf == "4h":
+        from pd1_landscape_viewer_v1.on_demand_4hpd1_v1 import on_demand_4hpd1_capabilities_scope
+
+        row = on_demand_4hpd1_capabilities_scope()
+    else:
+        raise HistoricalPoolStateError(
+            "INVALID_SCOPE",
+            f"no on-demand viewer bounds for pool timeframe {tf!r}",
+            {"timeframe": tf, "pool_detail": pd},
+        )
+    return {
+        "symbol": row.get("symbol") or PILOT_SYMBOL,
+        "timeframe": tf,
+        "pool_detail": pd,
+        "pipeline_line_id": row["pipeline_line_id"],
+        "config_hash": row["config_hash"],
+        "data_available_from": row["data_available_from"],
+        "data_available_to": row["data_available_to"],
+        "release_source": "on_demand_ch1m",
+        "builder_version": row.get("builder_version"),
+        "membership_slot_minutes": row.get("membership_slot_minutes"),
+    }
+
+
 def static_timeline_import_bounds(published: Sequence[datetime]) -> tuple[datetime, datetime]:
     closes = published_closes_apr_sep_import(published)
     if not closes:
@@ -261,6 +368,48 @@ def static_timeline_import_bounds(published: Sequence[datetime]) -> tuple[dateti
             },
         )
     return closes[0], closes[-1]
+
+
+def viewer_timeline_import_bounds(
+    published: Sequence[datetime],
+    *,
+    timeframe: str,
+    pool_detail: int,
+    symbol: str,
+) -> tuple[datetime, datetime]:
+    """Chart bounds: 5m DOGE PD1 follows validated publish SSOT; other scopes unchanged."""
+    sym = str(symbol).strip().upper()
+    tf = str(timeframe).strip()
+    pd = int(pool_detail)
+    if sym == PILOT_SYMBOL and tf == "5m" and pd == 1:
+        from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
+
+        pd_cfg = resolve_historical_pd_config(1, timeframe="5m")
+        pub_sorted = sorted(c.astimezone(timezone.utc) for c in published)
+        in_range = [c for c in pub_sorted if c >= STATIC_TIMELINE_IMPORT_FROM]
+        if not in_range:
+            raise HistoricalPoolStateError(
+                "OUT_OF_SCOPE",
+                "no published 5m PD1 closes within chart import window",
+                {"import_from": _iso_z(STATIC_TIMELINE_IMPORT_FROM)},
+            )
+        released_to = validated_doge_5m_pd1_publish_high_water(
+            in_range,
+            pipeline_line_id=pd_cfg.pipeline_line_id,
+            config_hash=pd_cfg.config_hash,
+        )
+        closes = [c for c in in_range if c <= released_to]
+        if not closes or closes[-1] != released_to:
+            raise HistoricalPoolStateError(
+                "INCOMPLETE_PUBLISH_TAIL",
+                "validated chart high-water missing from publication list",
+                {
+                    "validated_to": _iso_z(released_to),
+                    "list_max": _iso_z(in_range[-1]),
+                },
+            )
+        return closes[0], released_to
+    return static_timeline_import_bounds(published)
 
 
 def assert_static_timeline_window(
@@ -502,11 +651,16 @@ def load_historical_pool_state_at_close(
     if i >= len(published) or published[i] != dc:
         raise HistoricalPoolStateError("MISSING_PUBLICATION", "no published snapshot at decision_close")
     sym = symbol.upper()
-    if sym != hcfg.symbol or timeframe != hcfg.timeframe:
+    if sym != hcfg.symbol or timeframe != hcfg.timeframe or pool_detail != hcfg.pool_detail:
         raise HistoricalPoolStateError(
             "INVALID_SCOPE",
-            "historical scope symbol/timeframe mismatch",
-            {"symbol": sym, "timeframe": timeframe, "pool_detail": hcfg.pool_detail},
+            "requested scope does not match resolved historical PD config",
+            {
+                "symbol": sym,
+                "timeframe": timeframe,
+                "pool_detail": pool_detail,
+                "resolved": hcfg.to_api_dict(),
+            },
         )
     own_client = client is None
     if client is None:
