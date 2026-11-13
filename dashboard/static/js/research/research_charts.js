@@ -1384,10 +1384,7 @@
       }
     }
     if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
-      visibleIds().forEach(function (pid) {
-        const p = state.panes[pid];
-        if (p) p._suppressExactOriginViewport = true;
-      });
+      beginExactOriginViewportSuppress();
       try {
         await PD1ExactOriginResearch.refreshAll({
           force: true,
@@ -1399,10 +1396,7 @@
           try { console.warn("[research] exact-origin go-to", err); } catch (e) { /* ignore */ }
         }
       } finally {
-        visibleIds().forEach(function (pid) {
-          const p = state.panes[pid];
-          if (p) p._suppressExactOriginViewport = false;
-        });
+        endExactOriginViewportSuppress();
       }
     }
     if (isBtD26DynamicSelectorStrategy(btStrategy())) {
@@ -2523,6 +2517,65 @@
       const pane = state.panes[pid];
       if (pane) repaintExactOriginDensityFromCache(pane);
     });
+  }
+
+  let exactOriginViewportSuppressDepth = 0;
+
+  function applyExactOriginViewportSuppressFlag() {
+    const on = exactOriginViewportSuppressDepth > 0;
+    visibleIds().forEach(function (pid) {
+      const p = state.panes[pid];
+      if (p) p._suppressExactOriginViewport = on;
+    });
+  }
+
+  function beginExactOriginViewportSuppress() {
+    exactOriginViewportSuppressDepth += 1;
+    applyExactOriginViewportSuppressFlag();
+  }
+
+  function endExactOriginViewportSuppress() {
+    exactOriginViewportSuppressDepth = Math.max(0, exactOriginViewportSuppressDepth - 1);
+    applyExactOriginViewportSuppressFlag();
+  }
+
+  /** One post-switch refresh from the chart’s visible range (GO-TO pattern, P24C). */
+  function exactOriginRefreshAfterTfSwitch(pane) {
+    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) {
+      return Promise.resolve();
+    }
+    if (!pane || !PD1ExactOriginResearch.paneSupports(pane)) {
+      return Promise.resolve();
+    }
+    const chart = api(pane);
+    if (chart && chart.getVisibleTimeRange) {
+      const vr = chart.getVisibleTimeRange();
+      if (vr && vr.from != null && vr.to != null && Number(vr.from) < Number(vr.to)) {
+        return PD1ExactOriginResearch.refreshPane(pane, {
+          fromUnix: Math.floor(Number(vr.from)),
+          toUnix: Math.floor(Number(vr.to)),
+          viewport: true,
+        });
+      }
+    }
+    return PD1ExactOriginResearch.refreshPane(pane, { force: true });
+  }
+
+  function finalizeExactOriginChartTfSwitch(pane, loadPromise) {
+    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) {
+      return Promise.resolve(loadPromise);
+    }
+    if (PD1ExactOriginResearch.onPaneTimeframeChange) {
+      PD1ExactOriginResearch.onPaneTimeframeChange(pane);
+    }
+    return Promise.resolve(loadPromise)
+      .catch(function (err) {
+        throw err;
+      })
+      .finally(function () {
+        endExactOriginViewportSuppress();
+        return exactOriginRefreshAfterTfSwitch(pane);
+      });
   }
 
   function historicalLmv2ActiveEnabled() {
@@ -5070,10 +5123,15 @@
         if (pane.tf === "1d") {
           setStatus("1D: PD1-Density / LLD / Scanner deaktiviert — nur Chart & Zeichnungen.", "warn");
         }
+        const exactOriginTfSwitch = exactOriginDensityEnabled() && window.PD1ExactOriginResearch;
+        if (exactOriginTfSwitch) {
+          beginExactOriginViewportSuppress();
+        }
+        let loadPromise;
         if (isHistoricalReplay() && state.replayWindow && state.replayTargetTs != null) {
           const rw = state.replayWindow;
           const reqReplayGen = state.replayGen;
-          loadPane(pid, {
+          loadPromise = loadPane(pid, {
             force: false,
             sourceAction: "tf-change-replay",
             from: rw.from,
@@ -5086,8 +5144,6 @@
             return jumpChartsToUnix(state.replayTargetTs, rw.viewPad);
           }).then(function () {
             enforceReplayViewOnAllPanes();
-          }).catch(function (err) {
-            setStatus("TF-Wechsel Replay fehlgeschlagen: " + (err.message || err), "error");
           });
         } else {
           readHistoryFromUi();
@@ -5098,9 +5154,7 @@
             center = Math.floor(Number(state.gotoNavTargetTs));
           }
           if (center == null) {
-            loadPane(pid, { force: true, sourceAction: "tf-change" }).catch(function (err) {
-              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
-            });
+            loadPromise = loadPane(pid, { force: true, sourceAction: "tf-change" });
           } else {
             const range = navPaneLoadRangeForFreeNav(center);
             const fallback = resolvePaneLoadRange({});
@@ -5112,7 +5166,7 @@
               ? ResearchGotoTime.gotoLoadWindow(target)
               : null;
             const pad = win && win.viewPad != null ? win.viewPad : 4 * 3600;
-            loadPane(pid, Object.assign({
+            loadPromise = loadPane(pid, Object.assign({
               force: true,
               sourceAction: "tf-change",
             }, useRange.from != null && useRange.to != null ? { from: useRange.from, to: useRange.to } : {})).then(function () {
@@ -5121,13 +5175,18 @@
                 if (gen !== state.loadGen) return;
                 return jumpChartsToUnix(target, pad);
               });
-            }).catch(function (err) {
-              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
             });
           }
         }
-        if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
-          PD1ExactOriginResearch.onPaneTimeframeChange(pane);
+        if (exactOriginTfSwitch) {
+          finalizeExactOriginChartTfSwitch(pane, loadPromise).catch(function (err) {
+            endExactOriginViewportSuppress();
+            setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+          });
+        } else {
+          loadPromise.catch(function (err) {
+            setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+          });
         }
       });
       wrap.querySelector(".trp-reset").addEventListener("click", function () {
@@ -11477,6 +11536,9 @@
         VP_DEBOUNCE_MS: VP_DEBOUNCE_MS,
         setStatus: setStatus,
         mountDrawToolbar: mountDrawToolbar,
+        beginExactOriginViewportSuppress: beginExactOriginViewportSuppress,
+        endExactOriginViewportSuppress: endExactOriginViewportSuppress,
+        refreshExactOriginAfterTfSwitch: exactOriginRefreshAfterTfSwitch,
       });
     }
     function onLiveMicroV2FilterChange() {
