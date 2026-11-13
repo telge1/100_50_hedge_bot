@@ -129,7 +129,11 @@ Remote: `git@github.com:telge1/100_50_hedge_bot.git` → `332f348b` verified.
 
 ### Pools mirror commit
 
-See post-commit hash below — research reports P23–P25 only.
+```
+5be64b69 docs(doge-live): mirror P23–P25 multitimeframe pool release notes
+```
+
+**Files:** `research/doge_live_p23_auth_session_recovery.md` through `doge_live_p25_stable_multitimeframe_git_release.md` (8 reports).
 
 ---
 
