@@ -128,6 +128,39 @@ def test_ch_fallback_empty_bucket_returns_none():
     assert out is None
 
 
+def test_apply_live_forming_does_not_widen_when_last_ahead_of_bucket():
+    """Forming tick older than series tip must not max wicks onto the tip bar."""
+    packed = {
+        "symbol": "DOGEUSDT",
+        "timeframe": "5m",
+        "candles": [
+            {
+                "time": 1794562800,
+                "open": 0.06473,
+                "high": 0.06484,
+                "low": 0.06466,
+                "close": 0.0647,
+                "volume": 100.0,
+            }
+        ],
+    }
+    with patch(
+        "research_charts.service.fetch_forming_candle",
+        return_value={
+            "time": 1794562980,
+            "open": 0.0647,
+            "high": 0.09494,
+            "low": 0.0647,
+            "close": 0.0647,
+            "volume": 0,
+        },
+    ):
+        out = apply_live_forming_tip(packed)
+    tip = out["candles"][-1]
+    assert tip["high"] == 0.06484
+    assert tip["close"] == 0.0647
+
+
 def test_apply_live_forming_skipped_for_historical_end():
     packed = {
         "symbol": "TUTUSDT",

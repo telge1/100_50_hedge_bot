@@ -223,10 +223,16 @@ def apply_live_forming_tip(packed: dict[str, Any]) -> dict[str, Any]:
         return out
 
     if last_t == bucket:
+        if step > 60:
+            hi_use = max(last_h, px)
+            lo_use = min(last_l, px)
+        else:
+            hi_use = max(last_h, hi, px)
+            lo_use = min(last_l, lo, px)
         candles[-1] = {
             **last,
-            "high": max(last_h, hi, px),
-            "low": min(last_l, lo, px),
+            "high": hi_use,
+            "low": lo_use,
             "close": px,
         }
     elif last_t < bucket:
@@ -249,12 +255,8 @@ def apply_live_forming_tip(packed: dict[str, Any]) -> dict[str, Any]:
         if lim_i is not None and lim_i > 0 and len(candles) > lim_i:
             candles = candles[-lim_i:]
     else:
-        candles[-1] = {
-            **last,
-            "high": max(last_h, hi, px),
-            "low": min(last_l, lo, px),
-            "close": px,
-        }
+        # Last stored bar is newer than forming bucket — do not paint forming wicks on it.
+        pass
     out["candles"] = candles
     out["live_tip"] = True
     return out

@@ -152,6 +152,11 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     assert "pollForming(gen)" in host
     assert "seedLiveViewportForPane" in host
     assert "await ensurePaneCaughtUp" in host
+    assert "scheduleRefreshPaneEmaOverlays" in host
+    assert "paneEmaStaleVsCandles" in host
+    merge = host[host.index("function mergePollCandlesIntoPane") : host.index("function scheduleGotoNavViewportPrefetch")]
+    assert "byTime[t] = Object.assign({}, cur)" in merge
+    assert "Math.max(Number(cur.high), Number(oldTip.high))" not in merge
 
 
 def test_host_generation_guard():
