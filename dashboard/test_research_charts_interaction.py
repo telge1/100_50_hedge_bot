@@ -150,6 +150,8 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     assert "closedCandleFingerprint" in host
     assert "formingBarForTf" in host
     assert "pollForming(gen)" in host
+    assert "seedLiveViewportForPane" in host
+    assert "await ensurePaneCaughtUp" in host
 
 
 def test_host_generation_guard():

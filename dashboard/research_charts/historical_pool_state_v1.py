@@ -292,6 +292,8 @@ def doge_5m_pd1_viewer_bounds(
 
     pd_cfg = resolve_historical_pd_config(1, timeframe="5m")
     rdr = reader or PublishedActiveReader()
+    # DOGE-LIVE-P17: live dashboard must not serve a frozen publish list from process start.
+    _PUBLISHED_CLOSES_CACHE.pop((pd_cfg.pipeline_line_id, pd_cfg.config_hash), None)
     published = get_published_decision_closes(
         rdr, pd_cfg.config_hash, pipeline_line_id=pd_cfg.pipeline_line_id
     )
