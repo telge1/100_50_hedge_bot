@@ -928,6 +928,40 @@
     return from == null ? null : { from: from, to: to };
   }
 
+  function shouldSeedLiveViewportAfterLoad(opts) {
+    if (isHistoricalReplay() || historyBlocksLive()) return false;
+    if (opts && (opts.preserveView || opts.jumpToUnix != null || opts.indicatorsOnly)) return false;
+    const src = String((opts && opts.sourceAction) || "");
+    return (
+      src === "symbol-switch" ||
+      src === "tf-change" ||
+      src === "layout-change" ||
+      !!(opts && opts.focusLiveViewport)
+    );
+  }
+
+  /** After gap-backfill on live boot, re-center on the series tip (first setData alone may predate catch-up). */
+  function seedLiveViewportForPane(pane, opts) {
+    if (!shouldSeedLiveViewportAfterLoad(opts)) return false;
+    const chart = api(pane);
+    if (!chart || !chart.resetView) return false;
+    try {
+      const result = chart.resetView();
+      bootTrace("seed_live_viewport_ok", {
+        pane: pane.id,
+        source: (opts && opts.sourceAction) || "",
+        bars: result && result.barCount != null ? result.barCount : null,
+      });
+      return true;
+    } catch (e) {
+      bootTrace("seed_live_viewport_err", {
+        pane: pane.id,
+        message: e && e.message ? String(e.message).slice(0, 120) : "error",
+      });
+      return false;
+    }
+  }
+
   /** Focus each visible pane on its last loaded bar (tip), after a live restore. */
   async function focusChartsOnLatestLoadedCandle() {
     const ids = visibleIds();
@@ -7789,11 +7823,16 @@
       return;
     }
     if (!(opts && opts.indicatorsOnly)) {
-      void ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false }).catch(function (err) {
+      try {
+        await ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false });
+        if (!exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
+          seedLiveViewportForPane(pane, opts);
+        }
+      } catch (err) {
         if (!(err && err.name === "AbortError")) {
           try { console.warn("[research] pane gap-backfill", err); } catch (e) { /* ignore */ }
         }
-      });
+      }
     }
     if (pane.tf === "15m") {
       if (scannerPoolsCommonEnabled()) {

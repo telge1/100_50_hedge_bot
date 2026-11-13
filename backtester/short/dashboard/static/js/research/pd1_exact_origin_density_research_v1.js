@@ -629,6 +629,84 @@
     });
   }
 
+  const DOGE_5M_BOUNDS_REFRESH_MS = 30000;
+
+  function applyDoge5mViewerBoundsToCaps(capRoot, b) {
+    if (!capRoot || !b || !b.data_available_to) return;
+    if (deps.SC_HELPERS && deps.SC_HELPERS.applyDoge5mPd1ViewerBounds) {
+      deps.SC_HELPERS.applyDoge5mPd1ViewerBounds(b);
+    }
+    capRoot._doge5mPd1ViewerBounds = {
+      data_available_from: b.data_available_from,
+      data_available_to: b.data_available_to,
+      pipeline_line_id: b.pipeline_line_id,
+      config_hash: b.config_hash,
+    };
+    capRoot._doge5mBoundsFetchedAt = Date.now();
+    const scopes = capRoot.supported_viewer_scopes || [];
+    const idx = scopes.findIndex(function (s) {
+      return s && s.timeframe === "5m" && Number(s.pool_detail) === 1;
+    });
+    const patch = {
+      symbol: b.symbol || "DOGEUSDT",
+      timeframe: "5m",
+      pool_detail: 1,
+      pipeline_line_id: b.pipeline_line_id,
+      config_hash: b.config_hash,
+      data_available_from: b.data_available_from,
+      data_available_to: b.data_available_to,
+    };
+    if (idx >= 0) scopes[idx] = Object.assign({}, scopes[idx], patch);
+    else scopes.push(patch);
+    capRoot.supported_viewer_scopes = scopes;
+    if (
+      capRoot.timeframe === "5m" &&
+      Number(capRoot.pool_detail) === 1 &&
+      String(capRoot.symbol || "").toUpperCase() === "DOGEUSDT"
+    ) {
+      capRoot.data_available_from = b.data_available_from;
+      capRoot.data_available_to = b.data_available_to;
+    }
+  }
+
+  async function refreshDoge5mViewerBoundsIfStale(capRoot, traceId) {
+    if (!capRoot || !capRoot._loadCapsReady) return capRoot;
+    const now = Date.now();
+    const last = capRoot._doge5mBoundsFetchedAt || 0;
+    if (now - last < DOGE_5M_BOUNDS_REFRESH_MS) return capRoot;
+    const T = eoTr();
+    try {
+      const bRes = await fetch("/api/research/doge-5m-pd1-viewer-bounds", {
+        credentials: "same-origin",
+      });
+      if (T && T.enabled()) {
+        T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
+          doge_bounds_refresh: true,
+          doge_bounds_http: bRes.status,
+          doge_bounds_ok: bRes.ok,
+        });
+      }
+      if (!bRes.ok) {
+        capRoot._doge5mBoundsFetchedAt = now;
+        return capRoot;
+      }
+      const body = await bRes.json().catch(function () {
+        return null;
+      });
+      const b = body && body.data_available_to ? body : body && body.success ? body : null;
+      if (b && b.data_available_to) applyDoge5mViewerBoundsToCaps(capRoot, b);
+      else capRoot._doge5mBoundsFetchedAt = now;
+    } catch (e) {
+      capRoot._doge5mBoundsFetchedAt = now;
+      if (T && T.enabled()) {
+        T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
+          doge_bounds_refresh_error: String(e && e.message ? e.message : e),
+        });
+      }
+    }
+    return capRoot;
+  }
+
   async function loadCaps() {
     if (caps && caps._loadCapsReady) {
       const T = eoTr();
@@ -636,6 +714,7 @@
       if (T && T.enabled()) {
         T.event(tid, "loadCaps", { cache: "HIT", caps_key: "module_caps_singleton" });
       }
+      await refreshDoge5mViewerBoundsIfStale(caps, tid);
       return caps;
     }
     if (capsLoadInflight) {
@@ -681,39 +760,7 @@
         return null;
       });
       if (b && b.data_available_to) {
-        if (deps.SC_HELPERS && deps.SC_HELPERS.applyDoge5mPd1ViewerBounds) {
-          deps.SC_HELPERS.applyDoge5mPd1ViewerBounds(b);
-        }
-        caps._doge5mPd1ViewerBounds = {
-          data_available_from: b.data_available_from,
-          data_available_to: b.data_available_to,
-          pipeline_line_id: b.pipeline_line_id,
-          config_hash: b.config_hash,
-        };
-        const scopes = caps.supported_viewer_scopes || [];
-        const idx = scopes.findIndex(function (s) {
-          return s && s.timeframe === "5m" && Number(s.pool_detail) === 1;
-        });
-        const patch = {
-          symbol: b.symbol || "DOGEUSDT",
-          timeframe: "5m",
-          pool_detail: 1,
-          pipeline_line_id: b.pipeline_line_id,
-          config_hash: b.config_hash,
-          data_available_from: b.data_available_from,
-          data_available_to: b.data_available_to,
-        };
-        if (idx >= 0) scopes[idx] = Object.assign({}, scopes[idx], patch);
-        else scopes.push(patch);
-        caps.supported_viewer_scopes = scopes;
-        if (
-          caps.timeframe === "5m" &&
-          Number(caps.pool_detail) === 1 &&
-          String(caps.symbol || "").toUpperCase() === "DOGEUSDT"
-        ) {
-          caps.data_available_from = b.data_available_from;
-          caps.data_available_to = b.data_available_to;
-        }
+        applyDoge5mViewerBoundsToCaps(caps, b);
       }
     }
   } catch (e) {
@@ -1002,11 +1049,15 @@
     if (!missing.length) {
       return { fetched: 0, failed: 0, cacheHits: planned.length };
     }
+    if (loadSerial !== pane.exactOriginLoadSerial) {
+      return { fetched: 0, failed: 0, cacheHits: planned.length, superseded: true };
+    }
     let fetched = 0;
     let failed = 0;
     let cursor = 0;
     async function worker() {
       while (cursor < missing.length) {
+        if (loadSerial !== pane.exactOriginLoadSerial) return;
         const idx = cursor;
         cursor += 1;
         const w = missing[idx];
@@ -1014,6 +1065,7 @@
         try {
           const data = await fetchWindow(w.fromMs, w.toMs, scope, traceIdForPane(pane));
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
+          if (loadSerial !== pane.exactOriginLoadSerial) return;
           AD.touchExactOriginWindowCache(store, ck, {
             status: "ok",
             pools: data.pools || [],
@@ -1024,6 +1076,7 @@
           if (loadSerial === pane.exactOriginLoadSerial) fetched += 1;
         } catch (err) {
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
+          if (loadSerial !== pane.exactOriginLoadSerial) return;
           AD.touchExactOriginWindowCache(store, ck, {
             status: "error",
             error: String(err && err.message ? err.message : err),
@@ -1194,6 +1247,24 @@
     return merged;
   }
 
+  function eoRefreshPendingSupersedesInflight(pending) {
+    const p = pending || {};
+    return !!(p.viewport || p.force || (p.fromUnix != null && p.toUnix != null));
+  }
+
+  function bumpExactOriginLoadSerial(pane, reason) {
+    if (!pane) return 0;
+    pane.exactOriginLoadSerial = (pane.exactOriginLoadSerial || 0) + 1;
+    const T = eoTr();
+    if (T && T.enabled()) {
+      T.event(traceIdForPane(pane), "exactOrigin_load_serial_bump", {
+        reason: reason || "unspecified",
+        load_serial: pane.exactOriginLoadSerial,
+      });
+    }
+    return pane.exactOriginLoadSerial;
+  }
+
   async function refreshPane(pane, opts) {
     if (!pane) return;
     if (!pane._eoRefreshGate) {
@@ -1202,11 +1273,18 @@
     const gate = pane._eoRefreshGate;
     gate.pending = mergeEoRefreshOpts(gate.pending, opts);
     if (gate.inflight) {
+      if (eoRefreshPendingSupersedesInflight(gate.pending)) {
+        bumpExactOriginLoadSerial(pane, "coalesced_viewport_or_force");
+      }
       const Tc = eoTr();
       if (Tc && Tc.enabled()) {
         Tc.event(traceIdForPane(pane), "refreshPane_coalesced", {
           pending_force: !!(gate.pending && gate.pending.force),
           pending_viewport: !!(gate.pending && gate.pending.viewport),
+          pending_from_unix:
+            gate.pending && gate.pending.fromUnix != null ? gate.pending.fromUnix : null,
+          pending_to_unix: gate.pending && gate.pending.toUnix != null ? gate.pending.toUnix : null,
+          load_serial: pane.exactOriginLoadSerial,
         });
       }
       return gate.inflight;
