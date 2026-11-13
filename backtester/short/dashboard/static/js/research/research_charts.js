@@ -7459,6 +7459,96 @@
     return Math.min(3000, Math.ceil(lag / step) + 20);
   }
 
+  const PANE_EMA_REFRESH_DEBOUNCE_MS = 400;
+  const PANE_EMA_RELOAD_LIMIT_CAP = 50000;
+
+  function maxEmaWarmupBars(ws) {
+    const lines = (ws && ws.ema && ws.ema.lines) || [];
+    let warm = 100;
+    lines.forEach(function (line) {
+      if (!line || line.enabled === false) return;
+      const p = Number(line.period);
+      if (Number.isFinite(p)) warm = Math.max(warm, p);
+    });
+    return warm + 20;
+  }
+
+  /** Pane candle span for indicator recompute (warmup before first visible bar). */
+  function paneIndicatorReloadRange(pane) {
+    const candles = (pane.pendingData && pane.pendingData.candles) || [];
+    if (!candles.length) return null;
+    const times = candles.map(function (c) { return Number(c.time); }).filter(Number.isFinite);
+    const mm = minMaxUnixSeconds(times);
+    if (!mm) return null;
+    const step = TF_SEC[pane.tf] || 60;
+    const warm = maxEmaWarmupBars(state.workspace || {});
+    const now = Math.floor(Date.now() / 1000);
+    return {
+      from: mm.min - warm * step,
+      to: Math.max(mm.max, Math.min(now, mm.max + step)),
+      limit: Math.min(PANE_EMA_RELOAD_LIMIT_CAP, candles.length + warm + 5),
+    };
+  }
+
+  function paneEmaStaleVsCandles(pane) {
+    if (isHistoricalReplay()) return false;
+    const series = (pane.pendingEma && pane.pendingEma.series) || [];
+    const candles = (pane.pendingData && pane.pendingData.candles) || [];
+    if (!series.length || !candles.length) return false;
+    const lastC = Number(candles[candles.length - 1].time);
+    if (!Number.isFinite(lastC)) return false;
+    const step = TF_SEC[pane.tf] || 60;
+    let maxEmaT = null;
+    series.forEach(function (spec) {
+      const data = spec.data || [];
+      if (!data.length) return;
+      const t = Number(data[data.length - 1].time);
+      if (Number.isFinite(t)) maxEmaT = maxEmaT == null ? t : Math.max(maxEmaT, t);
+    });
+    if (maxEmaT == null) return true;
+    return maxEmaT < lastC - step * 2;
+  }
+
+  function scheduleRefreshPaneEmaOverlays(pane, opts) {
+    if (!pane || isHistoricalReplay()) return;
+    const ws = state.workspace || {};
+    if (!ws.ema || !(ws.ema.lines && ws.ema.lines.length)) return;
+    if (pane._emaOverlayRefreshTimer) clearTimeout(pane._emaOverlayRefreshTimer);
+    pane._emaOverlayRefreshTimer = setTimeout(function () {
+      pane._emaOverlayRefreshTimer = null;
+      void refreshPaneEmaOverlays(pane, opts || {}).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] pane ema refresh", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, PANE_EMA_REFRESH_DEBOUNCE_MS);
+  }
+
+  async function refreshPaneEmaOverlays(pane, opts) {
+    if (!pane || !state.symbol || isHistoricalReplay()) return;
+    const ws = state.workspace || {};
+    if (!ws.ema || !(ws.ema.lines && ws.ema.lines.length)) return;
+    const range = paneIndicatorReloadRange(pane);
+    if (!range) return;
+    const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    if (pane._emaOverlayRefreshInflight) return;
+    pane._emaOverlayRefreshInflight = true;
+    try {
+      await loadPane(pane.id, {
+        indicatorsOnly: true,
+        allowStale: true,
+        gen: gen,
+        from: range.from,
+        to: range.to,
+        limit: range.limit,
+        skipEmaRangeRestore: true,
+        sourceAction: (opts && opts.sourceAction) || "ema-candle-span-sync",
+      });
+    } finally {
+      pane._emaOverlayRefreshInflight = false;
+    }
+  }
+
   function mergePollCandlesIntoPane(pane, incoming, packed) {
     const step = TF_SEC[pane.tf] || 60;
     const nowSec = Math.floor(Date.now() / 1000);
@@ -7472,11 +7562,7 @@
       if (!cur) {
         byTime[t] = oldTip;
       } else {
-        byTime[t] = Object.assign({}, cur, {
-          high: Math.max(Number(cur.high), Number(oldTip.high)),
-          low: Math.min(Number(cur.low), Number(oldTip.low)),
-          close: Number(oldTip.close),
-        });
+        byTime[t] = Object.assign({}, cur);
       }
     }
     const merged = Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; })
@@ -7499,6 +7585,12 @@
     }
     if (packed && packed.forming) {
       applyFormingToPane(pane, packed.forming);
+    }
+    if (incoming && incoming.length && (prevClosedOpen !== nextClosedOpen || paneEmaStaleVsCandles(pane))) {
+      scheduleRefreshPaneEmaOverlays(pane, {
+        gen: state.loadGen,
+        sourceAction: "ema-after-candle-merge",
+      });
     }
     return nextClosedOpen;
   }
@@ -7763,7 +7855,7 @@
     const reqBody = {
       symbol: state.symbol,
       timeframe: pane.tf,
-      limit: historyLoadLimitForTimeframe(pane.tf),
+      limit: (opts && opts.limit != null) ? opts.limit : historyLoadLimitForTimeframe(pane.tf),
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
       open_interest: ws.open_interest || { enabled: false },
@@ -7811,7 +7903,8 @@
       // series (looks like the chart was "squeezed"). Jump sets the camera after.
       preserveView: !!(opts && opts.preserveView) || (isHistoricalReplay() && !(opts && opts.jumpToUnix != null)),
       skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
-      skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
+      skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay() ||
+        !!(opts && opts.skipEmaRangeRestore),
     };
     try {
       applyPaneBundle(pane, packed, bundleOpts);
@@ -7827,6 +7920,9 @@
         await ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false });
         if (!exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
           seedLiveViewportForPane(pane, opts);
+        }
+        if (paneEmaStaleVsCandles(pane)) {
+          await refreshPaneEmaOverlays(pane, { gen: gen, sourceAction: "ema-post-catch-up" });
         }
       } catch (err) {
         if (!(err && err.name === "AbortError")) {
@@ -8141,8 +8237,9 @@
     const bucket = Math.floor(t1 / tfSec) * tfSec;
     const fHigh = Number(forming.high);
     const fLow = Number(forming.low);
-    const hi = Number.isFinite(fHigh) ? fHigh : px;
-    const lo = Number.isFinite(fLow) ? fLow : px;
+    const hlFromForming = tfSec <= 60;
+    const hi = hlFromForming && Number.isFinite(fHigh) ? fHigh : px;
+    const lo = hlFromForming && Number.isFinite(fLow) ? fLow : px;
 
     if (!lastCandle) {
       const o = Number(forming.open);
@@ -8163,8 +8260,8 @@
       return {
         time: bucket,
         open: Number(lastCandle.open),
-        high: Math.max(Number(lastCandle.high), hi, px),
-        low: Math.min(Number(lastCandle.low), lo, px),
+        high: hlFromForming ? Math.max(Number(lastCandle.high), hi, px) : Math.max(Number(lastCandle.high), px),
+        low: hlFromForming ? Math.min(Number(lastCandle.low), lo, px) : Math.min(Number(lastCandle.low), px),
         close: px,
       };
     }
@@ -8179,12 +8276,12 @@
         close: px,
       };
     }
-    // Desync: tip candle is ahead of forming timestamp → still paint live price on tip.
+    // Desync: tip is ahead of forming bucket — move close only (no cross-bucket wick merge).
     return {
       time: lastT,
       open: Number(lastCandle.open),
-      high: Math.max(Number(lastCandle.high), hi, px),
-      low: Math.min(Number(lastCandle.low), lo, px),
+      high: Number(lastCandle.high),
+      low: Number(lastCandle.low),
       close: px,
     };
   }
