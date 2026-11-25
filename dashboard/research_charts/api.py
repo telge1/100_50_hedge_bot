@@ -79,6 +79,8 @@ from .public_trades_profile import (
     VolumeProfileQueryError,
     load_volume_profile,
 )
+from .orderflow_indicators import load_orderflow
+from .orderflow_price_impact_v1 import load_orderflow_price_impact
 from .trade_bubbles import load_bubbles_payload
 from .volume_profile import MAX_RANGE_SECONDS
 from .workspace_session import get_workspace
@@ -317,7 +319,89 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "trade_bubbles_failed", str(exc))
         return payload
 
-    @router.get("/api/research/orderbook-profile")
+    @router.get("/api/research/orderflow")
+    async def api_research_orderflow(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        timeframe: str = Query("5m"),
+        start: int = Query(..., description="UTC unix seconds, inclusive"),
+        end: int = Query(..., description="UTC unix seconds, exclusive"),
+        as_of: Optional[int] = Query(None),
+        cvd_reset: str = Query("utc_day"),
+    ):
+        """Delta, print density and CVD from public_trades_canonical FINAL."""
+        try:
+            start_dt = datetime.fromtimestamp(int(start), tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+            as_of_dt = (
+                datetime.fromtimestamp(int(as_of), tz=timezone.utc)
+                if as_of is not None
+                else datetime.now(timezone.utc)
+            )
+        except (TypeError, ValueError, OSError, OverflowError):
+            return _error(400, "invalid_time_range", "start/end/as_of must be UTC unix seconds")
+        try:
+            payload = await asyncio.to_thread(
+                load_orderflow,
+                str(symbol or ""),
+                str(timeframe or "5m"),
+                start_dt,
+                end_dt,
+                as_of=as_of_dt,
+                cvd_reset=str(cvd_reset or "utc_day"),
+            )
+        except ValueError as exc:
+            code = str(exc)
+            if code == "time_range_too_large":
+                return _error(400, code, "time range exceeds 7 days")
+            return _error(400, code, str(exc))
+        except Exception as exc:
+            return _error(500, "orderflow_failed", str(exc))
+        return payload
+
+    @router.get("/api/research/orderflow-price-impact")
+    async def api_research_orderflow_price_impact(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(...),
+        timeframe: str = Query("5m"),
+        start: int = Query(..., description="UTC unix seconds, inclusive"),
+        end: int = Query(..., description="UTC unix seconds, exclusive"),
+        as_of: Optional[int] = Query(None),
+        window_minutes: int = Query(15, description="Rolling wall-clock minutes: 15, 30, or 60"),
+    ):
+        """Orderflow Price Impact for visible range (Single-Chart). Aggregated only."""
+        try:
+            start_dt = datetime.fromtimestamp(int(start), tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(int(end), tz=timezone.utc)
+            as_of_dt = (
+                datetime.fromtimestamp(int(as_of), tz=timezone.utc)
+                if as_of is not None
+                else datetime.now(timezone.utc)
+            )
+        except (TypeError, ValueError, OSError, OverflowError):
+            return _error(400, "invalid_time_range", "start/end/as_of must be UTC unix seconds")
+        try:
+            payload = await asyncio.to_thread(
+                load_orderflow_price_impact,
+                str(symbol or ""),
+                str(timeframe or "5m"),
+                start_dt,
+                end_dt,
+                as_of=as_of_dt,
+                window_minutes=int(window_minutes),
+            )
+        except ValueError as exc:
+            code = str(exc)
+            if code == "time_range_too_large":
+                return _error(400, code, "visible range exceeds 6 hours")
+            if code == "no_public_trades":
+                return _error(400, code, "symbol has no public trade archive")
+            return _error(400, code, str(exc))
+        except Exception as exc:
+            return _error(500, "orderflow_price_impact_failed", str(exc))
+        return payload
+
+
     async def api_research_orderbook_profile(
         user: dict = Depends(require_auth),
         symbol: str = Query(...),

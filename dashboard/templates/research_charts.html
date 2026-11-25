@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=p17at-1">
+    <link rel="stylesheet" href="/static/css/research.css?v=research-mc-multi-v4">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -30,6 +30,14 @@
                 <span id="researchLiveDetail">–</span>
             </div>
             <div class="research-banner historical" id="researchFeedBanner">{{ feed_message }}</div>
+            <div class="research-multi-guard" id="researchMultiTradingGuard" hidden>
+                <strong>Multi 2×2:</strong> Long/Short-Positionswerkzeuge und Positions-Modal sind deaktiviert (Symbol-Isolation). Zeichnungen pro Kachel: Pane anklicken = Fokus-Symbol. Keine Live-Orders auf dieser Seite.
+            </div>
+            {% if request.query_params.get('pd1') == 'mc4v-c3-acceptance-v1' %}
+            <div class="research-banner" id="mc4vC4AcceptanceBanner" role="status" style="background:#1a3d5c;color:#e8f4ff;border:1px solid #4a9fd4;">
+                MC4V-C4 Abnahme · isoliertes PD1 <code>pd1-mc4v-c3-acceptance-v1</code> — Baseline-URL ohne Query unverändert.
+            </div>
+            {% endif %}
 
             <div id="researchFullscreenHost" class="research-fullscreen-host">
             <div class="trp-chrome">
@@ -38,8 +46,13 @@
                         <div class="trp-app-title">Research Charts</div>
                         <div class="trp-app-sub">P17 LONG · DOGEUSDT 5m · UTC</div>
                     </div>
-                    <span class="trp-field-label">SYMBOL</span>
+                    <span class="trp-field-label" id="researchSymbolLabel">SYMBOL</span>
                     <select id="researchSymbol" class="trp-select"></select>
+                    <span class="trp-field-label" id="researchViewModeLabel">ANSICHT</span>
+                    <div class="trp-view-mode-group" id="researchViewMode" role="group" aria-label="Chart-Ansicht">
+                        <button type="button" class="trp-view-mode-btn active" data-view="single" aria-pressed="true">Single</button>
+                        <button type="button" class="trp-view-mode-btn" data-view="multi" aria-pressed="false">Multi 2×2</button>
+                    </div>
                     <label class="trp-check" title="Crosshair über alle Panes synchronisieren"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair</label>
                 </div>
 
@@ -312,9 +325,11 @@
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2RemainingWrap" hidden title="Optional: historische Remaining-Projektion (separat von ACTIVE)"><input type="checkbox" id="researchIndHistoricalLmv2Remaining" autocomplete="off"> Historical Remaining</label>
                     <label class="trp-check trp-dock-ind" id="researchHistoricalLmv2StaticWrap" hidden title="Phase 5N: SSOT Static-Timeline (max 3 Tage/Request), Apr–Sep 2026, ohne Viewport-Rechunk"><input type="checkbox" id="researchIndHistoricalLmv2StaticTimeline" autocomplete="off"> Static timeline</label>
                     <label class="trp-check trp-dock-ind" id="researchExactOriginDensityWrap" title="Exact independent origin depth (ACTIVE only) — nicht parallel zu Historical LLD V2"><input type="checkbox" id="researchIndExactOriginDensity" autocomplete="off"> B – Exact Origin-Density</label>
+                    <span id="researchExactOriginFocusPaneLabel" class="trp-dock-ind trp-exact-origin-focus-pane" hidden title="Ausgewählte Multi-Kachel für Pool-Toolbar"></span>
                     <span id="researchExactOriginPoolTfWrap" class="trp-dock-ind" hidden title="PD1 Pool-Timeframe (unabhängig vom Kerzen-Chart)">
                         <span class="trp-muted">Pool-TF:</span>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="5m" autocomplete="off" checked> 5m</label>
+                        <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="15m" autocomplete="off"> 15m</label>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="30m" autocomplete="off"> 30m</label>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="1h" autocomplete="off"> 1h</label>
                         <label class="trp-check trp-dock-ind"><input type="radio" name="researchExactOriginPoolTimeframe" value="4h" autocomplete="off"> 4h</label>
@@ -363,6 +378,14 @@
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndStoch"> Stochastic</label>
                     <button type="button" class="trp-text-btn" id="trpStochSettings" title="Stochastic Settings">⚙</button>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndOi"> Open Interest</label>
+                    <span id="researchOpiWrap" class="trp-dock-ind">
+                    <label class="trp-check trp-dock-ind" title="Orderflow Price Impact"><input type="checkbox" id="researchIndOpi" autocomplete="off"> OPI</label>
+                    <select id="researchOpiWindow" class="trp-select trp-width" title="Rolling-Fenster (Minuten)" aria-label="OPI Fenster">
+                        <option value="15" selected>15m</option>
+                        <option value="30">30m</option>
+                        <option value="60">60m</option>
+                    </select>
+                    </span>
                     <label class="trp-check trp-dock-ind"><input type="checkbox" id="researchIndLld"> Research Liquidity Location</label>
                     <button type="button" class="trp-text-btn" id="trpLldSettings" title="Liquidity Location Settings">⚙</button>
                     <span class="trp-dock-sep" aria-hidden="true"></span>
@@ -396,8 +419,8 @@
                     <span id="researchOblControls" class="research-obl-controls" hidden>
                       <select id="researchOblDepth" class="trp-select trp-width" title="Orderbook depth" aria-label="OB Levels Depth">
                         <option value="200">OB200</option>
-                        <option value="1000" selected>OB1000</option>
-                        <option value="0">FULL</option>
+                        <option value="1000">OB1000</option>
+                        <option value="0" selected>FULL</option>
                       </select>
                       <select id="researchOblMode" class="trp-select trp-width" title="Raw vs Aggregated" aria-label="OB Levels Mode">
                         <option value="aggregated" selected>Aggregated</option>
@@ -415,6 +438,16 @@
                     <input type="number" id="researchPtbMin" class="trp-select trp-width" min="0" step="500" value="5000" title="Min. Notional (USDT Quote)" aria-label="Min Notional USDT" style="width:5.5rem">
                     <label class="trp-muted trp-dock-ind" for="researchPtbMax" title="Höchstens N größte Bubbles im Fenster (gegen Überlagerung)">Max</label>
                     <input type="number" id="researchPtbMax" class="trp-select trp-width" min="5" max="500" step="5" value="80" title="Max. Anzahl Bubbles" aria-label="Max Bubbles" style="width:4rem">
+                    <label class="trp-muted trp-dock-ind" for="researchPtbOpacity" title="Deckkraft der Bubble-Füllung in Prozent">Deckkraft</label>
+                    <input type="number" id="researchPtbOpacity" class="trp-select trp-width" min="5" max="80" step="5" value="25" title="Deckkraft in Prozent" aria-label="Bubble Deckkraft Prozent" style="width:3.6rem">
+                    <span class="trp-dock-sep" aria-hidden="true"></span>
+                    <label class="trp-check trp-dock-ind" title="Delta aus allen Public Trades der Kerze"><input type="checkbox" id="researchOfDelta"> Delta</label>
+                    <label class="trp-check trp-dock-ind" title="Anzahl der Ausführungen, nicht der Orders"><input type="checkbox" id="researchOfDensity"> Dichte</label>
+                    <label class="trp-check trp-dock-ind" title="Fortlaufende Buy-minus-Sell-Summe"><input type="checkbox" id="researchOfCvd"> CVD</label>
+                    <select id="researchOfReset" class="trp-select trp-width" title="CVD-Reset" aria-label="CVD Reset">
+                      <option value="utc_day" selected>UTC-Tag</option>
+                      <option value="range_start">Zeitraum</option>
+                    </select>
                     </div>
                 </div>
                 <div class="trp-workspace layout-1" id="researchWorkspace"></div>
@@ -693,9 +726,39 @@
     <script src="/static/js/research/doge_candle_live_trace_v1.js?v=p7-candle-trace-v1"></script>
     <script src="/static/js/research/research_scanner_common_helpers.js?v=phase6xt-bt-d34-density-cache-v1-p5i"></script>
     <script src="/static/js/research/pd1_exact_density_trp_adapter.js?v=pd1-p5i-e2e-trace-v1"></script>
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-p24f-1h-4h-bounds-v1"></script>
+    {% if request.query_params.get('pd1') == 'mc5h-perf-a-baseline-v1' %}
+    <script>window.__MC5H_PILOT={active:true,vpf:false,vis:false};</script>
+    <script src="/static/js/research/mc5h/pd1_exact_origin_density_research_v1.mc5h_perf_pilot_v1.js?v=pd1-mc5h-perf-pilot-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5h-perf-b-vpf-v1' %}
+    <script>window.__MC5H_PILOT={active:true,vpf:true,vis:false};</script>
+    <script src="/static/js/research/mc5h/pd1_exact_origin_density_research_v1.mc5h_perf_pilot_v1.js?v=pd1-mc5h-perf-pilot-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5h-perf-c-vpf-vis-v1' %}
+    <script>window.__MC5H_PILOT={active:true,vpf:true,vis:true};</script>
+    <script src="/static/js/research/mc5h/pd1_exact_origin_density_research_v1.mc5h_perf_pilot_v1.js?v=pd1-mc5h-perf-pilot-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5e-e-link-5m-viewport-v1' %}
+    <script src="/static/js/research/mc5e/pd1_exact_origin_density_research_v1.mc5e_e_link_5m_viewport_v1.js?v=pd1-mc5e-e-link-5m-viewport-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5e-d-link-refresh-v1' %}
+    <script src="/static/js/research/mc5e/pd1_exact_origin_density_research_v1.mc5e_d_link_refresh_v1.js?v=pd1-mc5e-d-link-refresh-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5e-b-link-caps-scope-v1' %}
+    <script src="/static/js/research/mc5e/pd1_exact_origin_density_research_v1.mc5e_b_link_caps_scope_v1.js?v=pd1-mc5e-b-link-caps-scope-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5e-link-xau-5m-v1' %}
+    <script src="/static/js/research/mc5e/pd1_exact_origin_density_research_v1.mc5e_link_xau_5m_v1.js?v=pd1-mc5e-link-xau-5m-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc5b-bnb-caps-race-v1' %}
+    <script src="/static/js/research/mc5b/pd1_exact_origin_density_research_v1.mc5b_bnb_caps_race_v1.js?v=pd1-mc5b-bnb-caps-race-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc4v-f3-doge-15m-v1' %}
+    <script src="/static/js/research/mc4v_f3/pd1_exact_origin_density_research_v1.mc4v_f3_doge_15m_v1.js?v=pd1-mc4v-f3-doge-15m-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc4v-f2-doge-15m-v1' %}
+    <script src="/static/js/research/mc4v_f2/pd1_exact_origin_density_research_v1.mc4v_f2_doge_15m_v1.js?v=pd1-mc4v-f2-doge-15m-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc4v-c3-acceptance-v1' %}
+    <script src="/static/js/research/mc4v_c4/pd1_exact_origin_density_research_v1.mc4v_c3_acceptance_v1.js?v=pd1-mc4v-c3-acceptance-v1"></script>
+    {% elif request.query_params.get('pd1') == 'mc6a-lit-hype-v1' %}
+    <script src="/static/js/research/mc6a/pd1_exact_origin_density_research_v1.mc6a_lit_hype_v1.js?v=pd1-mc6a-lit-hype-v1"></script>
+    {% else %}
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-mc-multi-pane-pools-v5"></script>
+    {% endif %}
     <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 long-v3-phase3g-sept-sl-cap-v1 -->
-    <script src="/static/js/research/research_charts.js?v=pd1-p24f-1h-4h-bounds-v1"></script>
+    <script src="/static/js/research/research_opi_e2e_diag.js?v=research-mc-opi-p3q-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=research-mc-opi-p3q-v1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>

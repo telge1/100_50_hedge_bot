@@ -934,3 +934,16 @@ body.research-browser-fs .trp-workspace {
     border-radius: 999px;
     transform: none;
 }
+
+.research-opi-e2e-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    margin: 0.35rem 0 0.65rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px dashed #4a5568;
+    border-radius: 6px;
+    background: rgba(20, 24, 35, 0.85);
+    font-size: 0.85rem;
+}

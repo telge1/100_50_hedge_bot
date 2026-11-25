@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Research Chart Pane</title>
-  <link rel="stylesheet" href="/static/research_trp/style.css?v=pos-order-ui-v1d" />
+  <link rel="stylesheet" href="/static/research_trp/style.css?v=research-mc-opi-p1s-v1" />
 </head>
 <body>
   <div id="app">
@@ -45,9 +45,23 @@
       <div id="osc-legend"></div>
       <div id="oscillator"></div>
     </div>
+    <div id="opi-stack" hidden>
+      <div id="opi-error" class="opi-error" hidden></div>
+      <div id="opi-tooltip" hidden></div>
+      <div class="opi-combined-row">
+        <div class="opi-legend">
+          <span class="opi-legend-item opi-legend-total">OPI %/1M Vol</span>
+          <span class="opi-legend-item opi-legend-delta">Netto-Delta USDT</span>
+          <span class="opi-legend-item opi-legend-price">Preisänderung %</span>
+        </div>
+        <div id="opi-combined"></div>
+      </div>
+    </div>
   </div>
   <script src="/static/research_trp/vendor/lightweight-charts.min.js"></script>
   <script src="/static/research_trp/chart_time_utc.js?v=crosshair-hm-v1"></script>
-  <script src="/static/research_trp/chart.js?v=p11c-render-v1"></script>
+  <script src="/static/research_trp/opi_pane.js?v=research-mc-opi-p3q-v1"></script>
+  <script src="/static/research_trp/opi_e2e_record.js?v=research-mc-opi-p3q-v1"></script>
+  <script src="/static/research_trp/chart.js?v=research-mc-opi-p3q-v1"></script>
 </body>
 </html>

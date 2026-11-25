@@ -10,9 +10,311 @@
   const PANE_IDS = ["pane-0", "pane-1", "pane-2", "pane-3"];
   const PANE_COUNT = { 1: 1, "2H": 2, "2V": 2, 4: 4 };
   const DEFAULT_TFS = { "pane-0": "1m", "pane-1": "5m", "pane-2": "15m", "pane-3": "1h" };
-  const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"];
-  const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400, "1d": 86400 };
-  const TF_LABEL = { "1d": "1D" };
+  const DEFAULT_PANE_SYMBOLS = {
+    "pane-0": "DOGEUSDT",
+    "pane-1": "SOLUSDT",
+    "pane-2": "BNBUSDT",
+    "pane-3": "XRPUSDT",
+  };
+  const DEFAULT_TFS_MULTI = { "pane-0": "5m", "pane-1": "5m", "pane-2": "5m", "pane-3": "5m" };
+  const MC4_5M_PD1_SYMBOLS = { DOGEUSDT: 1, SOLUSDT: 1, BNBUSDT: 1 };
+  const PANE_SYMBOLS_KEY = "research.pane_symbols.v1";
+  const PANE_EXACT_ORIGIN_KEY = "research.pane_exact_origin.v1";
+  const VIEW_MODE_KEY = "research.view_mode.v1";
+  let suppressExactOriginToolbarEvent = false;
+  const MULTI_OB_TILE_SPLIT = 0.3;
+  const MULTI_BLOCK_POSITION_TOOLS = ["long_position", "short_position"];
+  const TIMEFRAMES = ["1m", "5m", "15m", "30m", "1h", "4h"];
+  const TF_SEC = { "1m": 60, "5m": 300, "15m": 900, "30m": 1800, "1h": 3600, "4h": 14400 };
+
+  function isMultiManualMode() {
+    return !!state.multiManual;
+  }
+
+  function resolveInitialViewMode() {
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const q = params.get("view");
+      if (q === "multi" || q === "single") return q;
+    } catch (e) { /* ignore */ }
+    if (window.__RESEARCH_MULTI_MANUAL__) return "multi";
+    try {
+      const saved = localStorage.getItem(VIEW_MODE_KEY);
+      if (saved === "multi" || saved === "single") return saved;
+    } catch (e) { /* ignore */ }
+    if (document.body && document.body.classList.contains("research-multi-manual")) return "multi";
+    return "single";
+  }
+
+  function persistViewMode(mode) {
+    try { localStorage.setItem(VIEW_MODE_KEY, mode); } catch (e) { /* ignore */ }
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("view", mode);
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+  }
+
+  function multiBlocksPositionTool(tool) {
+    return isMultiManualMode() && MULTI_BLOCK_POSITION_TOOLS.indexOf(tool) >= 0;
+  }
+
+  function updateViewModeButtons() {
+    const group = $("researchViewMode");
+    if (!group) return;
+    group.querySelectorAll(".trp-view-mode-btn").forEach(function (btn) {
+      const active = (btn.dataset.view === "multi") === isMultiManualMode();
+      btn.classList.toggle("active", active);
+      btn.setAttribute("aria-pressed", active ? "true" : "false");
+    });
+    updateLayoutButtonsForViewMode();
+  }
+
+  /** Single view = one pane only; Multi view uses fixed 2×2 (layout picker hidden). */
+  function layoutAllowedForViewMode(layout) {
+    if (isMultiManualMode()) return layout === "4" ? "4" : "4";
+    return "1";
+  }
+
+  function updateLayoutButtonsForViewMode() {
+    const multi = isMultiManualMode();
+    document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
+      const L = btn.dataset.layout;
+      if (multi) return;
+      const onlyOne = L === "1";
+      btn.hidden = !onlyOne;
+      btn.disabled = !onlyOne;
+    });
+  }
+
+  function updateMultiTradingGuard() {
+    const guard = $("researchMultiTradingGuard");
+    if (guard) guard.hidden = !isMultiManualMode();
+    MULTI_BLOCK_POSITION_TOOLS.forEach(function (tool) {
+      const btn = document.querySelector('.trp-tool-btn[data-tool="' + tool + '"]');
+      if (btn) {
+        btn.disabled = isMultiManualMode();
+        btn.title = isMultiManualMode()
+          ? "In Multi 2×2 deaktiviert (Symbol-Isolation) — Single-Chart nutzen"
+          : "";
+      }
+    });
+    const ps = $("trpPositionSettings");
+    if (ps) {
+      if (isMultiManualMode()) {
+        ps.disabled = true;
+        ps.title = "Multi 2×2: Positions-Modal deaktiviert";
+      }
+    }
+    const applyBtn = $("posApply");
+    if (applyBtn) applyBtn.disabled = isMultiManualMode();
+    updateOpiSingleOnlyUi();
+  }
+
+  function updateOpiSingleOnlyUi() {
+    const wrap = $("researchOpiWrap");
+    const cb = $("researchIndOpi");
+    const win = $("researchOpiWindow");
+    if (wrap) wrap.hidden = isMultiManualMode();
+    if (isMultiManualMode()) {
+      if (cb) cb.checked = false;
+      visibleIds().forEach(function (pid) { clearPaneOpi(state.panes[pid]); });
+      return;
+    }
+    if (cb && state.opi) cb.checked = !!state.opi.enabled;
+    if (win && state.opi) win.value = String(state.opi.window_minutes || 15);
+  }
+
+  function clearMultiManualChrome() {
+    document.body.classList.remove("research-multi-manual");
+    const toolbar = $("trpToolbar");
+    if (toolbar) toolbar.classList.remove("trp-toolbar-multi-manual");
+    const symWrap = $("researchSymbol");
+    const symLabel = $("researchSymbolLabel");
+    if (symLabel) symLabel.style.display = "";
+    if (symWrap) symWrap.style.display = "";
+    const layouts = $("trpLayouts");
+    if (layouts) layouts.style.display = "";
+    const titleSub = document.querySelector(".trp-app-sub");
+    if (titleSub && !titleSub.dataset.singleSub) {
+      titleSub.dataset.singleSub = titleSub.textContent;
+    }
+    if (titleSub && titleSub.dataset.singleSub) titleSub.textContent = titleSub.dataset.singleSub;
+    const titleMain = document.querySelector(".trp-app-title");
+    if (titleMain) titleMain.textContent = "Research Charts";
+    updateMultiTradingGuard();
+    updateViewModeButtons();
+  }
+
+  function readPaneSymbolsFromStorage() {
+    try {
+      const raw = localStorage.getItem(PANE_SYMBOLS_KEY);
+      if (!raw) return Object.assign({}, DEFAULT_PANE_SYMBOLS);
+      const parsed = JSON.parse(raw);
+      const out = Object.assign({}, DEFAULT_PANE_SYMBOLS);
+      PANE_IDS.forEach(function (pid) {
+        if (parsed && parsed[pid]) out[pid] = String(parsed[pid]).toUpperCase();
+      });
+      return out;
+    } catch (e) {
+      return Object.assign({}, DEFAULT_PANE_SYMBOLS);
+    }
+  }
+
+  function persistPaneSymbols() {
+    if (!isMultiManualMode()) return;
+    const row = {};
+    PANE_IDS.forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (pane && pane.symbol) row[pid] = pane.symbol;
+    });
+    try { localStorage.setItem(PANE_SYMBOLS_KEY, JSON.stringify(row)); } catch (e) { /* ignore */ }
+  }
+
+  function readPaneExactOriginFlags() {
+    try {
+      const raw = localStorage.getItem(PANE_EXACT_ORIGIN_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function persistPaneExactOriginFlag(paneId, on) {
+    if (!isMultiManualMode() || !paneId) return;
+    const row = readPaneExactOriginFlags();
+    if (on) row[paneId] = true;
+    else delete row[paneId];
+    try { localStorage.setItem(PANE_EXACT_ORIGIN_KEY, JSON.stringify(row)); } catch (e) { /* ignore */ }
+  }
+
+  function exactOriginEnabledForPane(pane) {
+    if (!pane) return false;
+    if (!isMultiManualMode()) {
+      return !!(window.PD1ExactOriginResearch && PD1ExactOriginResearch.isEnabled());
+    }
+    return !!pane.exactOriginEnabled;
+  }
+
+  function anyPaneExactOriginEnabled() {
+    if (!isMultiManualMode()) return exactOriginDensityEnabled();
+    return PANE_IDS.some(function (pid) {
+      const p = state.panes[pid];
+      return p && exactOriginEnabledForPane(p);
+    });
+  }
+
+  function focusPaneForExactOrigin() {
+    if (!isMultiManualMode()) return state.panes["pane-0"] || null;
+    const sel = state.selectedPane;
+    if (sel && state.panes[sel]) return state.panes[sel];
+    return state.panes["pane-0"] || null;
+  }
+
+  function setPaneExactOriginPoolStatus(pane, kind, detail) {
+    if (!pane || !pane.el || !isMultiManualMode()) return;
+    const el = pane.el.querySelector(".trp-pane-pool-status");
+    if (!el) return;
+    if (!kind || kind === "off" || kind === "idle") {
+      el.textContent = "";
+      el.className = "trp-pane-pool-status";
+      return;
+    }
+    const labels = {
+      loading: "Pools: Loading…",
+      ready: "Pools: Ready",
+      error: "Pools: Error",
+      unsupported: "Pools: Unsupported",
+    };
+    el.textContent = detail ? (labels[kind] || kind) + " · " + detail : (labels[kind] || kind);
+    el.className = "trp-pane-pool-status trp-pane-pool-status-" + kind;
+  }
+
+  function applyMultiPanePoolFocusChrome() {
+    if (!isMultiManualMode()) return;
+    const focus = focusPaneForExactOrigin();
+    PANE_IDS.forEach(function (pid) {
+      const p = state.panes[pid];
+      if (p && p.el) {
+        p.el.classList.toggle("trp-pane-pool-focus", !!(focus && p.id === focus.id));
+      }
+    });
+    const label = $("researchExactOriginFocusPaneLabel");
+    if (label) {
+      label.hidden = false;
+      label.textContent = focus ? "Kachel: " + paneSymbol(focus) : "";
+    }
+  }
+
+  function syncExactOriginToolbarFromFocusPane(opts) {
+    if (!isMultiManualMode()) return;
+    const pane = focusPaneForExactOrigin();
+    const cb = $("researchIndExactOriginDensity");
+    const on = pane ? exactOriginEnabledForPane(pane) : false;
+    suppressExactOriginToolbarEvent = true;
+    if (cb && !(opts && opts.skipCheckbox)) cb.checked = on;
+    PANE_IDS.forEach(function (pid) {
+      const p = state.panes[pid];
+      if (!p || !p.el) return;
+      const mini = p.el.querySelector(".trp-pane-pool-active");
+      if (mini && !(opts && opts.skipMini)) mini.checked = exactOriginEnabledForPane(p);
+    });
+    suppressExactOriginToolbarEvent = false;
+    applyMultiPanePoolFocusChrome();
+    if (window.PD1ExactOriginResearch && PD1ExactOriginResearch.updateUiChrome) {
+      PD1ExactOriginResearch.updateUiChrome();
+    }
+  }
+
+  async function setMultiPaneExactOriginEnabled(pane, on, source) {
+    if (!pane || !isMultiManualMode()) return;
+    pane.exactOriginEnabled = !!on;
+    persistPaneExactOriginFlag(pane.id, !!on);
+    syncExactOriginToolbarFromFocusPane({ skipCheckbox: source === "toolbar", skipMini: source === "mini" });
+    if (!window.PD1ExactOriginResearch) return;
+    if (on) {
+      if (PD1ExactOriginResearch.disableHistoricalLmv2) PD1ExactOriginResearch.disableHistoricalLmv2();
+      if (PD1ExactOriginResearch.syncPoolDetailUi) PD1ExactOriginResearch.syncPoolDetailUi(pane);
+      try {
+        await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+      } catch (err) {
+        setStatus("Exact Origin (" + paneSymbol(pane) + "): " + (err.message || err), "error");
+        setPaneExactOriginPoolStatus(pane, "error");
+      }
+    } else if (PD1ExactOriginResearch.stripPane) {
+      PD1ExactOriginResearch.stripPane(pane);
+    }
+  }
+
+  function paneSymbol(pane) {
+    if (!pane) return String(state.symbol || "").toUpperCase();
+    if (isMultiManualMode() && pane.symbol) return String(pane.symbol).toUpperCase();
+    return String(state.symbol || "").toUpperCase();
+  }
+
+  function syncFocusSymbolFromPane(pane) {
+    if (!isMultiManualMode() || !pane) return;
+    const sym = paneSymbol(pane);
+    state.selectedPane = pane.id;
+    if (sym && sym !== state.symbol) {
+      state.symbol = sym;
+      const sel = $("researchSymbol");
+      if (sel && sel.value !== sym) sel.value = sym;
+    }
+    syncExactOriginToolbarFromFocusPane();
+  }
+
+  function syncMultiPaneObLayout(pane) {
+    if (!isMultiManualMode() || !pane) return;
+    const chart = api(pane);
+    if (!chart || !chart.setOrderbookLevels) return;
+    chart.setOrderbookLevels(null, Object.assign({}, oblSettingsPayload(), {
+      enabled: true,
+      tileSplit: MULTI_OB_TILE_SPLIT,
+    }));
+  }
 
   /** Min/max unix seconds without Function.apply (safe for 100k+ candle arrays). */
   function minMaxUnixSeconds(times) {
@@ -32,71 +334,31 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "tf-1d-local-v1";
+  const ASSET_V = "research-mc-opi-p3q-v1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
-  const PANE_CHART_DATA_RETRY_MS = 200;
-  const PANE_CHART_DATA_RETRY_MAX = 150;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
-
-  function scheduleRenderDiagnosis(pane) {
-    const T = typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
-    if (!T || !T.enabled()) return;
-    [1000, 3000, 10000].forEach(function (delayMs) {
-      setTimeout(function () {
-        const chart = api(pane);
-        const dbg = chart && chart.debugInfo ? chart.debugInfo() : null;
-        const frame = pane && pane.iframe;
-        let emptyVisible = null;
-        try {
-          const doc = frame && frame.contentDocument;
-          const emptyEl = doc && doc.getElementById("empty");
-          emptyVisible = !!(emptyEl && emptyEl.classList && emptyEl.classList.contains("visible"));
-        } catch (e) {
-          emptyVisible = null;
-        }
-        const st = paneStatusEl(pane);
-        T.event("render_diag", {
-          pane: pane && pane.id,
-          delay_ms: delayMs,
-          frame_w: frame ? frame.clientWidth : null,
-          frame_h: frame ? frame.clientHeight : null,
-          pane_status: st ? st.textContent : null,
-          empty_overlay: emptyVisible,
-          payload_count: dbg && dbg.payloadCount,
-          candle_set_count: dbg && dbg.candleSetCount,
-          chart_w: dbg && dbg.size ? dbg.size.w : null,
-          chart_h: dbg && dbg.size ? dbg.size.h : null,
-          candle_paint_pending: dbg && dbg.candlePaintPending,
-          bars_in_view: dbg && dbg.barsInfo ? dbg.barsInfo.bars : null,
-          logical: dbg && dbg.logical ? JSON.stringify(dbg.logical) : null,
-          visible_time: dbg && dbg.visibleTime ? JSON.stringify(dbg.visibleTime) : null,
-          set_data_error: dbg && dbg.setDataError,
-        });
-      }, delayMs);
-    });
-  }
-
-  function bootTrace(stage, fields) {
-    const T = typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
-    if (!T || !T.enabled()) return;
-    const f = fields || {};
-    if (typeof performance !== "undefined" && f.ms == null && f.t0 != null) {
-      f.ms = Math.round(performance.now() - f.t0);
-      delete f.t0;
-    }
-    T.event(stage, f);
-  }
   const CHART_TIME_LIVE = "LIVE";
   const CHART_TIME_REPLAY = "HISTORICAL_REPLAY";
   const SCANNER_COMMON_NS = "SCANNER_COMMON";
   const SC_HELPERS =
     typeof ResearchScannerCommonHelpers !== "undefined" ? ResearchScannerCommonHelpers : null;
   const VP_KEY = "research.volume_profile";
+  const OPI_KEY = "research.opi.v1";
   const OBP_KEY = "research.orderbook_profile";
   const OBL_KEY = "research.orderbook_levels.v3";
   const PTB_KEY = "research.trade_bubbles";
   const VP_DEBOUNCE_MS = 400;
+  const OPI_RANGE_RETRY_MAX = 5;
+  const OPI_RANGE_RETRY_MS = 400;
+  const OPI_429_MAX_RETRIES = 3;
+  const OPI_429_BASE_MS = 1000;
+  /** Match backend MAX_VISIBLE_SECONDS and legacy single-fetch clamp. */
+  const OPI_CHUNK_SECONDS = 6 * 3600 - 60;
+  const OPI_CHUNK_CACHE_MAX = 48;
+  const OPI_CHUNK_CACHE_TTL_MS = 12 * 60 * 1000;
+  const OPI_DISPLAY_STORE_MAX = 4500;
+  const OPI_DISPLAY_STORE_MARGIN_SEC = OPI_CHUNK_SECONDS + 7200;
   const GOTO_NAV_PREFETCH_DEBOUNCE_MS = 400;
   /** Max seconds to extend loaded candle span per prefetch batch (left/right). */
   const GOTO_NAV_EXTEND_BATCH_SEC = 35 * 86400;
@@ -131,6 +393,7 @@
 
   const state = {
     symbols: [],
+    multiManual: false,
     layout: "1",
     paneFs: null,
     symbol: "",
@@ -192,7 +455,6 @@
     paneSendJsonDiagLog: [],
     paneSendJsonDiagSeq: 0,
     liveStatus: null,
-    exactOriginLastPoolBucketOpen: null,
     workspace: null,
     hoverUnix: null,
     hoverPane: null,
@@ -230,6 +492,83 @@
     replayWindow: null,
     replayGen: 0,
   };
+  const OPI_RUNTIME_TRACE_MAX = 100;
+  const opiRuntimeTraceCore = (function () {
+    let enabled = false;
+    const ring = [];
+    function paneState() {
+      const pane = state.panes["pane-0"];
+      if (!pane) return {};
+      return {
+        opiInflight: !!pane.opiInflight,
+        opiPending: !!pane.opiPending,
+        opiGen: pane.opiGen,
+        opiCtx: pane.opiChunkCtx || null,
+        opiCacheSize: pane.opiChunkCache ? pane.opiChunkCache.size : 0,
+      };
+    }
+    function iframePeek() {
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (!win || !win.OpiRuntimeTrace || !win.OpiRuntimeTrace.peek) return null;
+        return win.OpiRuntimeTrace.peek();
+      } catch (err) {
+        return { err: String(err) };
+      }
+    }
+    function push(name, fields) {
+      if (!enabled) return;
+      const pane = state.panes["pane-0"];
+      const live = pane ? api(pane) : null;
+      let visibleTime = null;
+      try {
+        if (live && live.getVisibleTimeRange) visibleTime = live.getVisibleTimeRange();
+      } catch (err2) { /* ignore */ }
+      ring.push(Object.assign({
+        t: new Date().toISOString(),
+        layer: "host",
+        event: name,
+        sym: state.symbol,
+        tf: pane && pane.tf,
+        wm: state.opi && state.opi.window_minutes,
+        visibleTime: visibleTime,
+        iframe: iframePeek(),
+      }, paneState(), fields || {}));
+      while (ring.length > OPI_RUNTIME_TRACE_MAX) ring.shift();
+    }
+    return {
+      push: push,
+      enable: function () {
+        enabled = true;
+        push("trace_enable", {});
+      },
+      disable: function () {
+        push("trace_disable", {});
+        enabled = false;
+      },
+      clear: function () {
+        ring.length = 0;
+      },
+      dump: function () {
+        return ring.slice();
+      },
+      isEnabled: function () {
+        return enabled;
+      },
+    };
+  })();
+
+  function opiTracePush(name, fields) {
+    opiRuntimeTraceCore.push(name, fields);
+  }
+
+  function nextOpiDiagUpdateId(pane) {
+    if (!pane) return null;
+    pane.opiDiagUpdateId = (pane.opiDiagUpdateId | 0) + 1;
+    return pane.opiDiagUpdateId;
+  }
+
   const inflightGets = {};
   const inflightPosts = {};
   const PANE_HTTP_LIMIT = 2;
@@ -400,19 +739,7 @@
     const uiWeeks = $("lldHistoryWeeks") ? Number(($("lldHistoryWeeks") || {}).value || 0) : 0;
     const weeks = Math.max(1, Number(uiWeeks || (state.history && state.history.weeks) || 12) || 12);
     const step = TF_SEC[tf] || 60;
-    const bars = Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
-    if (tf === "1d") {
-      const preset = state.history && state.history.preset ? state.history.preset : "30d";
-      if (preset === "rolling") {
-        return 600;
-      }
-      return Math.max(90, Math.min(5000, bars));
-    }
-    return bars;
-  }
-
-  function paneSupportsResearchLld(pane) {
-    return !!(pane && pane.tf && pane.tf !== "1d");
+    return Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
   }
 
   function computeHistoryRangeUnix(override) {
@@ -796,52 +1123,6 @@
     if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
   }
 
-  function clearPaneChartDataRetry(pane) {
-    if (pane && pane._chartDataRetryTimer) {
-      clearInterval(pane._chartDataRetryTimer);
-      pane._chartDataRetryTimer = null;
-    }
-  }
-
-  function schedulePaneChartDataRetry(pane, packed) {
-    if (!pane || !pane.pendingData || !(pane.pendingData.candles || []).length) return;
-    if (api(pane)) return;
-    clearPaneChartDataRetry(pane);
-    let attempts = 0;
-    pane._chartDataRetryTimer = setInterval(function () {
-      attempts += 1;
-      const chart = api(pane);
-      if (chart && pane.pendingData) {
-        clearPaneChartDataRetry(pane);
-        try {
-          chart.setData(pane.pendingData, { preserveView: false, skipDefaultView: false });
-          pane.phase = "DATA_READY";
-          if (chart.resize) chart.resize();
-          updatePaneLoadStatusFromBundle(pane, packed || { candles: pane.pendingData.candles, cache: "bridge-retry" }, false);
-          bootTrace("loadPane_setData_retry_ok", {
-            pane: pane.id,
-            n: (pane.pendingData.candles || []).length,
-            attempts: attempts,
-          });
-        } catch (retryErr) {
-          bootTrace("loadPane_setData_retry_err", {
-            pane: pane.id,
-            message: retryErr && retryErr.message ? String(retryErr.message).slice(0, 120) : "error",
-          });
-        }
-        return;
-      }
-      if (attempts >= PANE_CHART_DATA_RETRY_MAX) {
-        clearPaneChartDataRetry(pane);
-        const st = paneStatusEl(pane);
-        if (st && st.textContent === "loading…") {
-          st.textContent = paneStatusFromPendingData(pane);
-        }
-        bootTrace("loadPane_setData_retry_exhausted", { pane: pane.id, attempts: attempts });
-      }
-    }, PANE_CHART_DATA_RETRY_MS);
-  }
-
   function releasePaneLoadOwner(pane, owner) {
     if (!paneLoadOwnerIsCurrent(pane, owner)) return;
     if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
@@ -1039,7 +1320,6 @@
     return from == null ? null : { from: from, to: to };
   }
 
-  /** Focus each visible pane on its last loaded bar (tip), after a live restore. */
   function shouldSeedLiveViewportAfterLoad(opts) {
     if (isHistoricalReplay() || historyBlocksLive()) return false;
     if (opts && (opts.preserveView || opts.jumpToUnix != null || opts.indicatorsOnly)) return false;
@@ -1074,6 +1354,7 @@
     }
   }
 
+  /** Focus each visible pane on its last loaded bar (tip), after a live restore. */
   async function focusChartsOnLatestLoadedCandle() {
     const ids = visibleIds();
     await Promise.all(ids.map(async function (pid) {
@@ -1384,7 +1665,10 @@
       }
     }
     if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
-      beginExactOriginViewportSuppress();
+      visibleIds().forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p) p._suppressExactOriginViewport = true;
+      });
       try {
         await PD1ExactOriginResearch.refreshAll({
           force: true,
@@ -1396,7 +1680,10 @@
           try { console.warn("[research] exact-origin go-to", err); } catch (e) { /* ignore */ }
         }
       } finally {
-        endExactOriginViewportSuppress();
+        visibleIds().forEach(function (pid) {
+          const p = state.panes[pid];
+          if (p) p._suppressExactOriginViewport = false;
+        });
       }
     }
     if (isBtD26DynamicSelectorStrategy(btStrategy())) {
@@ -1656,7 +1943,15 @@
         signal: meta && meta.signal,
       });
       const body = await res.json().catch(function () { return {}; });
-      if (!res.ok) throw httpError(res, body, url);
+      if (!res.ok) {
+        const e = httpError(res, body, url);
+        e.status = res.status;
+        if (body && body.error) e.apiError = body.error;
+        const ra = res.headers && res.headers.get ? res.headers.get("Retry-After") : null;
+        const raSec = ra != null ? parseInt(ra, 10) : NaN;
+        if (Number.isFinite(raSec) && raSec >= 0) e.retryAfterSec = raSec;
+        throw e;
+      }
       return body;
     })();
     // Abortable GETs must not share inflight promises (abort of A would fail B).
@@ -1861,336 +2156,6 @@
     return api(pane);
   }
 
-  var mlbOrderPending = null;
-  var mlbStatusTimer = null;
-  var mlbSizingCache = null;
-
-  function longPositionDrawingIds() {
-    var ids = [];
-    PANE_IDS.forEach(function (pid) {
-      var pane = state.panes[pid];
-      if (!pane || !pane.overlayPayloads) return;
-      Object.keys(pane.overlayPayloads).forEach(function (oid) {
-        var p = pane.overlayPayloads[oid];
-        if (!p || p.type !== "position" || p.side !== "long") return;
-        var did = p.metadata && p.metadata.drawing_id;
-        if (did && ids.indexOf(did) < 0) ids.push(String(did));
-      });
-    });
-    return ids;
-  }
-
-  function pushMlbStatusesToPanes(statuses) {
-    PANE_IDS.forEach(function (pid) {
-      var pane = state.panes[pid];
-      var chart = pane && api(pane);
-      if (chart && chart.setPositionOrderStatuses) chart.setPositionOrderStatuses(statuses);
-    });
-  }
-
-  function pushMlbSizingToPanes(cfg) {
-    PANE_IDS.forEach(function (pid) {
-      var pane = state.panes[pid];
-      var chart = pane && api(pane);
-      if (chart && chart.setMlbSizingConfig) chart.setMlbSizingConfig(cfg);
-    });
-  }
-
-  async function refreshMlbSizingConfig() {
-    try {
-      var body = await sendJson("/api/research/manual-long-box/sizing-config", "GET");
-      if (body && body.ok) {
-        mlbSizingCache = body;
-        pushMlbSizingToPanes(body);
-      }
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  async function refreshMlbOrderStatuses() {
-    var ids = longPositionDrawingIds();
-    if (!ids.length) return;
-    try {
-      var body = await sendJson("/api/research/manual-long-box/status", "POST", { drawing_ids: ids });
-      if (body && body.statuses) pushMlbStatusesToPanes(body.statuses);
-    } catch (e) {
-      /* ignore */
-    }
-  }
-
-  function scheduleMlbStatusPoll() {
-    if (mlbStatusTimer) clearInterval(mlbStatusTimer);
-    mlbStatusTimer = setInterval(function () {
-      refreshMlbOrderStatuses().catch(function () {});
-    }, 4000);
-    refreshMlbOrderStatuses().catch(function () {});
-  }
-
-  function showMlbOrderModal(title, text, hint, onConfirm, confirmLabel) {
-    var modal = document.getElementById("modalMlbOrder");
-    var btn = document.getElementById("mlbOrderConfirm");
-    if (!modal || !btn) {
-      alert(title + "\n\n" + text + (hint ? "\n\n" + hint : ""));
-      if (typeof onConfirm === "function") onConfirm();
-      return;
-    }
-    document.getElementById("mlbOrderTitle").textContent = title;
-    document.getElementById("mlbOrderBody").textContent = text;
-    document.getElementById("mlbOrderHint").textContent = hint || "";
-    btn.textContent = confirmLabel || "Order bestätigen";
-    btn.disabled = !onConfirm;
-    mlbOrderPending = onConfirm || null;
-    modal.hidden = false;
-  }
-
-  function formatMlbAmendDialog(prep) {
-    var cur = prep.current_bybit || {};
-    var neu = prep.proposed_box || prep.normalized_targets || {};
-    var ch = prep.changes || {};
-    var tick = prep.tick_size != null ? Number(prep.tick_size) : null;
-    var fmt = function (v) {
-      if (v == null || v === "") return "—";
-      var n = Number(v);
-      if (!Number.isFinite(n)) return String(v);
-      if (tick && tick > 0) {
-        var dec = 0;
-        var ts = String(tick);
-        if (ts.indexOf(".") >= 0) {
-          dec = ts.split(".")[1].replace(/0+$/, "").length;
-        }
-        return n.toFixed(dec);
-      }
-      return String(n);
-    };
-    var row = function (label, keyCur, keyNew, changeKey) {
-      var changed = !!ch[changeKey];
-      return (
-        label +
-        " | Bisher Bybit: " +
-        fmt(cur[keyCur]) +
-        " | Neu aus Box: " +
-        fmt(neu[keyNew]) +
-        (changed ? " | GEÄNDERT" : " | unverändert")
-      );
-    };
-    return [
-      (prep.symbol || "DOGEUSDT") + " LONG LIMIT",
-      "Orderstatus: " + (prep.order_status || "OFFEN"),
-      "Order-ID: " + (prep.order_id || "—"),
-      "",
-      row("Entry", "entry_price", "entry_price", "entry_price"),
-      row("Stop-Loss", "stop_loss", "stop_loss", "stop_loss"),
-      row("Take-Profit", "take_profit", "take_profit", "take_profit"),
-      "",
-      (tick ? "Bybit-Tick: " + tick : "") +
-        (prep.tick_source ? " (" + prep.tick_source + ")" : "") +
-        (tick ? " — Dialog nur normalisierte Zielpreise" : ""),
-      "Menge: " + fmt(cur.qty) + " DOGE (unverändert — nur geänderte Felder werden gesendet)",
-    ].join("\n");
-  }
-
-  function hideMlbOrderModal() {
-    var modal = document.getElementById("modalMlbOrder");
-    if (modal) modal.hidden = true;
-    mlbOrderPending = null;
-    setMlbModalBusy(false);
-  }
-
-  function mlbDialogAudit(stage, detail) {
-    try {
-      var payload = { stage: stage, t: Date.now() };
-      if (detail && typeof detail === "object") {
-        Object.keys(detail).forEach(function (k) {
-          if (k !== "prepare_token") payload[k] = detail[k];
-        });
-      }
-      console.info("[mlb-dialog]", payload);
-    } catch (e) { /* ignore */ }
-  }
-
-  function setMlbModalBusy(busy, hintText) {
-    var btn = document.getElementById("mlbOrderConfirm");
-    var cancelBtn = document.querySelector('[data-close="modalMlbOrder"]');
-    var hint = document.getElementById("mlbOrderHint");
-    if (btn) btn.disabled = !!busy;
-    if (cancelBtn) cancelBtn.disabled = !!busy;
-    if (hint && hintText != null && hintText !== "") hint.textContent = hintText;
-  }
-
-  async function handlePositionOrder(msg) {
-    if (!msg || !msg.drawing_id) {
-      alert("Order: fehlende drawing_id — Zeichnung speichern und erneut versuchen.");
-      return;
-    }
-    var did = String(msg.drawing_id);
-    if (msg.action === "prepare_place") {
-      var prep;
-      try {
-        prep = await sendJson("/api/research/manual-long-box/prepare", "POST", {
-          drawing_id: did,
-        });
-      } catch (err) {
-        alert("Prepare fehlgeschlagen: " + (err && err.message ? err.message : "Netzwerk/API"));
-        return;
-      }
-      if (!prep || !prep.ok) {
-        var errMsg = (prep && prep.error) || "Vorbereitung fehlgeschlagen";
-        if (prep && prep.error === "no_changes") {
-          errMsg = "Keine Änderungen gegenüber der offenen Bybit-Order.";
-        }
-        alert(errMsg);
-        return;
-      }
-      if (prep.operation === "amend") {
-        var canAmend = !!(prep.can_amend && prep.prepare_token);
-        mlbDialogAudit("open", {
-          operation: "amend",
-          drawing_id: did,
-          order_id: prep.order_id,
-          changes: prep.changes,
-        });
-        showMlbOrderModal(
-          "Bestehende Order ändern",
-          formatMlbAmendDialog(prep),
-          "Nur geänderte Felder werden per AMEND an Bybit gesendet. Keine neue Order.",
-          canAmend
-            ? async function () {
-                mlbDialogAudit("confirm_clicked", { drawing_id: did, operation: "amend" });
-                setMlbModalBusy(true, "Änderung wird an Bybit gesendet und per REST geprüft …");
-                var row = {};
-                row[did] = { lamp: "loading", lamp_tooltip: "AMEND_PENDING" };
-                pushMlbStatusesToPanes(row);
-                var conf;
-                try {
-                  conf = await sendJson("/api/research/manual-long-box/confirm", "POST", {
-                    drawing_id: did,
-                    prepare_token: prep.prepare_token,
-                  });
-                } catch (err) {
-                  mlbDialogAudit("visible_error", { drawing_id: did, error: "network" });
-                  setMlbModalBusy(false, err && err.message ? String(err.message) : "Netzwerkfehler");
-                  alert("Änderung fehlgeschlagen: Netzwerk/API");
-                  return;
-                }
-                mlbDialogAudit("request_finished", {
-                  drawing_id: did,
-                  ok: !!(conf && conf.ok),
-                  verified: conf && conf.verified,
-                });
-                await refreshMlbOrderStatuses();
-                if (conf && conf.ok && conf.verified !== false) {
-                  mlbDialogAudit("verified_success", { drawing_id: did, action: conf.action });
-                  hideMlbOrderModal();
-                  if (conf.message) {
-                    try { console.info("[mlb-order]", conf.message); } catch (e) { /* ignore */ }
-                  }
-                } else {
-                  var errText = (conf && conf.error) || "Änderung fehlgeschlagen";
-                  if (errText.indexOf("mismatch") >= 0 || errText.indexOf("missing_in_rest") >= 0) {
-                    errText = "AMEND nicht verifiziert — " + errText;
-                  } else if (errText === "amend_verify_failed") {
-                    errText = "AMEND nicht verifiziert — Exchange-Werte stimmen noch nicht mit Tick-Rundung überein.";
-                  }
-                  mlbDialogAudit("visible_error", { drawing_id: did, error: errText });
-                  setMlbModalBusy(false, errText);
-                  alert(errText);
-                }
-              }
-            : null,
-          "Änderung bestätigen"
-        );
-        return;
-      }
-      var sideLabel = (prep.side || "long") === "short" ? "SHORT" : "LONG";
-      var lines = [
-        (prep.symbol || "DOGEUSDT") + " " + sideLabel + " LIMIT · Bybit " + (prep.environment || "mainnet"),
-        "Entry: " + prep.entry_price,
-        "Stop-Loss: " + prep.stop_loss,
-        "Take-Profit: " + prep.take_profit,
-        "Nominalwert (max): " + (prep.notional_cap_usdt != null ? prep.notional_cap_usdt : 10) + " USDT",
-        "Tatsächlicher Nominalwert: " + prep.notional_usd + " USDT",
-        "Menge: " + prep.qty_doge + " DOGE",
-        "Hebel: " + (prep.leverage != null ? prep.leverage + "×" : "— (nicht ermittelbar)") +
-          (prep.required_leverage != null ? " (erforderlich: " + prep.required_leverage + "×)" : ""),
-        "Verfügbare Margin: " +
-          (prep.available_margin_usdt != null ? prep.available_margin_usdt + " USDT" : "—"),
-        "Order gültig: " + (prep.order_valid ? "ja" : "nein"),
-      ];
-      if (prep.blockers && typeof prep.blockers === "object") {
-        Object.keys(prep.blockers).forEach(function (k) {
-          lines.push("Blocker (" + k + "): " + prep.blockers[k]);
-        });
-      }
-      var hintParts = ["Nach „Order bestätigen“ wird die Limit-Order gesendet (nur bei Live-ARMED)."];
-      if (!prep.writes_allowed) {
-        hintParts.push("Live nicht armed oder Credentials fehlen (MANUAL_LONG_BOX_LIVE_ARMED).");
-      }
-      if (!prep.can_place) {
-        hintParts.push("Order derzeit nicht platzierbar — Blocker beheben oder Live armen.");
-      }
-      var canConfirm = !!(prep.can_place && prep.prepare_token);
-      showMlbOrderModal(
-        "Order bestätigen",
-        lines.join("\n"),
-        hintParts.join(" "),
-        canConfirm
-          ? async function () {
-              setMlbModalBusy(true, "Order wird an Bybit gesendet …");
-              var row = {};
-              row[did] = { lamp: "loading", lamp_tooltip: "CREATE_PENDING" };
-              pushMlbStatusesToPanes(row);
-              var conf;
-              try {
-                conf = await sendJson("/api/research/manual-long-box/confirm", "POST", {
-                  drawing_id: did,
-                  prepare_token: prep.prepare_token,
-                });
-              } catch (err) {
-                setMlbModalBusy(false, "Netzwerkfehler");
-                alert("Order fehlgeschlagen: Netzwerk/API");
-                return;
-              }
-              await refreshMlbOrderStatuses();
-              if (conf && conf.ok) {
-                hideMlbOrderModal();
-              } else {
-                setMlbModalBusy(false, (conf && conf.error) || "Order fehlgeschlagen");
-                alert((conf && conf.error) || "Order fehlgeschlagen");
-              }
-            }
-          : null,
-        "Order bestätigen"
-      );
-      return;
-    }
-    if (msg.action === "prepare_cancel") {
-      var cprep = await sendJson("/api/research/manual-long-box/cancel/prepare", "POST", { drawing_id: did });
-      if (!cprep || !cprep.ok) {
-        alert((cprep && cprep.message) || (cprep && cprep.error) || "Cancel nicht möglich");
-        return;
-      }
-      showMlbOrderModal(
-        "Limit stornieren",
-        "Drawing: " + did + "\nOrder-ID: " + (cprep.order_id || "—"),
-        "Nur offene Limit-Orders werden storniert.",
-        async function () {
-          hideMlbOrderModal();
-          var row = {};
-          row[did] = { lamp: "loading", lamp_tooltip: "CANCEL_PENDING" };
-          pushMlbStatusesToPanes(row);
-          var cconf = await sendJson("/api/research/manual-long-box/cancel/confirm", "POST", {
-            drawing_id: did,
-            prepare_token: cprep.prepare_token,
-          });
-          await refreshMlbOrderStatuses();
-          if (!cconf || !cconf.ok) alert((cconf && cconf.error) || "Cancel fehlgeschlagen");
-        },
-        "Stornierung bestätigen"
-      );
-    }
-  }
-
   function attachBridge(pane) {
     const win = pane.iframe && pane.iframe.contentWindow;
     if (!win) return;
@@ -2215,7 +2180,15 @@
         pane.phase = "INTERACTION_READY";
         chart.resize();
         if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
-        if (mlbSizingCache && chart.setMlbSizingConfig) chart.setMlbSizingConfig(mlbSizingCache);
+        syncMultiPaneObLayout(pane);
+        if (
+          pane.id === "pane-0" &&
+          state.opi &&
+          state.opi.enabled &&
+          !isMultiManualMode()
+        ) {
+          scheduleOpi(pane);
+        }
       },
       on_crosshair_move: function (unix) { handleHover(pane.id, unix); },
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
@@ -2224,6 +2197,7 @@
         if (pane._suppressOverlayViewportFeedback) return;
         handleVisibleRangeForGotoNav(pane.id, from, to);
         scheduleVolumeProfile(pane, from, to);
+        scheduleOpi(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
         scheduleOrderbookLevels(pane);
         scheduleTradeBubbles(pane, from, to);
@@ -2231,21 +2205,14 @@
         scheduleBtD26DynamicSelector(pane, from, to);
         scheduleBtD46Chronological(pane, from, to);
         scheduleLiveMicroLldV2ViewportSync(pane);
-        if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch) {
+        if (exactOriginEnabledForPane(pane) && window.PD1ExactOriginResearch) {
           PD1ExactOriginResearch.scheduleViewport(pane, from, to);
         }
       },
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
-      on_position_order: function (msg) {
-        handlePositionOrder(msg).catch(function (err) {
-          try { console.warn("[mlb-order]", err); } catch (e) { /* ignore */ }
-        });
-      },
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
     };
-    refreshMlbSizingConfig().catch(function () {});
-    scheduleMlbStatusPoll();
   }
 
   function toolMode() {
@@ -2309,21 +2276,6 @@
         p.visible === false ? "0" : "1",
       ].join("|");
     }
-    if (p.type === "position") {
-      const meta = p.metadata || {};
-      return [
-        p.type || "",
-        p.side || "",
-        p.start_timestamp != null ? p.start_timestamp : "",
-        p.end_timestamp != null ? p.end_timestamp : "",
-        p.entry_price != null ? p.entry_price : "",
-        p.stop_price != null ? p.stop_price : "",
-        p.target_price != null ? p.target_price : "",
-        meta.selected ? "1" : "0",
-        meta.locked ? "1" : "0",
-        p.visible === false ? "0" : "1",
-      ].join("|");
-    }
     return [
       p.type || "",
       p.shape || "",
@@ -2373,7 +2325,7 @@
           : false;
       const eodCanvasOn =
         exactOriginDensityCanvasEnabled() &&
-        exactOriginDensityEnabled() &&
+        exactOriginEnabledForPane(pane) &&
         pane.exactOriginSegmentCache &&
         pane.exactOriginSegmentCache.segments &&
         pane.exactOriginSegmentCache.segments.length;
@@ -2397,7 +2349,7 @@
       !exactOriginDensityEnabled() &&
       paneSupportsHistoricalLmv2(pane);
     const eodOn =
-      exactOriginDensityEnabled() &&
+      exactOriginEnabledForPane(pane) &&
       window.PD1ExactOriginResearch &&
       PD1ExactOriginResearch.paneSupports(pane);
     if (!v2On && !chOn && !histOn && !eodOn) return;
@@ -2485,7 +2437,9 @@
   }
 
   function exactOriginDensityEnabled() {
-    return !!(window.PD1ExactOriginResearch && PD1ExactOriginResearch.isEnabled());
+    if (!window.PD1ExactOriginResearch) return false;
+    if (isMultiManualMode()) return anyPaneExactOriginEnabled();
+    return !!PD1ExactOriginResearch.isEnabled();
   }
 
   const EXACT_ORIGIN_CANVAS_FLAG_KEY = "phase6xt_eod_density_canvas_v1";
@@ -2501,7 +2455,7 @@
   /** Re-push cached exact-origin canvas segments after iframe/chart or overlay sync. */
   function repaintExactOriginDensityFromCache(pane) {
     if (
-      !exactOriginDensityEnabled() ||
+      !exactOriginEnabledForPane(pane) ||
       !window.PD1ExactOriginResearch ||
       !PD1ExactOriginResearch.paneSupports(pane) ||
       !PD1ExactOriginResearch.repaintPaneFromCache
@@ -2512,70 +2466,11 @@
   }
 
   function repaintExactOriginDensityAllVisiblePanes() {
-    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
+    if (!window.PD1ExactOriginResearch) return;
     visibleIds().forEach(function (pid) {
       const pane = state.panes[pid];
-      if (pane) repaintExactOriginDensityFromCache(pane);
+      if (pane && exactOriginEnabledForPane(pane)) repaintExactOriginDensityFromCache(pane);
     });
-  }
-
-  let exactOriginViewportSuppressDepth = 0;
-
-  function applyExactOriginViewportSuppressFlag() {
-    const on = exactOriginViewportSuppressDepth > 0;
-    visibleIds().forEach(function (pid) {
-      const p = state.panes[pid];
-      if (p) p._suppressExactOriginViewport = on;
-    });
-  }
-
-  function beginExactOriginViewportSuppress() {
-    exactOriginViewportSuppressDepth += 1;
-    applyExactOriginViewportSuppressFlag();
-  }
-
-  function endExactOriginViewportSuppress() {
-    exactOriginViewportSuppressDepth = Math.max(0, exactOriginViewportSuppressDepth - 1);
-    applyExactOriginViewportSuppressFlag();
-  }
-
-  /** One post-switch refresh from the chart’s visible range (GO-TO pattern, P24C). */
-  function exactOriginRefreshAfterTfSwitch(pane) {
-    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) {
-      return Promise.resolve();
-    }
-    if (!pane || !PD1ExactOriginResearch.paneSupports(pane)) {
-      return Promise.resolve();
-    }
-    const chart = api(pane);
-    if (chart && chart.getVisibleTimeRange) {
-      const vr = chart.getVisibleTimeRange();
-      if (vr && vr.from != null && vr.to != null && Number(vr.from) < Number(vr.to)) {
-        return PD1ExactOriginResearch.refreshPane(pane, {
-          fromUnix: Math.floor(Number(vr.from)),
-          toUnix: Math.floor(Number(vr.to)),
-          viewport: true,
-        });
-      }
-    }
-    return PD1ExactOriginResearch.refreshPane(pane, { force: true });
-  }
-
-  function finalizeExactOriginChartTfSwitch(pane, loadPromise) {
-    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) {
-      return Promise.resolve(loadPromise);
-    }
-    if (PD1ExactOriginResearch.onPaneTimeframeChange) {
-      PD1ExactOriginResearch.onPaneTimeframeChange(pane);
-    }
-    return Promise.resolve(loadPromise)
-      .catch(function (err) {
-        throw err;
-      })
-      .finally(function () {
-        endExactOriginViewportSuppress();
-        return exactOriginRefreshAfterTfSwitch(pane);
-      });
   }
 
   function historicalLmv2ActiveEnabled() {
@@ -3232,10 +3127,6 @@
       return !!SC_HELPERS.LIVE_MICRO_LLD_V2_TFS[pane.tf];
     }
     return pane.tf === "1m" || pane.tf === "5m" || pane.tf === "15m" || pane.tf === "30m" || pane.tf === "1h" || pane.tf === "4h";
-  }
-
-  function timeframeToolbarLabel(tf) {
-    return TF_LABEL[tf] || tf;
   }
 
   function paneForScannerCommon() {
@@ -4923,64 +4814,6 @@
     });
   }
 
-  function lastCompletePoolBarOpenSec(poolSec, nowSec) {
-    if (!poolSec || !Number.isFinite(nowSec)) return null;
-    return Math.floor((nowSec - poolSec) / poolSec) * poolSec;
-  }
-
-  function refreshExactOriginPanesOnNewPoolBucket(bucketOpenSec, reason) {
-    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return false;
-    if (isHistoricalReplay() || historyBlocksLive()) return false;
-    if (bucketOpenSec == null || !Number.isFinite(bucketOpenSec)) return false;
-    const prev = state.exactOriginLastPoolBucketOpen;
-    if (prev != null && bucketOpenSec <= prev) return false;
-    state.exactOriginLastPoolBucketOpen = bucketOpenSec;
-    if (prev == null) return false;
-    if (PD1ExactOriginResearch.invalidateCapsCache) {
-      PD1ExactOriginResearch.invalidateCapsCache();
-    }
-    visibleIds().forEach(function (pid) {
-      const pane = state.panes[pid];
-      if (!pane || !PD1ExactOriginResearch.paneSupports(pane)) return;
-      void PD1ExactOriginResearch.refreshPane(pane, { viewport: true }).catch(function (err) {
-        if (!(err && err.name === "AbortError")) {
-          try {
-            console.warn("[research] exact-origin pool-bucket refresh", reason || "", err);
-          } catch (e) { /* ignore */ }
-        }
-      });
-    });
-    return true;
-  }
-
-  function tickExactOriginPoolTimeframeRefresh() {
-    if (!exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
-    if (isHistoricalReplay() || historyBlocksLive()) return;
-    const poolTf =
-      PD1ExactOriginResearch.selectedPoolTimeframe && PD1ExactOriginResearch.selectedPoolTimeframe();
-    const poolSec = TF_SEC[poolTf] || 0;
-    if (!poolSec) return;
-    const nowSec = Math.floor(Date.now() / 1000);
-    const bucket = lastCompletePoolBarOpenSec(poolSec, nowSec);
-    refreshExactOriginPanesOnNewPoolBucket(bucket, "wall_clock");
-  }
-
-  function scheduleExactOriginRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
-    if (!pane || !exactOriginDensityEnabled() || !window.PD1ExactOriginResearch) return;
-    if (!PD1ExactOriginResearch.paneSupports(pane)) return;
-    if (isHistoricalReplay() || historyBlocksLive()) return;
-    if (prevClosedOpen == null || nextClosedOpen == null) return;
-    if (Number(prevClosedOpen) === Number(nextClosedOpen)) return;
-    const poolTf =
-      PD1ExactOriginResearch.selectedPoolTimeframe && PD1ExactOriginResearch.selectedPoolTimeframe();
-    const poolSec = TF_SEC[poolTf] || 0;
-    if (!poolSec) return;
-    const prevBucket = Math.floor(Number(prevClosedOpen) / poolSec) * poolSec;
-    const nextBucket = Math.floor(Number(nextClosedOpen) / poolSec) * poolSec;
-    if (nextBucket <= prevBucket) return;
-    refreshExactOriginPanesOnNewPoolBucket(nextBucket, "chart_closed_bar");
-  }
-
   function scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen) {
     if (!pane || !SC_HELPERS) return;
     if (isHistoricalReplay()) return;
@@ -5064,34 +4897,56 @@
   function buildPanes() {
     const root = $("researchWorkspace");
     root.innerHTML = "";
+    const paneSymbols = isMultiManualMode() ? readPaneSymbolsFromStorage() : {};
+    const paneExactOrigin = isMultiManualMode() ? readPaneExactOriginFlags() : {};
     PANE_IDS.forEach(function (pid) {
       const wrap = document.createElement("div");
-      wrap.className = "trp-pane";
+      wrap.className = "trp-pane" + (isMultiManualMode() ? " trp-pane-multi" : "");
       wrap.dataset.paneId = pid;
+      const symControl = isMultiManualMode()
+        ? '<select class="trp-pane-symbol trp-pane-symbol-select" title="Symbol"></select>'
+        : '<span class="trp-pane-symbol"></span>';
+      const multiPoolUi = isMultiManualMode()
+        ? '<span class="trp-pane-sep">|</span>' +
+          '<label class="trp-pane-pool-toggle" title="ACTIVE Pools nur diese Kachel">' +
+          '<input type="checkbox" class="trp-pane-pool-active" autocomplete="off"> ACTIVE</label>' +
+          '<span class="trp-pane-pool-status"></span>'
+        : "";
       wrap.innerHTML =
         '<div class="trp-pane-header">' +
-        '<span class="trp-pane-symbol"></span><span class="trp-pane-sep">|</span>' +
+        symControl + '<span class="trp-pane-sep">|</span>' +
         '<select class="trp-pane-tf"></select>' +
+        multiPoolUi +
         '<button type="button" class="trp-reset" title="Chartansicht zurücksetzen" aria-label="Chartansicht zurücksetzen">⟲</button>' +
         '<button type="button" class="trp-fs" title="Chart Vollbild" aria-label="Chart Vollbild">⛶</button>' +
         '<div class="trp-pane-draw-host"></div>' +
         '<span class="trp-pane-status"></span></div>' +
         '<iframe class="trp-pane-frame" title="' + pid + '"></iframe>';
       const tfSel = wrap.querySelector(".trp-pane-tf");
+      const defaultTf = isMultiManualMode() ? (DEFAULT_TFS_MULTI[pid] || "5m") : DEFAULT_TFS[pid];
       TIMEFRAMES.forEach(function (tf) {
         const opt = document.createElement("option");
         opt.value = tf;
-        opt.textContent = timeframeToolbarLabel(tf);
+        opt.textContent = tf;
         tfSel.appendChild(opt);
       });
-      tfSel.value = DEFAULT_TFS[pid];
+      tfSel.value = defaultTf;
       const iframe = wrap.querySelector("iframe");
       const gate = makeReadyGate();
       const pane = {
         id: pid,
         el: wrap,
         iframe: iframe,
-        tf: DEFAULT_TFS[pid],
+        tf: defaultTf,
+        symbol: isMultiManualMode() ? (paneSymbols[pid] || DEFAULT_PANE_SYMBOLS[pid]) : "",
+        exactOriginEnabled: isMultiManualMode() ? !!paneExactOrigin[pid] : false,
+        obl1000: {
+          leaseId: null,
+          leaseSymbol: null,
+          leaseDepth: null,
+          leaseGen: 0,
+          uiState: "DISABLED",
+        },
         ready: false,
         phase: "IFRAME_LOADING",
         readyPromise: gate.promise,
@@ -5112,6 +4967,19 @@
         ptbGen: 0,
         ptbTimer: null,
         ptbAbort: null,
+        opiGen: 0,
+        opiTimer: null,
+        opiAbort: null,
+        opiInflight: false,
+        opiPending: false,
+        opiRangeWait: 0,
+        opiRangeTimer: null,
+        opiRetryTimer: null,
+        opiRetryCount: 0,
+        opiLastFinal1mWatermark: null,
+        opiDisplayStore: null,
+        opiDisplayStoreCtx: null,
+        opiLastAppliedBars: null,
       };
       state.panes[pid] = pane;
       iframe.addEventListener("load", function () {
@@ -5120,18 +4988,10 @@
       iframe.src = "/static/research_trp/pane.html?v=" + ASSET_V;
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
-        if (pane.tf === "1d") {
-          setStatus("1D: PD1-Density / LLD / Scanner deaktiviert — nur Chart & Zeichnungen.", "warn");
-        }
-        const exactOriginTfSwitch = exactOriginDensityEnabled() && window.PD1ExactOriginResearch;
-        if (exactOriginTfSwitch) {
-          beginExactOriginViewportSuppress();
-        }
-        let loadPromise;
         if (isHistoricalReplay() && state.replayWindow && state.replayTargetTs != null) {
           const rw = state.replayWindow;
           const reqReplayGen = state.replayGen;
-          loadPromise = loadPane(pid, {
+          loadPane(pid, {
             force: false,
             sourceAction: "tf-change-replay",
             from: rw.from,
@@ -5144,6 +5004,8 @@
             return jumpChartsToUnix(state.replayTargetTs, rw.viewPad);
           }).then(function () {
             enforceReplayViewOnAllPanes();
+          }).catch(function (err) {
+            setStatus("TF-Wechsel Replay fehlgeschlagen: " + (err.message || err), "error");
           });
         } else {
           readHistoryFromUi();
@@ -5154,7 +5016,9 @@
             center = Math.floor(Number(state.gotoNavTargetTs));
           }
           if (center == null) {
-            loadPromise = loadPane(pid, { force: true, sourceAction: "tf-change" });
+            loadPane(pid, { force: true, sourceAction: "tf-change" }).catch(function (err) {
+              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+            });
           } else {
             const range = navPaneLoadRangeForFreeNav(center);
             const fallback = resolvePaneLoadRange({});
@@ -5166,7 +5030,7 @@
               ? ResearchGotoTime.gotoLoadWindow(target)
               : null;
             const pad = win && win.viewPad != null ? win.viewPad : 4 * 3600;
-            loadPromise = loadPane(pid, Object.assign({
+            loadPane(pid, Object.assign({
               force: true,
               sourceAction: "tf-change",
             }, useRange.from != null && useRange.to != null ? { from: useRange.from, to: useRange.to } : {})).then(function () {
@@ -5175,20 +5039,24 @@
                 if (gen !== state.loadGen) return;
                 return jumpChartsToUnix(target, pad);
               });
+            }).catch(function (err) {
+              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
             });
           }
         }
-        if (exactOriginTfSwitch) {
-          finalizeExactOriginChartTfSwitch(pane, loadPromise).catch(function (err) {
-            endExactOriginViewportSuppress();
-            setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
-          });
-        } else {
-          loadPromise.catch(function (err) {
-            setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
-          });
+        if (exactOriginEnabledForPane(pane) && window.PD1ExactOriginResearch) {
+          PD1ExactOriginResearch.onPaneTimeframeChange(pane);
         }
       });
+      const poolMini = wrap.querySelector(".trp-pane-pool-active");
+      if (poolMini) {
+        poolMini.checked = !!pane.exactOriginEnabled;
+        poolMini.addEventListener("change", function () {
+          if (suppressExactOriginToolbarEvent) return;
+          syncFocusSymbolFromPane(pane);
+          void setMultiPaneExactOriginEnabled(pane, poolMini.checked, "mini");
+        });
+      }
       wrap.querySelector(".trp-reset").addEventListener("click", function () {
         const chart = api(pane);
         if (chart && chart.resetView) chart.resetView();
@@ -5196,9 +5064,14 @@
       wrap.querySelector(".trp-fs").addEventListener("click", function (ev) {
         ev.preventDefault();
         ev.stopPropagation();
+        if (isMultiManualMode()) {
+          toggleMultiPaneTileFullscreen(pid);
+          return;
+        }
         onResearchFullscreenUserClick();
       });
       wrap.querySelector(".trp-pane-header").addEventListener("mousedown", function () {
+        syncFocusSymbolFromPane(pane);
         mountDrawToolbar(pid);
       });
       let resizeTimer = null;
@@ -5221,6 +5094,7 @@
   }
 
   function applyLayout(layout, force) {
+    layout = layoutAllowedForViewMode(layout);
     if (!PANE_COUNT[layout]) layout = "1";
     if (!force && layout === state.layout && !state.paneFs) return;
     state.layout = layout;
@@ -5286,12 +5160,70 @@
     });
   }
 
+  function resizeVisibleChartsWithOb() {
+    visibleIds().forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      const chart = api(pane);
+      if (chart && chart.resize) chart.resize();
+      if (isMultiManualMode()) syncMultiPaneObLayout(pane);
+    });
+  }
+
+  function exitMultiPaneTileFullscreen() {
+    state.paneFs = null;
+    document.body.classList.remove("research-multi-tile-fs");
+    setResearchChartImmersiveFs(false);
+    restoreWorkspaceGeomFromFs();
+    applyLayout(state.layout, true);
+    requestAnimationFrame(resizeVisibleChartsWithOb);
+    syncPaneFullscreenButtons();
+  }
+
+  function syncPaneFullscreenButtons() {
+    PANE_IDS.forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane || !pane.el) return;
+      const fsBtn = pane.el.querySelector(".trp-fs");
+      if (!fsBtn) return;
+      const active = state.paneFs === pid;
+      fsBtn.classList.toggle("active", active);
+      fsBtn.title = active
+        ? "2×2 wiederherstellen"
+        : (isMultiManualMode() ? "Kachel maximieren" : "Chart Vollbild");
+      fsBtn.setAttribute("aria-label", fsBtn.title);
+    });
+  }
+
+  function toggleMultiPaneTileFullscreen(paneId) {
+    if (!isMultiManualMode()) {
+      togglePaneFullscreen(paneId);
+      return;
+    }
+    const entering = state.paneFs !== paneId;
+    if (entering && state.panes[paneId]) syncFocusSymbolFromPane(state.panes[paneId]);
+    state.paneFs = entering ? paneId : null;
+    document.body.classList.toggle("research-multi-tile-fs", !!entering);
+    applyLayout(state.layout, true);
+    if (entering) {
+      rememberWorkspaceGeomForFs();
+      setResearchChartImmersiveFs(true);
+      applyResearchImmersiveWorkspaceGeom();
+    } else {
+      setResearchChartImmersiveFs(false);
+      restoreWorkspaceGeomFromFs();
+    }
+    syncPaneFullscreenButtons();
+    requestAnimationFrame(resizeVisibleChartsWithOb);
+  }
+
   function togglePaneFullscreen(paneId) {
     const entering = state.paneFs !== paneId;
     state.paneFs = entering ? paneId : null;
     applyLayout(state.layout, true);
     setBrowserFs(entering);
     if (entering) loadNewlyVisiblePanes();
+    syncPaneFullscreenButtons();
   }
 
   function isBrowserFs() {
@@ -5378,9 +5310,13 @@
         ? (nativeOn ? "Vollbild beenden" : "Vollbild beenden (Fallback)")
         : "Vollbild";
     }
-    document.querySelectorAll(".trp-pane .trp-fs").forEach(function (el) {
-      el.classList.toggle("active", fsActive);
-    });
+    if (isMultiManualMode() && state.paneFs && document.body.classList.contains("research-multi-tile-fs")) {
+      syncPaneFullscreenButtons();
+    } else {
+      document.querySelectorAll(".trp-pane .trp-fs").forEach(function (el) {
+        el.classList.toggle("active", fsActive);
+      });
+    }
     setResearchChartImmersiveFs(fsActive);
     if (fsActive) {
       applyResearchImmersiveWorkspaceGeom();
@@ -5731,7 +5667,7 @@
   }
 
   function defaultOrderbookLevels() {
-    return { enabled: false, depth: 1000, mode: "aggregated", scale: "sqrt", width_px: 140 };
+    return { enabled: false, depth: 0, mode: "aggregated", scale: "sqrt", width_px: 140 };
   }
 
   function oblDataDepth() {
@@ -5758,12 +5694,23 @@
     return "OB200";
   }
 
-  function getOb1000LeaseId() {
+  function obLeaseStore(pane) {
+    if (pane && isMultiManualMode()) return pane.obl1000;
+    return state.obl1000;
+  }
+
+  function obLeaseStorageKey(pane) {
+    if (pane && isMultiManualMode()) return OBL1000_LEASE_KEY + "." + pane.id;
+    return OBL1000_LEASE_KEY;
+  }
+
+  function getOb1000LeaseId(pane) {
+    const key = obLeaseStorageKey(pane);
     try {
-      let id = sessionStorage.getItem(OBL1000_LEASE_KEY);
+      let id = sessionStorage.getItem(key);
       if (!id) {
-        id = "tab-" + Math.random().toString(36).slice(2) + "-" + Date.now();
-        sessionStorage.setItem(OBL1000_LEASE_KEY, id);
+        id = "tab-" + (pane && pane.id ? pane.id + "-" : "") + Math.random().toString(36).slice(2) + "-" + Date.now();
+        sessionStorage.setItem(key, id);
       }
       return id;
     } catch (e) {
@@ -5836,71 +5783,84 @@
   }
 
   function releaseOb1000LeaseBestEffort() {
-    if (!state.obl1000 || !state.obl1000.leaseId) return;
-    const body = {
-      op: "release",
-      lease_id: state.obl1000.leaseId,
-      depth: state.obl1000.leaseDepth != null ? state.obl1000.leaseDepth : oblDataDepth(),
-    };
-    try {
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon("/api/research/ob1000/lease", new Blob([JSON.stringify(body)], { type: "application/json" }));
-      } else {
-        fetch("/api/research/ob1000/lease", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          keepalive: true,
-        }).catch(function () {});
-      }
-    } catch (e) {}
+    const stores = isMultiManualMode()
+      ? PANE_IDS.map(function (pid) { return state.panes[pid] && state.panes[pid].obl1000; }).filter(Boolean)
+      : [state.obl1000];
+    stores.forEach(function (ls) {
+      if (!ls || !ls.leaseId) return;
+      const body = {
+        op: "release",
+        lease_id: ls.leaseId,
+        depth: ls.leaseDepth != null ? ls.leaseDepth : oblDataDepth(),
+      };
+      try {
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon("/api/research/ob1000/lease", new Blob([JSON.stringify(body)], { type: "application/json" }));
+        } else {
+          fetch("/api/research/ob1000/lease", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+            keepalive: true,
+          }).catch(function () {});
+        }
+      } catch (e) {}
+    });
   }
 
-  async function stopOb1000Lease() {
-    stopOb1000Heartbeat();
-    state.obl1000.leaseGen += 1;
-    const leaseId = state.obl1000.leaseId;
-    const leaseDepth = state.obl1000.leaseDepth;
-    state.obl1000.leaseId = null;
-    state.obl1000.leaseSymbol = null;
-    state.obl1000.leaseDepth = null;
-    state.obl1000.uiState = "DISABLED";
+  async function stopOb1000Lease(pane) {
+    if (!pane && isMultiManualMode()) {
+      await Promise.all(PANE_IDS.map(function (pid) {
+        return stopOb1000Lease(state.panes[pid]);
+      }));
+      return;
+    }
+    const ls = obLeaseStore(pane);
+    ls.leaseGen += 1;
+    const leaseId = ls.leaseId;
+    const leaseDepth = ls.leaseDepth;
+    ls.leaseId = null;
+    ls.leaseSymbol = null;
+    ls.leaseDepth = null;
+    ls.uiState = "DISABLED";
     if (!leaseId) return;
     try {
       await sendJson("/api/research/ob1000/lease", "POST", {
         op: "release",
         lease_id: leaseId,
         depth: leaseDepth != null ? leaseDepth : oblDataDepth(),
-      }, { sourceAction: "ob1000-release" });
+      }, { sourceAction: "ob1000-release", pane: pane && pane.id });
     } catch (e) {}
   }
 
-  function invalidateOb1000LeaseLocal() {
-    state.obl1000.leaseId = null;
-    state.obl1000.leaseSymbol = null;
-    state.obl1000.leaseDepth = null;
+  function invalidateOb1000LeaseLocal(pane) {
+    const ls = obLeaseStore(pane);
+    ls.leaseId = null;
+    ls.leaseSymbol = null;
+    ls.leaseDepth = null;
   }
 
-  async function ensureOb1000Lease(symbol, opts) {
+  async function ensureOb1000Lease(symbol, opts, pane) {
     if (!isOnDemandBookMode() || !symbol) return false;
     const force = !!(opts && opts.force);
-    const leaseId = getOb1000LeaseId();
+    const ls = obLeaseStore(pane);
+    const leaseId = getOb1000LeaseId(pane);
     const depth = oblDataDepth();
     if (
       !force &&
-      state.obl1000.leaseId === leaseId &&
-      state.obl1000.leaseSymbol === symbol &&
-      state.obl1000.leaseDepth === depth
+      ls.leaseId === leaseId &&
+      ls.leaseSymbol === symbol &&
+      ls.leaseDepth === depth
     ) {
       return true;
     }
-    const gen = ++state.obl1000.leaseGen;
+    const gen = ++ls.leaseGen;
     if (
-      state.obl1000.leaseId &&
-      (state.obl1000.leaseSymbol !== symbol || state.obl1000.leaseDepth !== depth)
+      ls.leaseId &&
+      (ls.leaseSymbol !== symbol || ls.leaseDepth !== depth)
     ) {
-      await stopOb1000Lease();
-      if (gen !== state.obl1000.leaseGen) return false;
+      await stopOb1000Lease(pane);
+      if (gen !== ls.leaseGen) return false;
     }
     try {
       const resp = await sendJson("/api/research/ob1000/lease", "POST", {
@@ -5908,47 +5868,57 @@
         symbol: symbol,
         lease_id: leaseId,
         depth: depth,
-      }, { sourceAction: "ob1000-acquire" });
-      if (gen !== state.obl1000.leaseGen) return false;
-      state.obl1000.leaseId = leaseId;
-      state.obl1000.leaseSymbol = symbol;
-      state.obl1000.leaseDepth = depth;
-      state.obl1000.uiState = computeOb1000UiState(resp, null);
+      }, { sourceAction: "ob1000-acquire", pane: pane && pane.id });
+      if (gen !== ls.leaseGen) return false;
+      ls.leaseId = leaseId;
+      ls.leaseSymbol = symbol;
+      ls.leaseDepth = depth;
+      ls.uiState = computeOb1000UiState(resp, null);
       return true;
     } catch (err) {
-      if (gen !== state.obl1000.leaseGen) return false;
-      state.obl1000.uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
-      invalidateOb1000LeaseLocal();
+      if (gen !== ls.leaseGen) return false;
+      ls.uiState = computeOb1000UiState(null, parseOb1000ApiError(err));
+      invalidateOb1000LeaseLocal(pane);
       return false;
     }
+  }
+
+  function heartbeatOb1000Lease(pane) {
+    const ls = obLeaseStore(pane);
+    const sym = pane ? paneSymbol(pane) : state.symbol;
+    if (!sym) return;
+    const leaseId = ls.leaseId;
+    if (!leaseId) {
+      ensureOb1000Lease(sym, { force: true }, pane).catch(function () {});
+      return;
+    }
+    sendJson("/api/research/ob1000/lease", "POST", {
+      op: "heartbeat",
+      lease_id: leaseId,
+      symbol: sym,
+      depth: ls.leaseDepth != null ? ls.leaseDepth : oblDataDepth(),
+    }, { sourceAction: "ob1000-heartbeat", pane: pane && pane.id }).catch(function (err) {
+      const parsed = parseOb1000ApiError(err);
+      if (parsed && parsed.code === "unknown_lease") {
+        invalidateOb1000LeaseLocal(pane);
+        ensureOb1000Lease(sym, { force: true }, pane).catch(function () {});
+      }
+    });
   }
 
   function startOb1000Heartbeat() {
     stopOb1000Heartbeat();
     if (!isOnDemandBookMode()) return;
     state.obl1000.heartbeatTimer = setInterval(function () {
-      if (!isOnDemandBookMode() || document.hidden || !state.symbol) return;
-      const leaseId = state.obl1000.leaseId;
-      if (!leaseId) {
-        ensureOb1000Lease(state.symbol, { force: true }).then(function (ok) {
-          if (ok) startOb1000Heartbeat();
+      if (!isOnDemandBookMode()) return;
+      if (isMultiManualMode()) {
+        visibleIds().forEach(function (pid) {
+          heartbeatOb1000Lease(state.panes[pid]);
         });
         return;
       }
-      sendJson("/api/research/ob1000/lease", "POST", {
-        op: "heartbeat",
-        lease_id: leaseId,
-        symbol: state.symbol,
-        depth: state.obl1000.leaseDepth != null ? state.obl1000.leaseDepth : oblDataDepth(),
-      }, { sourceAction: "ob1000-heartbeat" }).catch(function (err) {
-        const parsed = parseOb1000ApiError(err);
-        if (parsed && parsed.code === "unknown_lease") {
-          invalidateOb1000LeaseLocal();
-          ensureOb1000Lease(state.symbol, { force: true }).then(function (ok) {
-            if (ok) startOb1000Heartbeat();
-          });
-        }
-      });
+      if (!state.symbol) return;
+      heartbeatOb1000Lease(null);
     }, OBL1000_HEARTBEAT_MS);
   }
 
@@ -6016,7 +5986,14 @@
       });
     }
     if (isOnDemandBookMode()) {
-      ensureOb1000Lease(state.symbol).then(function () { startOb1000Heartbeat(); });
+      if (isMultiManualMode()) {
+        Promise.all(visibleIds().map(function (pid) {
+          const pane = state.panes[pid];
+          return ensureOb1000Lease(paneSymbol(pane), {}, pane);
+        })).then(function () { startOb1000Heartbeat(); });
+      } else {
+        ensureOb1000Lease(state.symbol).then(function () { startOb1000Heartbeat(); });
+      }
     } else {
       stopOb1000Lease();
     }
@@ -6026,13 +6003,15 @@
 
   function oblSettingsPayload() {
     const obl = state.obl || defaultOrderbookLevels();
-    return {
-      enabled: !!obl.enabled,
+    const payload = {
+      enabled: isMultiManualMode() ? true : !!obl.enabled,
       depth: oblDataDepth(),
       mode: obl.mode === "raw" ? "raw" : "aggregated",
       scale: ["sqrt", "linear", "log"].indexOf(obl.scale) >= 0 ? obl.scale : "sqrt",
       width_px: Math.max(100, Math.min(220, Number(obl.width_px) || 140)),
     };
+    if (isMultiManualMode()) payload.tileSplit = MULTI_OB_TILE_SPLIT;
+    return payload;
   }
 
   function clearPaneOrderbookLevels(pane) {
@@ -6119,8 +6098,13 @@
     };
   }
 
+  function oblSymbolStillCurrent(pane, reqSymbol) {
+    return String(reqSymbol).toUpperCase() === paneSymbol(pane);
+  }
+
   async function refreshPaneOrderbookLevels(pane) {
-    if (!pane || !state.obl || !state.obl.enabled || !state.symbol) {
+    const reqSymbolBoot = paneSymbol(pane);
+    if (!pane || !state.obl || (!state.obl.enabled && !isMultiManualMode()) || !reqSymbolBoot) {
       clearPaneOrderbookLevels(pane);
       return;
     }
@@ -6128,8 +6112,9 @@
     const chart = api(pane);
     if (!chart) return;
     const gen = ++pane.oblGen;
-    const reqSymbol = state.symbol;
+    const reqSymbol = reqSymbolBoot;
     const reqDepth = oblDataDepth();
+    const paneLease = obLeaseStore(pane);
     if (pane.oblAbort) {
       try { pane.oblAbort.abort(); } catch (e) {}
     }
@@ -6138,17 +6123,17 @@
     try {
     if (reqDepth === 1000 || reqDepth === 0) {
       if (isHistoricalReplay()) {
-        if (gen !== pane.oblGen || reqSymbol !== state.symbol) return;
+        if (gen !== pane.oblGen || !oblSymbolStillCurrent(pane, reqSymbol)) return;
         const live = api(pane);
         if (live && live.setOrderbookLevels) {
           live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, "DISABLED"), oblSettingsPayload());
         }
         return;
       }
-      const leased = await ensureOb1000Lease(reqSymbol);
-      if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+      const leased = await ensureOb1000Lease(reqSymbol, {}, pane);
+      if (gen !== pane.oblGen || !oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
       if (!leased) {
-        const uiState = state.obl1000.uiState || "NO_DATA";
+        const uiState = paneLease.uiState || "NO_DATA";
         if (uiState === "NOT_PILOT") {
           setStatus(oblDepthLabel(reqDepth) + " ungültiges Symbol (aktuell " + reqSymbol + ")", "empty");
         }
@@ -6160,8 +6145,8 @@
       }
       let url = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol) +
         "&depth=" + encodeURIComponent(String(reqDepth));
-      if (state.obl1000.leaseId) {
-        url += "&lease_id=" + encodeURIComponent(state.obl1000.leaseId);
+      if (paneLease.leaseId) {
+        url += "&lease_id=" + encodeURIComponent(paneLease.leaseId);
       }
       try {
         let body = await getJson(url, {
@@ -6169,26 +6154,26 @@
           sourceAction: "ob1000-levels",
         });
         if (gen !== pane.oblGen) return;
-        if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+        if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
         const emptyBook = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
         if (emptyBook && (body.data_status === "no_data" || body.subscription_state === "stopped" || body.subscription_state === "grace")) {
           // Stale client lease after TTL/expiry — re-acquire once before blanking the panel.
-          invalidateOb1000LeaseLocal();
-          const again = await ensureOb1000Lease(reqSymbol, { force: true });
-          if (gen !== pane.oblGen || reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+          invalidateOb1000LeaseLocal(pane);
+          const again = await ensureOb1000Lease(reqSymbol, { force: true }, pane);
+          if (gen !== pane.oblGen || !oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
           if (again) {
             startOb1000Heartbeat();
             let retryUrl = "/api/research/ob1000-levels?symbol=" + encodeURIComponent(reqSymbol) +
               "&depth=" + encodeURIComponent(String(reqDepth));
-            if (state.obl1000.leaseId) {
-              retryUrl += "&lease_id=" + encodeURIComponent(state.obl1000.leaseId);
+            if (paneLease.leaseId) {
+              retryUrl += "&lease_id=" + encodeURIComponent(paneLease.leaseId);
             }
             body = await getJson(retryUrl, {
               signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
               sourceAction: "ob1000-levels-retry",
             });
             if (gen !== pane.oblGen) return;
-            if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+            if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
           }
         }
         const stillEmpty = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
@@ -6203,7 +6188,7 @@
           body.ui_state = "OFFLINE";
           body.subscription_state = "error";
           body._mismatch = "expected_full_got_" + (gotMode || ("depth_" + String(gotDepth)));
-          state.obl1000.uiState = "OFFLINE";
+          paneLease.uiState = "OFFLINE";
           setStatus("FULL braucht Dashboard-Restart (API liefert noch OB1000). sudo systemctl restart dashboard.service", "empty");
           const live = api(pane);
           if (live && live.setOrderbookLevels) {
@@ -6214,7 +6199,7 @@
           return;
         }
         body.ui_state = computeOb1000UiState(body, null);
-        state.obl1000.uiState = body.ui_state;
+        paneLease.uiState = body.ui_state;
         const live = api(pane);
         if (live && live.setOrderbookLevels) {
           const sig = String(body.timestamp_utc || "") + "|" + String(body.sequence || "") + "|" +
@@ -6236,16 +6221,16 @@
       } catch (err) {
         if (err && err.name === "AbortError") return;
         if (gen !== pane.oblGen) return;
-        if (reqSymbol !== state.symbol || oblDataDepth() !== reqDepth) return;
+        if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
         const parsed = parseOb1000ApiError(err);
         if (parsed && parsed.code === "unknown_lease") {
-          invalidateOb1000LeaseLocal();
-          await ensureOb1000Lease(reqSymbol, { force: true });
+          invalidateOb1000LeaseLocal(pane);
+          await ensureOb1000Lease(reqSymbol, { force: true }, pane);
           if (gen !== pane.oblGen) return;
           return;
         }
         const uiState = computeOb1000UiState(null, parsed);
-        state.obl1000.uiState = uiState;
+        paneLease.uiState = uiState;
         if (uiState === "NOT_PILOT") {
           setStatus(oblDepthLabel(reqDepth) + " ungültiges Symbol (aktuell " + reqSymbol + ")", "empty");
         }
@@ -6269,7 +6254,7 @@
         sourceAction: "ob-levels",
       });
       if (gen !== pane.oblGen) return;
-      if (reqSymbol !== state.symbol || oblDataDepth() !== 200) return;
+      if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== 200) return;
       body.depth = 200;
       const live = api(pane);
       if (live && live.setOrderbookLevels) {
@@ -6278,7 +6263,7 @@
     } catch (err) {
       if (err && err.name === "AbortError") return;
       if (gen !== pane.oblGen) return;
-      if (reqSymbol !== state.symbol || oblDataDepth() !== 200) return;
+      if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== 200) return;
       const live = api(pane);
       if (live && live.setOrderbookLevels) {
         live.setOrderbookLevels(oblEmptyPayload(reqSymbol, 200, null), oblSettingsPayload());
@@ -6493,6 +6478,671 @@
     } catch (err) {
       if (err && err.name === "AbortError") return;
       if (gen !== pane.vpGen) return;
+    }
+  }
+
+  function defaultOpi() {
+    return { enabled: false, window_minutes: 15 };
+  }
+
+  function readStoredOpi() {
+    try {
+      const raw = localStorage.getItem(OPI_KEY);
+      if (!raw) return defaultOpi();
+      return Object.assign(defaultOpi(), JSON.parse(raw));
+    } catch (e) {
+      return defaultOpi();
+    }
+  }
+
+  function persistOpi() {
+    try { localStorage.setItem(OPI_KEY, JSON.stringify(state.opi)); } catch (e) {}
+  }
+
+  function resolveOpiAsOfUnix(viewEndUnix) {
+    if (state.liquidityLocationAsOf) {
+      const parsed = Date.parse(state.liquidityLocationAsOf);
+      if (Number.isFinite(parsed)) return Math.floor(parsed / 1000);
+    }
+    return resolveBtD26AsOfUnix(viewEndUnix);
+  }
+
+  /** Last fully closed 1m candle open from collector/CH forming payload (not wall clock alone). */
+  function lastFinal1mOpenFromForming(forming) {
+    if (!forming) return null;
+    const ft = Math.floor(Number(forming.time));
+    if (!Number.isFinite(ft) || ft <= 0) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (ft + 60 <= now) {
+      return ft;
+    }
+    return ft - 60;
+  }
+
+  function opiDisplayContextKey(pane, sym, wm) {
+    return String(sym).toUpperCase() + "|" + String(pane && pane.tf ? pane.tf : "") + "|" + wm;
+  }
+
+  function clearPaneOpiDisplayStore(pane) {
+    if (!pane) return;
+    pane.opiDisplayStore = null;
+    pane.opiDisplayStoreCtx = null;
+    pane.opiLastAppliedBars = null;
+    pane.opiLastFinal1mWatermark = null;
+  }
+
+  function ensurePaneOpiDisplayStore(pane, ctx) {
+    if (!pane.opiDisplayStore || pane.opiDisplayStoreCtx !== ctx) {
+      pane.opiDisplayStore = new Map();
+      pane.opiDisplayStoreCtx = ctx;
+    }
+    return pane.opiDisplayStore;
+  }
+
+  function opiPruneDisplayStore(pane, visStart, visEnd) {
+    if (!pane || !pane.opiDisplayStore) return;
+    const lo = Number(visStart) - OPI_DISPLAY_STORE_MARGIN_SEC;
+    const hi = Number(visEnd) + OPI_DISPLAY_STORE_MARGIN_SEC;
+    const store = pane.opiDisplayStore;
+    const keys = Array.from(store.keys());
+    keys.forEach(function (t) {
+      if (t < lo || t > hi) store.delete(t);
+    });
+    while (store.size > OPI_DISPLAY_STORE_MAX) {
+      let oldest = null;
+      store.forEach(function (_, t) {
+        if (oldest == null || t < oldest) oldest = t;
+      });
+      if (oldest == null) break;
+      store.delete(oldest);
+    }
+  }
+
+  function opiUpsertDisplayBars(pane, ctx, bars) {
+    if (!pane) return;
+    const store = ensurePaneOpiDisplayStore(pane, ctx);
+    (bars || []).forEach(function (b) {
+      const t = Number(b.time);
+      if (!Number.isFinite(t)) return;
+      store.set(t, b);
+    });
+  }
+
+  function opiBarsFromDisplayStore(pane, visStart, visEnd) {
+    if (!pane || !pane.opiDisplayStore) return [];
+    const from = Number(visStart);
+    const to = Number(visEnd);
+    const out = [];
+    pane.opiDisplayStore.forEach(function (b, t) {
+      if (t >= from && t < to) out.push(b);
+    });
+    out.sort(function (a, b) { return a.time - b.time; });
+    return out;
+  }
+
+  function opiMergeVisibleDisplayBars(pane, ctx, freshBars, visStart, visEnd) {
+    opiUpsertDisplayBars(pane, ctx, freshBars);
+    opiPruneDisplayStore(pane, visStart, visEnd);
+    return opiBarsFromDisplayStore(pane, visStart, visEnd);
+  }
+
+  function maybeScheduleOpiOnFinal1m(pane, forming, meta) {
+    if (isMultiManualMode()) return;
+    if (!pane || pane.id !== "pane-0") return;
+    if (!state.opi || !state.opi.enabled) return;
+    const open1m = lastFinal1mOpenFromForming(forming);
+    if (open1m == null) return;
+    const prev = pane.opiLastFinal1mWatermark;
+    if (prev != null && open1m <= prev) return;
+    const missed = prev == null ? 0 : Math.max(0, Math.floor((open1m - prev) / 60) - 1);
+    pane.opiLastFinal1mWatermark = open1m;
+    opiTracePush("opiFinal1m_advanced", {
+      prev: prev,
+      open1m: open1m,
+      missedMinutes: missed,
+      source: meta && meta.source ? meta.source : null,
+    });
+    opiTracePush("scheduleOpi_from_final1m", { open1m: open1m, missedMinutes: missed });
+    scheduleOpi(pane);
+  }
+
+  function fillOpiControls() {
+    const cb = $("researchIndOpi");
+    const win = $("researchOpiWindow");
+    if (!state.opi) state.opi = defaultOpi();
+    if (cb) cb.checked = !!state.opi.enabled;
+    if (win) win.value = String(state.opi.window_minutes || 15);
+  }
+
+  function opiNoPublicTradesMessage(symbol) {
+    const sym = String(symbol || state.symbol || "").toUpperCase() || "?";
+    return "OPI nicht verfügbar – keine Public-Trade-Daten für " + sym;
+  }
+
+  function showPaneOpiError(pane, message, opts) {
+    const live = api(pane);
+    if (!live || !live.setOpiPane) return;
+    const transient = !!(opts && opts.preserveData);
+    opiTracePush("showPaneOpiError", {
+      preserveData: transient,
+      message: String(message).slice(0, 120),
+    });
+    live.setOpiPane({
+      visible: true,
+      error: message,
+      preserveData: transient,
+    });
+  }
+
+  function parseOpiFetchError(err) {
+    if (!err) return null;
+    if (err.apiError === "no_public_trades") {
+      return { code: "no_public_trades", status: err.status || 400 };
+    }
+    const msg = String(err.message || err);
+    if (msg.indexOf("no_public_trades") >= 0) {
+      return { code: "no_public_trades", status: err.status || 400 };
+    }
+    if (err.status === 429 || msg.indexOf("429") >= 0 || msg.indexOf("Too many concurrent") >= 0) {
+      return {
+        code: "rate_limited",
+        status: 429,
+        retryAfterSec: err.retryAfterSec,
+      };
+    }
+    return { code: "error", status: err.status, message: msg };
+  }
+
+  function scheduleOpiRangeWait(pane) {
+    if (!pane || isMultiManualMode()) return;
+    if (!state.opi || !state.opi.enabled) return;
+    pane.opiRangeWait = (pane.opiRangeWait || 0) + 1;
+    if (pane.opiRangeWait > OPI_RANGE_RETRY_MAX) return;
+    if (pane.opiRangeTimer) return;
+    pane.opiRangeTimer = setTimeout(function () {
+      pane.opiRangeTimer = null;
+      scheduleOpi(pane);
+    }, OPI_RANGE_RETRY_MS);
+  }
+
+  function clearOpiRetryTimers(pane) {
+    if (!pane) return;
+    if (pane.opiRetryTimer) {
+      clearTimeout(pane.opiRetryTimer);
+      pane.opiRetryTimer = null;
+    }
+    if (pane.opiRangeTimer) {
+      clearTimeout(pane.opiRangeTimer);
+      pane.opiRangeTimer = null;
+    }
+  }
+
+  function finishOpiInflight(pane) {
+    if (!pane) return;
+    pane.opiInflight = false;
+    pane.opiAbort = null;
+    const pending = !!pane.opiPending;
+    pane.opiPending = false;
+    if (
+      pending &&
+      state.opi &&
+      state.opi.enabled &&
+      !isMultiManualMode() &&
+      pane.id === "pane-0"
+    ) {
+      scheduleOpi(pane);
+    }
+  }
+
+  function clearPaneOpi(pane) {
+    if (!pane) return;
+    opiTracePush("clearPaneOpi", { reason: "clearPaneOpi" });
+    clearPaneOpiDisplayStore(pane);
+    pane.opiGen += 1;
+    pane.opiInflight = false;
+    pane.opiPending = false;
+    pane.opiRangeWait = 0;
+    pane.opiRetryCount = 0;
+    clearOpiRetryTimers(pane);
+    if (pane.opiTimer) {
+      clearTimeout(pane.opiTimer);
+      pane.opiTimer = null;
+    }
+    if (pane.opiAbort) {
+      try { pane.opiAbort.abort(); } catch (e) {}
+      pane.opiAbort = null;
+    }
+    clearPaneOpiChunkCache(pane);
+    const chart = api(pane);
+    if (chart && chart.clearOpiPane) chart.clearOpiPane();
+  }
+
+  function scheduleOpi(pane) {
+    if (isMultiManualMode()) return;
+    if (!pane || pane.id !== "pane-0") return;
+    if (pane.opiTimer) clearTimeout(pane.opiTimer);
+    pane.opiTimer = setTimeout(function () {
+      pane.opiTimer = null;
+      opiTracePush("scheduleOpi_fire", { debounceMs: VP_DEBOUNCE_MS });
+      fetchPaneOpi(pane);
+    }, VP_DEBOUNCE_MS);
+  }
+
+  function scheduleOpi429Retry(pane, delayMs) {
+    if (!pane || pane.opiRetryTimer) return;
+    if (!state.opi || !state.opi.enabled || isMultiManualMode()) return;
+    const wait = Math.min(15000, Math.max(500, Number(delayMs) || OPI_429_BASE_MS));
+    pane.opiRetryTimer = setTimeout(function () {
+      pane.opiRetryTimer = null;
+      fetchPaneOpi(pane);
+    }, wait);
+  }
+
+  function opiAlignChunkStart(unix) {
+    const chunk = OPI_CHUNK_SECONDS;
+    return Math.floor(Number(unix) / chunk) * chunk;
+  }
+
+  function opiChunksCoveringRange(start, end) {
+    const chunk = OPI_CHUNK_SECONDS;
+    const out = [];
+    let cs = opiAlignChunkStart(start);
+    const e = Number(end);
+    while (cs < e) {
+      const ce = Math.min(cs + chunk, e);
+      if (ce > cs) out.push({ start: cs, end: ce, chunkStart: cs });
+      cs += chunk;
+    }
+    return out;
+  }
+
+  function opiChunkContext(sym, tf, wm, asOf) {
+    return String(sym).toUpperCase() + "|" + tf + "|" + wm + "|" + asOf;
+  }
+
+  function opiChunkStoreKey(ctx, chunkStart) {
+    return ctx + "|" + chunkStart;
+  }
+
+  function clearPaneOpiChunkCache(pane) {
+    if (!pane) return;
+    pane.opiChunkCache = null;
+    pane.opiChunkCtx = null;
+    pane.opiChunkLru = null;
+  }
+
+  function ensurePaneOpiChunkCache(pane, ctx) {
+    if (!pane.opiChunkCache || pane.opiChunkCtx !== ctx) {
+      pane.opiChunkCache = new Map();
+      pane.opiChunkCtx = ctx;
+      pane.opiChunkLru = [];
+    }
+  }
+
+  function opiGetCachedChunk(pane, ctx, chunkStart) {
+    if (!pane || !pane.opiChunkCache) return null;
+    const key = opiChunkStoreKey(ctx, chunkStart);
+    const entry = pane.opiChunkCache.get(key);
+    if (!entry) return null;
+    if (Date.now() - entry.fetchedAt > OPI_CHUNK_CACHE_TTL_MS) {
+      pane.opiChunkCache.delete(key);
+      const lru = pane.opiChunkLru || [];
+      const idx = lru.indexOf(key);
+      if (idx >= 0) lru.splice(idx, 1);
+      return null;
+    }
+    return entry;
+  }
+
+  function opiPutCachedChunk(pane, ctx, chunkStart, body) {
+    ensurePaneOpiChunkCache(pane, ctx);
+    const key = opiChunkStoreKey(ctx, chunkStart);
+    pane.opiChunkCache.set(key, {
+      fetchedAt: Date.now(),
+      bars: (body && body.bars) ? body.bars.slice() : [],
+      meta: body,
+    });
+    const lru = pane.opiChunkLru;
+    const idx = lru.indexOf(key);
+    if (idx >= 0) lru.splice(idx, 1);
+    lru.push(key);
+    while (lru.length > OPI_CHUNK_CACHE_MAX) {
+      const old = lru.shift();
+      pane.opiChunkCache.delete(old);
+    }
+  }
+
+  function opiMergeVisibleBars(pane, ctx, rangeStart, rangeEnd) {
+    const chunks = opiChunksCoveringRange(rangeStart, rangeEnd);
+    const byTime = new Map();
+    let meta = null;
+    chunks.forEach(function (ch) {
+      const entry = opiGetCachedChunk(pane, ctx, ch.chunkStart);
+      if (!entry) return;
+      if (!meta && entry.meta) meta = entry.meta;
+      (entry.bars || []).forEach(function (b) {
+        const t = Number(b.time);
+        if (!Number.isFinite(t)) return;
+        if (t < rangeStart || t >= rangeEnd) return;
+        byTime.set(t, b);
+      });
+    });
+    const merged = Array.from(byTime.values()).sort(function (a, b) {
+      return a.time - b.time;
+    });
+    return { bars: merged, meta: meta };
+  }
+
+  function opiMissingChunks(pane, ctx, chunks) {
+    return chunks.filter(function (ch) {
+      return !opiGetCachedChunk(pane, ctx, ch.chunkStart);
+    }).sort(function (a, b) {
+      return a.start - b.start;
+    });
+  }
+
+  function opiE2eActive() {
+    return !!(window.OpiE2eDiag && window.OpiE2eDiag.active);
+  }
+
+  function opiApplyMergedPane(pane, merge, sym, wm, visRange) {
+    const live = api(pane);
+    if (!live || !live.setOpiPane) return;
+    const visStart = visRange && visRange.start != null ? Number(visRange.start) : null;
+    const visEnd = visRange && visRange.end != null ? Number(visRange.end) : null;
+    const ctx = opiDisplayContextKey(pane, sym, wm);
+    let bars = merge.bars || [];
+    if (visStart != null && visEnd != null && visEnd > visStart) {
+      bars = opiMergeVisibleDisplayBars(pane, ctx, bars, visStart, visEnd);
+    } else if (bars.length) {
+      opiUpsertDisplayBars(pane, ctx, bars);
+    }
+    if (!bars.length && pane.opiLastAppliedBars && pane.opiLastAppliedBars.length) {
+      opiTracePush("opiApplyMergedPane_skip_empty", {
+        kept: pane.opiLastAppliedBars.length,
+      });
+      return;
+    }
+    if (!bars.length) return;
+    let firstBar = null;
+    let lastBar = null;
+    if (bars.length) {
+      firstBar = Number(bars[0].time);
+      lastBar = Number(bars[bars.length - 1].time);
+    }
+    pane.opiLastAppliedBars = bars.slice();
+    const diagOn = !!(window.OpiViewportDiag && window.OpiViewportDiag.enabled);
+    const updateId = nextOpiDiagUpdateId(pane);
+    if (opiE2eActive()) {
+      let validTotal = 0;
+      let validDelta = 0;
+      let validPrice = 0;
+      (bars || []).forEach(function (b) {
+        if (!b) return;
+        if (b.opi_total != null) validTotal += 1;
+        if (b.delta_usdt != null) validDelta += 1;
+        if (b.price_change_pct != null) validPrice += 1;
+      });
+      window.OpiE2eDiag.hostEvent("opiApplyMergedPane", {
+        phase: "before_setOpiPane",
+        updateId: updateId,
+        symbol: sym,
+        timeframe: pane.tf,
+        windowMinutes: wm,
+        barCount: bars.length,
+        firstBar: firstBar,
+        lastBar: lastBar,
+        visStart: visStart,
+        visEnd: visEnd,
+        displayStoreSize: pane.opiDisplayStore ? pane.opiDisplayStore.size : 0,
+        validTotal: validTotal,
+        validDelta: validDelta,
+        validPrice: validPrice,
+        paneGen: pane.opiGen,
+      });
+    }
+    opiTracePush("opiApplyMergedPane", {
+      phase: "before_setOpiPane",
+      updateId: updateId,
+      barCount: bars.length,
+      firstBar: firstBar,
+      lastBar: lastBar,
+      displayStoreSize: pane.opiDisplayStore ? pane.opiDisplayStore.size : 0,
+    });
+    const meta = merge.meta || {};
+    live.setOpiPane({
+      visible: true,
+      success: true,
+      symbol: meta.symbol || sym,
+      timeframe: meta.timeframe || pane.tf,
+      window_minutes: meta.window_minutes != null ? meta.window_minutes : wm,
+      formulas: meta.formulas,
+      thresholds: meta.thresholds,
+      as_of: meta.as_of,
+      bars: bars,
+      _diagUpdateId: updateId,
+    });
+    if (opiE2eActive()) {
+      window.OpiE2eDiag.hostEvent("opiApplyMergedPane", {
+        phase: "after_setOpiPane",
+        updateId: updateId,
+        barCount: bars.length,
+      });
+    }
+    opiTracePush("opiApplyMergedPane", {
+      phase: "after_setOpiPane",
+      updateId: updateId,
+      barCount: bars.length,
+    });
+  }
+
+  async function fetchPaneOpi(pane) {
+    if (isMultiManualMode()) return;
+    if (!pane || pane.id !== "pane-0" || !state.symbol) return;
+    if (!state.opi || !state.opi.enabled) {
+      opiTracePush("fetchPaneOpi_abort", { reason: "opi_disabled" });
+      clearPaneOpi(pane);
+      return;
+    }
+    const sym = String(state.symbol).toUpperCase();
+    if (sym === "XAUUSDT") {
+      showPaneOpiError(pane, opiNoPublicTradesMessage(sym));
+      return;
+    }
+    if (pane.opiInflight) {
+      pane.opiPending = true;
+      opiTracePush("fetchPaneOpi_defer", { reason: "opiInflight" });
+      return;
+    }
+    const chart = api(pane);
+    if (!chart || !chart.getVisibleTimeRange) {
+      scheduleOpiRangeWait(pane);
+      return;
+    }
+    const range = chart.getVisibleTimeRange();
+    if (!range || range.firstCandle == null || range.lastCandle == null) {
+      scheduleOpiRangeWait(pane);
+      return;
+    }
+    pane.opiRangeWait = 0;
+    const step = TF_SEC[pane.tf] || 60;
+    const visStart = Number(range.firstCandle);
+    const visEnd = Number(range.lastCandle) + step;
+    if (!(visEnd > visStart)) return;
+    const wm = Number(state.opi.window_minutes) || 15;
+    const asOf = resolveOpiAsOfUnix(visEnd);
+    const reqSymbol = sym;
+    const reqTf = pane.tf;
+    const ctx = opiChunkContext(reqSymbol, reqTf, wm, asOf);
+    ensurePaneOpiChunkCache(pane, ctx);
+    const chunks = opiChunksCoveringRange(visStart, visEnd);
+    const missing = opiMissingChunks(pane, ctx, chunks);
+    const mergeNow = opiMergeVisibleBars(pane, ctx, visStart, visEnd);
+    const visRange = { start: visStart, end: visEnd };
+    const displayCtx = opiDisplayContextKey(pane, reqSymbol, wm);
+    if (pane.opiDisplayStoreCtx && pane.opiDisplayStoreCtx !== displayCtx) {
+      clearPaneOpiDisplayStore(pane);
+    }
+    const e2eRequestId = opiE2eActive() ? window.OpiE2eDiag.nextRequestId() : null;
+    const fetchT0 = opiE2eActive() ? performance.now() : 0;
+    opiTracePush("fetchPaneOpi_start", {
+      visStart: visStart,
+      visEnd: visEnd,
+      asOf: asOf,
+      ctx: ctx,
+      missingChunks: missing.length,
+      mergeBarCount: mergeNow.bars.length,
+      displayStoreSize: pane.opiDisplayStore ? pane.opiDisplayStore.size : 0,
+    });
+    if (opiE2eActive()) {
+      window.OpiE2eDiag.hostEvent("fetchPaneOpi_start", {
+        requestId: e2eRequestId,
+        symbol: reqSymbol,
+        timeframe: reqTf,
+        windowMinutes: wm,
+        visStart: visStart,
+        visEnd: visEnd,
+        asOf: asOf,
+        missingChunks: missing.length,
+        mergeBarCount: mergeNow.bars.length,
+        cacheHit: missing.length === 0,
+        displayStoreSize: pane.opiDisplayStore ? pane.opiDisplayStore.size : 0,
+        opiGen: pane.opiGen,
+        trigger: pane.opiPending ? "pending" : "schedule",
+      });
+    }
+    if (missing.length === 0) {
+      if (mergeNow.bars.length) {
+        opiApplyMergedPane(pane, mergeNow, reqSymbol, wm, visRange);
+      } else {
+        opiApplyMergedPane(pane, { bars: [], meta: mergeNow.meta }, reqSymbol, wm, visRange);
+      }
+      if (opiE2eActive()) {
+        window.OpiE2eDiag.hostEvent("fetchPaneOpi_done", {
+          requestId: e2eRequestId,
+          reason: "cache_satisfied",
+          mergeBarCount: mergeNow.bars.length,
+        });
+      }
+      opiTracePush("fetchPaneOpi_done", { reason: "cache_satisfied" });
+      return;
+    }
+    if (mergeNow.bars.length) {
+      opiApplyMergedPane(pane, mergeNow, reqSymbol, wm, visRange);
+    }
+    const target = missing[0];
+    const gen = ++pane.opiGen;
+    pane.opiAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    pane.opiInflight = true;
+    const url = "/api/research/orderflow-price-impact?symbol=" + encodeURIComponent(reqSymbol) +
+      "&timeframe=" + encodeURIComponent(reqTf) +
+      "&start=" + encodeURIComponent(String(Math.floor(target.start))) +
+      "&end=" + encodeURIComponent(String(Math.floor(target.end))) +
+      "&as_of=" + encodeURIComponent(String(asOf)) +
+      "&window_minutes=" + encodeURIComponent(String(wm));
+    if (opiE2eActive()) {
+      window.OpiE2eDiag.hostEvent("fetchPaneOpi_network", {
+        requestId: e2eRequestId,
+        urlPath: "/api/research/orderflow-price-impact",
+        chunkStart: target.start,
+        chunkEnd: target.end,
+        asOf: asOf,
+      });
+    }
+    try {
+      const body = await getJson(url, {
+        sourceAction: "opi",
+        pane: pane.id,
+        timeframe: reqTf,
+        signal: pane.opiAbort && pane.opiAbort.signal,
+      });
+      if (gen !== pane.opiGen) {
+        opiTracePush("fetchPaneOpi_drop", { reason: "stale_gen", gen: gen, liveGen: pane.opiGen });
+        return;
+      }
+      if (!state.opi || !state.opi.enabled || isMultiManualMode()) return;
+      if (String(state.symbol).toUpperCase() !== reqSymbol || pane.tf !== reqTf) return;
+      if (Number(state.opi.window_minutes) !== wm) return;
+      pane.opiRetryCount = 0;
+      opiPutCachedChunk(pane, ctx, target.chunkStart, body);
+      const merge = opiMergeVisibleBars(pane, ctx, visStart, visEnd);
+      if (merge.bars.length) {
+        opiApplyMergedPane(pane, merge, reqSymbol, wm, visRange);
+      } else {
+        opiApplyMergedPane(pane, { bars: [], meta: merge.meta }, reqSymbol, wm, visRange);
+      }
+      if (opiE2eActive()) {
+        const barsIn = (body && body.bars) ? body.bars : [];
+        window.OpiE2eDiag.hostEvent("fetchPaneOpi_ok", {
+          requestId: e2eRequestId,
+          ms: Math.round(performance.now() - fetchT0),
+          http: "ok",
+          barsReturned: barsIn.length,
+          asOf: body && body.as_of != null ? body.as_of : asOf,
+          mergeBarCount: merge.bars.length,
+          stillMissing: opiMissingChunks(pane, ctx, chunks).length,
+        });
+      }
+      opiTracePush("fetchPaneOpi_chunk_ok", {
+        chunkStart: target.chunkStart,
+        mergeBarCount: merge.bars.length,
+        stillMissing: opiMissingChunks(pane, ctx, chunks).length,
+      });
+      if (opiMissingChunks(pane, ctx, chunks).length > 0) {
+        pane.opiPending = true;
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        opiTracePush("fetchPaneOpi_abort", { reason: "AbortError" });
+        return;
+      }
+      if (gen !== pane.opiGen) {
+        opiTracePush("fetchPaneOpi_drop", { reason: "stale_gen_catch", gen: gen, liveGen: pane.opiGen });
+        return;
+      }
+      const parsed = parseOpiFetchError(err);
+      if (parsed && parsed.code === "no_public_trades") {
+        showPaneOpiError(pane, opiNoPublicTradesMessage(reqSymbol));
+        return;
+      }
+      if (opiE2eActive()) {
+        window.OpiE2eDiag.hostEvent("fetchPaneOpi_err", {
+          requestId: e2eRequestId,
+          ms: Math.round(performance.now() - fetchT0),
+          message: err && err.message ? String(err.message).slice(0, 160) : "error",
+          parsed: parsed || null,
+        });
+      }
+      if (parsed && parsed.code === "rate_limited") {
+        pane.opiRetryCount = (pane.opiRetryCount || 0) + 1;
+        if (pane.opiRetryCount <= OPI_429_MAX_RETRIES) {
+          const backoff = OPI_429_BASE_MS * Math.pow(2, pane.opiRetryCount - 1);
+          const delay = parsed.retryAfterSec != null
+            ? parsed.retryAfterSec * 1000
+            : backoff;
+          showPaneOpiError(pane, "OPI vorübergehend ausgelastet – erneuter Versuch …", {
+            preserveData: true,
+          });
+          scheduleOpi429Retry(pane, delay);
+          return;
+        }
+        showPaneOpiError(pane, "OPI konnte nicht geladen werden – Server ausgelastet.", {
+          preserveData: true,
+        });
+        return;
+      }
+      if (parsed && parsed.code === "error") {
+        showPaneOpiError(pane, "OPI vorübergehend nicht erreichbar – erneuter Versuch …", {
+          preserveData: true,
+        });
+        pane.opiRetryCount = (pane.opiRetryCount || 0) + 1;
+        if (pane.opiRetryCount <= OPI_429_MAX_RETRIES) {
+          scheduleOpi429Retry(pane, OPI_429_BASE_MS);
+        }
+        return;
+      }
+    } finally {
+      if (pane.opiInflight) finishOpiInflight(pane);
     }
   }
 
@@ -7895,6 +8545,10 @@
   }
 
   async function setTool(tool) {
+    if (multiBlocksPositionTool(tool)) {
+      setStatus("Long/Short-Position in Multi 2×2 deaktiviert — für Positions-Boxen Single-Chart nutzen.", "empty");
+      return;
+    }
     applyWorkspace(await sendJson("/api/research/drawings/tool", "POST", { tool: tool }, {
       sourceAction: "set-tool",
     }));
@@ -7916,9 +8570,15 @@
       return;
     }
     const pane = state.panes[paneId];
+    if (!pane) return;
+    syncFocusSymbolFromPane(pane);
+    if (isMultiManualMode() && MULTI_BLOCK_POSITION_TOOLS.indexOf(state.workspace && state.workspace.tool) >= 0) {
+      setStatus("Long/Short-Position in Multi 2×2 deaktiviert.", "empty");
+      return;
+    }
     data.pane_id = paneId;
     data.timeframe = pane.tf;
-    data.symbol = state.symbol;
+    data.symbol = paneSymbol(pane);
     if (data.type === "edit") {
       applyWorkspace(await sendJson("/api/research/drawings/event", "POST", data));
       openPositionModal();
@@ -7973,8 +8633,9 @@
 
   function handleClick(paneId, unix) {
     mountDrawToolbar(paneId);
-    state.selectedUnix = Number(unix);
     state.selectedPane = paneId;
+    syncFocusSymbolFromPane(state.panes[paneId]);
+    state.selectedUnix = Number(unix);
     visibleIds().forEach(function (pid) {
       const chart = api(state.panes[pid]);
       if (chart) chart.setSelectedMarker(floorUtc(unix, state.panes[pid].tf));
@@ -8150,8 +8811,6 @@
       if (!cur) {
         byTime[t] = oldTip;
       } else {
-        // API rows are canonical for bucket O/H/L — never inherit client-side highs
-        // (e.g. stale frozen-tail wicks surviving P18 gap-backfill).
         byTime[t] = Object.assign({}, cur);
       }
     }
@@ -8165,7 +8824,6 @@
     const nextClosedOpen = lastClosedBarTime(pane);
     scheduleScannerCommonRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
     scheduleLiveMicroLldV2RefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
-    scheduleExactOriginRefreshOnNewClosedBar(pane, prevClosedOpen, nextClosedOpen);
     const chart = api(pane);
     if (chart) {
       chart.setData(pane.pendingData, {
@@ -8174,10 +8832,29 @@
       });
       if (isHistoricalReplay()) enforceReplayViewOnAllPanes();
     }
+    if (
+      state.opi &&
+      state.opi.enabled &&
+      pane.id === "pane-0" &&
+      !isMultiManualMode()
+    ) {
+      const closedAdvanced = prevClosedOpen !== nextClosedOpen;
+      opiTracePush("mergePollCandlesIntoPane", {
+        incomingCount: incoming.length,
+        candleCount: merged.length,
+        closedBarAdvanced: closedAdvanced,
+      });
+      if (closedAdvanced) {
+        scheduleOpi(pane);
+      }
+    }
     if (packed && packed.forming) {
       applyFormingToPane(pane, packed.forming);
     }
     if (incoming && incoming.length && (prevClosedOpen !== nextClosedOpen || paneEmaStaleVsCandles(pane))) {
+      opiTracePush("scheduleRefreshPaneEmaOverlays", {
+        source: "ema-after-candle-merge",
+      });
       scheduleRefreshPaneEmaOverlays(pane, {
         gen: state.loadGen,
         sourceAction: "ema-after-candle-merge",
@@ -8218,7 +8895,8 @@
 
   async function extendPaneCandleRangeIfNeeded(paneId, fromVisible, toVisible) {
     const pane = state.panes[paneId];
-    if (!pane || !state.symbol) return;
+    const sym = paneSymbol(pane);
+    if (!pane || !sym) return;
     if (isHistoricalReplay()) return;
     if ($("researchGoToReplayMode") && $("researchGoToReplayMode").checked) return;
     if (pane._gotoNavExtendInflight) return;
@@ -8244,7 +8922,7 @@
         if (chunkEnd > b.to + margin) {
           const last = b.to;
           const pollLimit = Math.min(batchLim, pollLimitForPaneLag(pane));
-          const url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+          const url = "/api/research/candles?symbol=" + encodeURIComponent(sym) +
             "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
           const packed = await getJson(url, {
             sourceAction: "goto-nav-extend",
@@ -8271,7 +8949,7 @@
         if (anchorEnd > chunkStart + margin) {
           const fresh = paneCandleBounds(pane);
           if (!fresh) return;
-          const leftUrl = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+          const leftUrl = "/api/research/candles?symbol=" + encodeURIComponent(sym) +
             "&timeframe=" + encodeURIComponent(pane.tf) + "&end=" + anchorEnd + "&limit=" + batchLim;
           const packedLeft = await getJson(leftUrl, {
             sourceAction: "goto-nav-extend-left",
@@ -8298,7 +8976,8 @@
   }
 
   async function ensurePaneCaughtUp(pane, opts) {
-    if (!pane || !state.symbol || isHistoricalReplay() || historyBlocksLive()) return;
+    const sym = paneSymbol(pane);
+    if (!pane || !sym || isHistoricalReplay() || historyBlocksLive()) return;
     if (opts && opts.indicatorsOnly) return;
     const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
     const lag = paneClosedTipLagSec(pane);
@@ -8308,7 +8987,7 @@
     if (last == null || !pane.pendingData) return;
     const pollLimit = pollLimitForPaneLag(pane);
     const paneId = pane.id || pane.paneId;
-    const url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+    const url = "/api/research/candles?symbol=" + encodeURIComponent(sym) +
       "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
     const packed = await getJson(url, {
       sourceAction: "gap-backfill",
@@ -8356,7 +9035,7 @@
         }
       }
     }
-    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch && PD1ExactOriginResearch.paneSupports(pane)) {
+    if (exactOriginEnabledForPane(pane) && window.PD1ExactOriginResearch && PD1ExactOriginResearch.paneSupports(pane)) {
       try {
         await PD1ExactOriginResearch.refreshPane(pane, { force: true });
       } catch (err) {
@@ -8414,11 +9093,6 @@
           skipDefaultView: skipDefaultView,
         });
         pane.phase = "DATA_READY";
-        bootTrace("loadPane_setData_ok", {
-          pane: pane.id,
-          payload_n: (packed.candles || []).length,
-          candle_set_count: chart.debugInfo ? (chart.debugInfo().candleSetCount || null) : null,
-        });
       }
       if (!preserveView && chart.resize) chart.resize();
       chart.setEmaOverlays(pane.pendingEma, {
@@ -8430,8 +9104,6 @@
       chart.setInteractionMode(toolMode());
       if (chart.setHostShift) chart.setHostShift(!!state.hostShift);
       pane.phase = "INTERACTION_READY";
-    } else if (!skipCandles && (packed.candles || []).length) {
-      schedulePaneChartDataRetry(pane, packed);
     }
     syncOverlays(pane, pane.pendingOverlays);
     repaintExactOriginDensityFromCache(pane);
@@ -8442,7 +9114,8 @@
 
   async function loadPane(paneId, opts) {
     const pane = state.panes[paneId];
-    if (!pane || !state.symbol) return;
+    const sym = paneSymbol(pane);
+    if (!pane || !sym) return;
     const force = opts && opts.force;
     const gen = (opts && opts.gen != null) ? opts.gen : state.loadGen;
     const reqReplayGen = (opts && opts.replayGen != null) ? opts.replayGen : null;
@@ -8450,21 +9123,19 @@
     const owner = registerPaneLoadOwner(pane, paneId, paneGen, gen);
     const ws = state.workspace || {};
     const range = resolvePaneLoadRange(opts || {});
-    const on1d = pane.tf === "1d";
     const reqBody = {
-      symbol: state.symbol,
+      symbol: sym,
       timeframe: pane.tf,
       limit: (opts && opts.limit != null) ? opts.limit : historyLoadLimitForTimeframe(pane.tf),
       ema: ws.ema || { enabled: false },
       stochastic: ws.stochastic || { enabled: false },
       open_interest: ws.open_interest || { enabled: false },
-      liquidity: on1d ? { enabled: false } : (ws.liquidity || { enabled: false }),
+      liquidity: ws.liquidity || { enabled: false },
       allow_stale: !!(opts && opts.allowStale),
     };
     if (range.from != null) reqBody.from = range.from;
     if (range.to != null) reqBody.to = range.to;
     if (
-      !on1d &&
       state.liquidityLocationAsOf &&
       ws.liquidity &&
       ws.liquidity.enabled !== false &&
@@ -8474,14 +9145,6 @@
     }
     const statusEl = paneStatusEl(pane);
     if (statusEl) statusEl.textContent = "loading…";
-    const loadPaneT0 = typeof performance !== "undefined" ? performance.now() : 0;
-    bootTrace("loadPane_start", {
-      pane: paneId,
-      tf: pane.tf,
-      gen: gen,
-      paneGen: paneGen,
-      owner_seq: owner && owner.seq,
-    });
     let packed;
     try {
       packed = await sendJson("/api/research/pane", "POST", reqBody, {
@@ -8496,35 +9159,15 @@
         return;
       }
       setPaneLoadHttpError(pane, paneGen, gen, owner, err);
-      bootTrace("loadPane_error", {
-        pane: paneId,
-        phase: "pane_api",
-        message: err && err.message ? String(err.message).slice(0, 160) : "error",
-        t0: loadPaneT0,
-      });
       throw err;
     }
-    bootTrace("loadPane_pane_api_ok", {
-      pane: paneId,
-      n: packed && Array.isArray(packed.candles) ? packed.candles.length : 0,
-      t0: loadPaneT0,
-    });
-    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
-      bootTrace("loadPane_superseded", { pane: paneId, phase: "post_pane_api", paneGen: paneGen, gen: gen });
-      if (!pane._paneLoadOwner) scheduleOrphanPaneLoadRecovery(paneId);
-      return;
-    }
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
     if (packed.timeframe && packed.timeframe !== pane.tf) {
       discardPaneLoadResult(pane, paneId, owner);
       return;
     }
     await whenReady(pane, 8000);
-    await waitPaneSize(pane, 5000);
-    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
-      bootTrace("loadPane_superseded", { pane: paneId, phase: "post_whenReady", paneGen: paneGen, gen: gen });
-      if (!pane._paneLoadOwner) scheduleOrphanPaneLoadRecovery(paneId);
-      return;
-    }
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
     const bundleOpts = {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
       // GO TO: never restore the previous live logical range onto a much longer
@@ -8536,23 +9179,6 @@
     };
     try {
       applyPaneBundle(pane, packed, bundleOpts);
-      const chartAfter = api(pane);
-      const dbg = chartAfter && chartAfter.debugInfo ? chartAfter.debugInfo() : null;
-      bootTrace("loadPane_apply_ok", {
-        pane: paneId,
-        chart_ready: !!chartAfter,
-        candle_set_count: dbg ? dbg.candleSetCount : null,
-        chart_w: dbg && dbg.size ? dbg.size.w : null,
-        chart_h: dbg && dbg.size ? dbg.size.h : null,
-        candle_paint_pending: dbg ? dbg.candlePaintPending : null,
-        status: paneStatusEl(pane) ? paneStatusEl(pane).textContent : null,
-        t0: loadPaneT0,
-      });
-      scheduleRenderDiagnosis(pane);
-      requestAnimationFrame(function () {
-        const ch = api(pane);
-        if (ch && ch.resize) ch.resize();
-      });
     } catch (applyErr) {
       if (paneLoadOwnerIsCurrent(pane, owner) && !paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen)) {
         logPaneLoadFailure(paneId, pane, owner, applyErr, "applyPaneBundle");
@@ -8616,17 +9242,6 @@
         }
       });
     }
-    if (
-      exactOriginDensityEnabled() &&
-      window.PD1ExactOriginResearch &&
-      PD1ExactOriginResearch.paneSupports(pane)
-    ) {
-      void PD1ExactOriginResearch.refreshPane(pane, { force: true }).catch(function (err) {
-        if (!(err && err.name === "AbortError")) {
-          try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
-        }
-      });
-    }
     if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
     // Soft follow-lock only — do not yank visible range here (GO TO jump owns the camera).
     if (!(opts && opts.jumpToUnix != null)) {
@@ -8674,12 +9289,30 @@
       }
     }
     scheduleVolumeProfile(pane);
+    scheduleOpi(pane);
     scheduleOrderbookProfile(pane);
     scheduleOrderbookLevels(pane);
     scheduleTradeBubbles(pane);
     scheduleBtD23SetupScanner(pane);
     scheduleBtD26DynamicSelector(pane);
     scheduleBtD46Chronological(pane);
+    if (
+      exactOriginEnabledForPane(pane) &&
+      window.PD1ExactOriginResearch &&
+      PD1ExactOriginResearch.paneSupports(pane) &&
+      !(isMultiManualMode() && opts && opts.sourceAction === "multi-boot") &&
+      !exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)
+    ) {
+      const chartApi = api(pane);
+      if (chartApi && chartApi.layoutOverlays) chartApi.layoutOverlays();
+      try {
+        await PD1ExactOriginResearch.refreshPane(pane, { force: !!(opts && opts.force) });
+      } catch (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
+        }
+      }
+    }
     releasePaneLoadOwner(pane, owner);
   }
 
@@ -8749,8 +9382,10 @@
 
   async function loadOverlays(paneId) {
     const pane = state.panes[paneId];
+    const sym = paneSymbol(pane);
+    if (!sym) return;
     const body = await getJson(
-      "/api/research/overlays?symbol=" + encodeURIComponent(state.symbol) +
+      "/api/research/overlays?symbol=" + encodeURIComponent(sym) +
       "&timeframe=" + encodeURIComponent(pane.tf),
       { sourceAction: "overlays", pane: paneId, timeframe: pane.tf }
     );
@@ -8764,12 +9399,12 @@
         false,
         false,
         false,
-        exactOriginDensityEnabled()
+        exactOriginEnabledForPane(pane)
       );
     }
     syncOverlays(pane, nextOverlays);
     if (
-      exactOriginDensityEnabled() &&
+      exactOriginEnabledForPane(pane) &&
       window.PD1ExactOriginResearch &&
       PD1ExactOriginResearch.paneSupports(pane)
     ) {
@@ -8864,7 +9499,6 @@
       if (gen !== state.pollGen || !state.initialLoadDone) return;
       if (document.hidden) return;
       pollForming(gen);
-      tickExactOriginPoolTimeframeRefresh();
     }, FORMING_MS);
     // Immediate first tick so price moves without waiting for the interval.
     if (!document.hidden) {
@@ -9044,40 +9678,38 @@
     } else {
       emit("update_false", { detail: "unpainted_changed", unchanged: unchanged });
     }
-    const CLT = candleLiveTr();
-    if (CLT && CLT.enabled()) {
-      CLT.event(painted ? "forming_candle_applied" : unchanged ? "chart_last_price_unchanged" : "poll_error", {
-        tf: pane.tf,
-        bar_open_unix: bar.time,
-        bar_close: bar.close,
-        unchanged: unchanged,
-        update_ok: updateOk,
-        painted: painted,
-      });
-      if (painted || !unchanged) {
-        CLT.event("chart_last_price_updated", { tf: pane.tf, close: bar.close, open_unix: bar.time });
-      }
-    }
     if (painted || !unchanged) {
       const st = pane.el && pane.el.querySelector(".trp-pane-status");
       if (st) st.textContent = "live " + Number(bar.close);
     }
+    if (pane.id === "pane-0" && forming) {
+      maybeScheduleOpiOnFinal1m(pane, forming, { source: "applyForming" });
+    }
     return painted || !unchanged;
-  }
-
-  function candleLiveTr() {
-    return typeof window !== "undefined" ? window.DogeCandleLiveTrace : null;
   }
 
   let formingInflight = null;
   let formingWantRestart = false;
+  function visiblePaneSymbolsUnique() {
+    const out = [];
+    const seen = {};
+    visibleIds().forEach(function (pid) {
+      const sym = paneSymbol(state.panes[pid]);
+      if (!sym || seen[sym]) return;
+      seen[sym] = true;
+      out.push(sym);
+    });
+    return out;
+  }
+
   async function pollForming(gen) {
-    if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    const formingSymbols = isMultiManualMode() ? visiblePaneSymbolsUnique() : (state.symbol ? [state.symbol] : []);
+    if (gen !== state.pollGen || !formingSymbols.length || !state.initialLoadDone) return;
     if (isHistoricalReplay()) return;
     if (historyBlocksLive()) {
       postLiveDiag({
         reason: "blocked_history",
-        symbol: state.symbol,
+        symbol: formingSymbols[0],
         pinned: !!(state.history && state.history.pinned),
         preset: state.history && state.history.preset,
       });
@@ -9088,58 +9720,41 @@
       return;
     }
     formingInflight = true;
-    const CLT = candleLiveTr();
-    const pollT0 = typeof performance !== "undefined" ? performance.now() : 0;
-    if (CLT && CLT.enabled()) {
-      CLT.event("poll_start", { symbol: state.symbol, utc: new Date().toISOString() });
-    }
     try {
       do {
         formingWantRestart = false;
-        let formingStatus = 0;
-        const body = await fetch(
-          "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol),
-          { credentials: "same-origin" }
-        ).then(async function (res) {
-          formingStatus = res.status;
-          const j = await res.json().catch(function () { return null; });
-          if (!res.ok) return null;
-          return j;
-        }).catch(function () { return null; });
-        if (gen !== state.pollGen) return;
-        if (formingStatus === 401) {
-          const now = Date.now();
-          if (now - (pollForming._lastAuthDiagAt || 0) >= 3000) {
-            pollForming._lastAuthDiagAt = now;
-            postLiveDiag({ reason: "auth_401", symbol: state.symbol, status: 401 });
+        for (let si = 0; si < formingSymbols.length; si += 1) {
+          const symPoll = formingSymbols[si];
+          let formingStatus = 0;
+          const body = await fetch(
+            "/api/research/forming-bar?symbol=" + encodeURIComponent(symPoll),
+            { credentials: "same-origin" }
+          ).then(async function (res) {
+            formingStatus = res.status;
+            const j = await res.json().catch(function () { return null; });
+            if (!res.ok) return null;
+            return j;
+          }).catch(function () { return null; });
+          if (gen !== state.pollGen) return;
+          if (formingStatus === 401) {
+            const now = Date.now();
+            if (now - (pollForming._lastAuthDiagAt || 0) >= 3000) {
+              pollForming._lastAuthDiagAt = now;
+              postLiveDiag({ reason: "auth_401", symbol: symPoll, status: 401 });
+            }
+            continue;
           }
-          continue;
-        }
-        const forming = body && body.forming;
-        if (CLT && CLT.enabled()) {
-          CLT.event("poll_http_response", {
-            http: formingStatus,
-            ms: typeof performance !== "undefined" ? Math.round(performance.now() - pollT0) : null,
-            forming_close: forming && forming.close,
-            forming_time_unix: forming && forming.time,
-            forming_open_utc: forming && CLT.isoFromUnix(forming.time),
+          const forming = body && body.forming;
+          if (!forming) {
+            postLiveDiag({ reason: "no_forming", symbol: symPoll, status: formingStatus });
+            continue;
+          }
+          visibleIds().forEach(function (pid) {
+            const pane = state.panes[pid];
+            if (!pane || paneSymbol(pane) !== symPoll) return;
+            applyFormingToPane(pane, forming);
           });
         }
-        if (!forming) {
-          postLiveDiag({ reason: "no_forming", symbol: state.symbol, status: formingStatus });
-          if (CLT && CLT.enabled()) CLT.event("poll_error", { detail: "no_forming", http: formingStatus });
-          continue;
-        }
-        if (CLT && CLT.enabled()) {
-          CLT.event("forming_candle_received", {
-            close: forming.close,
-            open_utc: CLT.isoFromUnix(forming.time),
-            age_s: forming.time ? Math.max(0, Math.floor(Date.now() / 1000) - Number(forming.time)) : null,
-          });
-        }
-        visibleIds().forEach(function (pid) {
-          applyFormingToPane(state.panes[pid], forming);
-        });
       } while (formingWantRestart && gen === state.pollGen);
     } finally {
       formingInflight = null;
@@ -9147,13 +9762,13 @@
   }
 
   async function pollIncremental(gen) {
-    if (gen !== state.pollGen || !state.symbol || !state.initialLoadDone) return;
+    const canPoll = isMultiManualMode() ? visiblePaneSymbolsUnique().length > 0 : !!state.symbol;
+    if (gen !== state.pollGen || !canPoll || !state.initialLoadDone) return;
     if (isHistoricalReplay()) return;
     try {
       await mapLimit(visibleIds(), PANE_HTTP_LIMIT, function (pid) {
         return pollPane(pid, gen);
       });
-      tickExactOriginPoolTimeframeRefresh();
     } catch (err) {
       if (gen !== state.pollGen) return;
       setStatus(String(err.message || err), "error");
@@ -9162,13 +9777,14 @@
 
   async function pollPane(paneId, gen) {
     const pane = state.panes[paneId];
-    if (!pane || !state.symbol) return;
+    const sym = paneSymbol(pane);
+    if (!pane || !sym) return;
     if (gen !== state.pollGen) return;
     if (historyBlocksLive()) return;
     const last = lastClosedBarTime(pane);
     if (last == null || !pane.pendingData) return;
     const pollLimit = pollLimitForPaneLag(pane);
-    let url = "/api/research/candles?symbol=" + encodeURIComponent(state.symbol) +
+    let url = "/api/research/candles?symbol=" + encodeURIComponent(sym) +
       "&timeframe=" + encodeURIComponent(pane.tf) + "&from=" + last + "&limit=" + pollLimit;
     const packed = await getJson(url, {
       sourceAction: pollLimit > 50 ? "poll-gap" : "poll",
@@ -9176,7 +9792,7 @@
       timeframe: pane.tf,
       start: last,
     });
-    if (gen !== state.pollGen || pane.el.querySelector(".trp-pane-symbol").textContent !== state.symbol) return;
+    if (gen !== state.pollGen || paneSymbol(pane) !== sym) return;
     const incoming = packed.candles || [];
     if (!incoming.length) return;
     const nextClosedFp = (function () {
@@ -9195,7 +9811,7 @@
     if (!packed.forming) {
       try {
         const formingBody = await getJson(
-          "/api/research/forming-bar?symbol=" + encodeURIComponent(state.symbol),
+          "/api/research/forming-bar?symbol=" + encodeURIComponent(sym),
           { sourceAction: "forming-after-poll", silent: true }
         );
         if (gen === state.pollGen && formingBody && formingBody.forming) {
@@ -9243,12 +9859,16 @@
     state.causalLldCache = {};
     state.liveMicroLldV2Cache = {};
     try { localStorage.setItem(SYMBOL_KEY, next); } catch (e) {}
+    if (exactOriginDensityEnabled() && window.PD1ExactOriginResearch && PD1ExactOriginResearch.onSymbolSwitch) {
+      PD1ExactOriginResearch.onSymbolSwitch();
+    }
     const sel = $("researchSymbol");
     if (sel && sel.value !== next) sel.value = next;
     PANE_IDS.forEach(function (pid) {
       const pane = state.panes[pid];
       if (!pane) return;
-      pane.el.querySelector(".trp-pane-symbol").textContent = next;
+      const symEl = pane.el.querySelector(".trp-pane-symbol");
+      if (symEl && symEl.tagName !== "SELECT") symEl.textContent = next;
       pane.overlayPayloads = {};
       pane.pendingOverlays = [];
       pane.pendingData = null;
@@ -9258,6 +9878,7 @@
       const chart = api(pane);
       if (chart && chart.clearOverlays) chart.clearOverlays();
       clearPaneVolumeProfile(pane);
+      clearPaneOpi(pane);
       clearPaneOrderbookProfile(pane);
       clearPaneOrderbookLevels(pane);
     });
@@ -9283,6 +9904,205 @@
     state.initialLoadDone = true;
     state.phase = "INTERACTION_READY";
     startPoll();
+    if (state.opi && state.opi.enabled && !isMultiManualMode()) {
+      scheduleOpi(state.panes["pane-0"]);
+    }
+  }
+
+  async function switchPaneSymbol(paneId, symbol) {
+    const pane = state.panes[paneId];
+    const next = String(symbol || "").trim().toUpperCase();
+    if (!pane || !next || pane.symbol === next) return;
+    pane.symbol = next;
+    persistPaneSymbols();
+    const symSel = pane.el.querySelector(".trp-pane-symbol-select");
+    if (symSel && symSel.value !== next) symSel.value = next;
+    pane.overlayPayloads = {};
+    pane.pendingOverlays = [];
+    pane.pendingData = null;
+    pane.candleFp = null;
+    pane.lastTimes = new Set();
+    pane.paneGen += 1;
+    pane._oblHadLive = false;
+    pane._oblPaintSig = null;
+    const chart = api(pane);
+    if (chart && chart.clearOverlays) chart.clearOverlays();
+    clearPaneVolumeProfile(pane);
+    clearPaneOrderbookProfile(pane);
+    clearPaneOrderbookLevels(pane);
+    if (state.obl && (state.obl.enabled || isMultiManualMode()) && isOnDemandBookMode()) {
+      await stopOb1000Lease(pane);
+      await ensureOb1000Lease(next, { force: true }, pane);
+      startOb1000Heartbeat();
+    }
+    syncFocusSymbolFromPane(pane);
+    if (exactOriginEnabledForPane(pane) && window.PD1ExactOriginResearch && PD1ExactOriginResearch.onPaneSymbolChange) {
+      PD1ExactOriginResearch.onPaneSymbolChange(pane);
+    }
+    const gen = state.loadGen;
+    await loadPane(paneId, { force: true, gen: gen, sourceAction: "pane-symbol-switch" });
+    scheduleOrderbookLevels(pane);
+  }
+
+  function fillPaneSymbolSelects(names) {
+    if (!isMultiManualMode()) return;
+    const list = names || [];
+    PANE_IDS.forEach(function (pid) {
+      const pane = state.panes[pid];
+      if (!pane) return;
+      const sel = pane.el.querySelector(".trp-pane-symbol-select");
+      if (!sel) return;
+      sel.innerHTML = "";
+      list.forEach(function (sym) {
+        const opt = document.createElement("option");
+        opt.value = sym;
+        opt.textContent = sym;
+        sel.appendChild(opt);
+      });
+      if (pane.symbol && list.indexOf(pane.symbol) >= 0) sel.value = pane.symbol;
+      else if (list.length) {
+        pane.symbol = list.indexOf(DEFAULT_PANE_SYMBOLS[pid]) >= 0 ? DEFAULT_PANE_SYMBOLS[pid] : list[0];
+        sel.value = pane.symbol;
+      }
+      if (!sel._multiSymBound) {
+        sel._multiSymBound = true;
+        sel.addEventListener("change", function () {
+          switchPaneSymbol(pid, sel.value).catch(function (err) {
+            setStatus("Symbol-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+          });
+        });
+      }
+    });
+    persistPaneSymbols();
+  }
+
+  function applyMultiManualChrome() {
+    if (!isMultiManualMode()) {
+      clearMultiManualChrome();
+      return;
+    }
+    document.body.classList.add("research-multi-manual");
+    state.layout = "4";
+    const toolbar = $("trpToolbar");
+    if (toolbar) toolbar.classList.add("trp-toolbar-multi-manual");
+    const symWrap = $("researchSymbol");
+    const symLabel = $("researchSymbolLabel");
+    if (symLabel) symLabel.style.display = "none";
+    if (symWrap) symWrap.style.display = "none";
+    const layouts = $("trpLayouts");
+    if (layouts) layouts.style.display = "none";
+    const titleSub = document.querySelector(".trp-app-sub");
+    if (titleSub) titleSub.textContent = "Multi 4× · Manual Trading · UTC";
+    const titleMain = document.querySelector(".trp-app-title");
+    if (titleMain) titleMain.textContent = "Research Multi-Chart";
+    updateMultiTradingGuard();
+    updateViewModeButtons();
+  }
+
+  function bindViewModeToggle() {
+    const group = $("researchViewMode");
+    if (!group) return;
+    updateViewModeButtons();
+    group.querySelectorAll(".trp-view-mode-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        const next = btn.dataset.view === "multi" ? "multi" : "single";
+        if ((next === "multi") === isMultiManualMode()) return;
+        try { localStorage.setItem(VIEW_MODE_KEY, next); } catch (e) { /* ignore */ }
+        let url = "/live-charts/research?view=" + encodeURIComponent(next);
+        window.location.assign(url);
+      });
+    });
+  }
+
+  async function hydrateResearchWorkspaceFromServer() {
+    try {
+      applyWorkspace(await getJson("/api/research/workspace"));
+    } catch (err) {
+      setStatus(String(err.message || err), "error");
+    }
+    state.vp = Object.assign(
+      defaultVolumeProfile(),
+      (state.workspace && state.workspace.volume_profile) || {},
+      readStoredVolumeProfile()
+    );
+    fillVolumeProfileControls();
+    state.obp = Object.assign(
+      defaultOrderbookProfile(),
+      (state.workspace && state.workspace.orderbook_profile) || {},
+      readStoredOrderbookProfile()
+    );
+    fillOrderbookProfileControls();
+    state.obl = Object.assign(
+      defaultOrderbookLevels(),
+      (state.workspace && state.workspace.orderbook_levels) || {},
+      readStoredOrderbookLevels()
+    );
+    if (state.obl.enabled) state.obl.depth = 0;
+    fillOrderbookLevelsControls();
+    state.ptb = normalizeTradeBubbles(readStoredTradeBubbles());
+    fillTradeBubblesControls();
+  }
+
+  async function bootMultiManual(names) {
+    await hydrateResearchWorkspaceFromServer();
+    state.obl.enabled = true;
+    state.obl.depth = 0;
+    applyOrderbookLevelsSettings(state.obl, true);
+    applyLayout("4", true);
+    fillPaneSymbolSelects(names);
+    state.symbol = paneSymbol(state.panes["pane-0"]) || names[0] || "";
+    if ($("researchSymbol") && state.symbol) $("researchSymbol").value = state.symbol;
+    PANE_IDS.forEach(function (pid) {
+      const symEl = state.panes[pid] && state.panes[pid].el.querySelector(".trp-pane-symbol");
+      if (symEl && symEl.tagName !== "SELECT") symEl.textContent = paneSymbol(state.panes[pid]);
+    });
+    stopPoll();
+    state.initialLoadDone = false;
+    const gen = ++state.loadGen;
+    state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    PANE_IDS.forEach(function (pid) {
+      const p = state.panes[pid];
+      if (p) p._suppressExactOriginViewport = true;
+    });
+    try {
+      await mapLimit(PANE_IDS, PANE_HTTP_LIMIT, function (pid) {
+        return loadPane(pid, { force: true, gen: gen, sourceAction: "multi-boot" });
+      });
+      if (gen !== state.loadGen) return;
+      await Promise.all(PANE_IDS.map(function (pid) {
+        return ensureOb1000Lease(paneSymbol(state.panes[pid]), {}, state.panes[pid]);
+      }));
+      startOb1000Heartbeat();
+      if (state.symbol) await refreshLiveBar(true);
+      state.initialLoadDone = true;
+      state.phase = "INTERACTION_READY";
+      startPoll();
+      visibleIds().forEach(function (pid) {
+        syncMultiPaneObLayout(state.panes[pid]);
+        scheduleOrderbookLevels(state.panes[pid]);
+      });
+      if (window.PD1ExactOriginResearch) {
+        try {
+          for (let i = 0; i < PANE_IDS.length; i += 1) {
+            const p = state.panes[PANE_IDS[i]];
+            if (p && exactOriginEnabledForPane(p) && PD1ExactOriginResearch.paneSupports(p)) {
+              await PD1ExactOriginResearch.refreshPane(p, { force: true });
+            }
+          }
+        } catch (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] exact-origin multi-boot", err); } catch (e) { /* ignore */ }
+          }
+        }
+      }
+      syncExactOriginToolbarFromFocusPane();
+    } finally {
+      PANE_IDS.forEach(function (pid) {
+        const p = state.panes[pid];
+        if (p) p._suppressExactOriginViewport = false;
+      });
+    }
+    syncPaneFullscreenButtons();
   }
 
   function fillSymbolSelect(rows) {
@@ -9535,6 +10355,10 @@
   }
 
   async function openPositionModal() {
+    if (isMultiManualMode()) {
+      setStatus("Positions-Modal in Multi 2×2 deaktiviert (Symbol-Isolation).", "empty");
+      return;
+    }
     const body = await getJson("/api/research/position").catch(function () { return null; });
     if (!body || !body.position) return;
     const p = body.position;
@@ -9560,14 +10384,43 @@
     applyResearchUiLegacyCleanup();
     bindHistoryUi();
     restoreHistoryPrefs();
+    bindViewModeToggle();
     document.querySelectorAll(".trp-layout-btn").forEach(function (btn) {
       btn.addEventListener("click", function () {
+        if (!isMultiManualMode() && btn.dataset.layout !== "1") return;
         state.paneFs = null;
         applyLayout(btn.dataset.layout);
         loadNewlyVisiblePanes();
       });
     });
     $("researchSymbol").addEventListener("change", function () { switchSymbol($("researchSymbol").value); });
+    const opiEn = $("researchIndOpi");
+    const opiWin = $("researchOpiWindow");
+    if (opiEn) {
+      opiEn.addEventListener("change", function () {
+        if (isMultiManualMode()) {
+          opiEn.checked = false;
+          return;
+        }
+        if (!state.opi) state.opi = defaultOpi();
+        state.opi.enabled = opiEn.checked;
+        persistOpi();
+        if (!state.opi.enabled) {
+          clearPaneOpi(state.panes["pane-0"]);
+        } else {
+          scheduleOpi(state.panes["pane-0"]);
+        }
+      });
+    }
+    if (opiWin) {
+      opiWin.addEventListener("change", function () {
+        if (isMultiManualMode()) return;
+        if (!state.opi) state.opi = defaultOpi();
+        state.opi.window_minutes = Number(opiWin.value) || 15;
+        persistOpi();
+        if (state.opi.enabled) scheduleOpi(state.panes["pane-0"]);
+      });
+    }
     const vpEn = $("researchVpEnabled");
     if (vpEn) {
       vpEn.addEventListener("change", function () {
@@ -9601,6 +10454,7 @@
     if (oblEn) {
       oblEn.addEventListener("change", function () {
         state.obl.enabled = oblEn.checked;
+        if (state.obl.enabled) state.obl.depth = 0;
         persistOrderbookLevels();
         fillOrderbookLevelsControls();
         sendJson("/api/research/settings", "PUT", { orderbook_levels: state.obl }, { sourceAction: "obl-settings" }).catch(function () {});
@@ -11522,12 +12376,13 @@
       PD1ExactOriginResearch.install({
         $: $,
         state: state,
+        paneSymbol: paneSymbol,
+        isMultiManualMode: isMultiManualMode,
         visibleIds: visibleIds,
         syncOverlays: syncOverlays,
         api: api,
         SC_HELPERS: SC_HELPERS,
         isHistoricalReplay: isHistoricalReplay,
-        historyBlocksLive: historyBlocksLive,
         decisionContext: liveMicroLldV2DecisionContext,
         historicalLmv2PoolsEnabled: historicalLmv2PoolsEnabled,
         historicalLmv2HistoricalPoolDetail: historicalLmv2HistoricalPoolDetail,
@@ -11536,9 +12391,15 @@
         VP_DEBOUNCE_MS: VP_DEBOUNCE_MS,
         setStatus: setStatus,
         mountDrawToolbar: mountDrawToolbar,
-        beginExactOriginViewportSuppress: beginExactOriginViewportSuppress,
-        endExactOriginViewportSuppress: endExactOriginViewportSuppress,
-        refreshExactOriginAfterTfSwitch: exactOriginRefreshAfterTfSwitch,
+        exactOriginEnabledForPane: exactOriginEnabledForPane,
+        focusPaneForExactOrigin: focusPaneForExactOrigin,
+        setPaneExactOriginPoolStatus: setPaneExactOriginPoolStatus,
+        persistPaneExactOriginFlag: persistPaneExactOriginFlag,
+        syncExactOriginToolbarFromFocusPane: syncExactOriginToolbarFromFocusPane,
+        suppressExactOriginToolbarEvent: function () {
+          return suppressExactOriginToolbarEvent;
+        },
+        setMultiPaneExactOriginEnabled: setMultiPaneExactOriginEnabled,
       });
     }
     function onLiveMicroV2FilterChange() {
@@ -11696,7 +12557,10 @@
     }
     $("trpClear").addEventListener("click", async function () {
       if (!window.confirm("Zeichnungen dieses Symbols löschen?")) return;
-      applyWorkspace(await sendJson("/api/research/drawings/clear", "POST", { symbol: state.symbol }));
+      const clearSym = (isMultiManualMode() && state.selectedPane && state.panes[state.selectedPane])
+        ? paneSymbol(state.panes[state.selectedPane])
+        : state.symbol;
+      applyWorkspace(await sendJson("/api/research/drawings/clear", "POST", { symbol: clearSym }));
       await refreshOverlaysVisible();
     });
     $("trpDrawColor").addEventListener("change", async function () {
@@ -11721,6 +12585,10 @@
       state.posGuard = false;
     });
     $("posApply").addEventListener("click", async function () {
+      if (isMultiManualMode()) {
+        setStatus("Positions-Modal in Multi 2×2 deaktiviert.", "empty");
+        return;
+      }
       applyWorkspace(await sendJson("/api/research/position", "POST", {
         drawing_id: (state.workspace || {}).selected_id,
         entry_price: Number($("posEntry").value),
@@ -11756,10 +12624,16 @@
           return;
         }
         if (state.paneFs || isBrowserFs()) {
+          if (isMultiManualMode() && state.paneFs) {
+            exitMultiPaneTileFullscreen();
+            return;
+          }
           state.paneFs = null;
+          document.body.classList.remove("research-multi-tile-fs");
           applyLayout(state.layout, true);
           setBrowserFs(false);
           restoreWorkspaceGeomFromFs();
+          syncPaneFullscreenButtons();
           return;
         }
         handleChartKey("escape");
@@ -11781,7 +12655,7 @@
     });
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) {
-        stopOb1000Heartbeat();
+        // Background tab keeps the FULL lease heartbeat.
         return;
       }
       // Browser throttles background timers — kick live price immediately.
@@ -11796,36 +12670,48 @@
         });
       }
     });
+    window.addEventListener("pagehide", function () {
+      releaseOb1000LeaseBestEffort();
+    });
     window.addEventListener("beforeunload", function () {
       releaseOb1000LeaseBestEffort();
     });
   }
 
   async function boot() {
-    const bootT0 = typeof performance !== "undefined" ? performance.now() : 0;
-    bootTrace("boot_start", {});
+    const viewMode = resolveInitialViewMode();
+    state.multiManual = viewMode === "multi";
+    persistViewMode(viewMode);
     try {
-      const saved = localStorage.getItem(LAYOUT_KEY);
-      if (saved && PANE_COUNT[saved]) state.layout = saved;
+      if (!isMultiManualMode()) {
+        state.layout = "1";
+      } else {
+        state.layout = "4";
+      }
     } catch (e) {}
+    if (isMultiManualMode()) {
+      applyMultiManualChrome();
+      if (!state.selectedPane) state.selectedPane = "pane-0";
+      syncExactOriginToolbarFromFocusPane();
+      if (window.OpiE2eDiag && OpiE2eDiag.refreshUi) OpiE2eDiag.refreshUi();
+    }
+    else clearMultiManualChrome();
     buildTools();
     buildPanes();
     bindUi();
     restoreWorkspaceHeight();
     const symbols = await getJson("/api/research/symbols");
     state.symbols = symbols.symbols || [];
-    bootTrace("boot_symbols_ok", { n: (state.symbols || []).length, t0: bootT0 });
     if (SC_HELPERS && SC_HELPERS.applyDoge5mPd1ViewerBounds) {
       getJson("/api/research/doge-5m-pd1-viewer-bounds")
         .then(function (dogeBounds) {
           SC_HELPERS.applyDoge5mPd1ViewerBounds(dogeBounds);
-          bootTrace("boot_bounds_async_ok", { t0: bootT0 });
+          if (window.PD1ExactOriginResearch && PD1ExactOriginResearch.invalidateCapsCache) {
+            PD1ExactOriginResearch.invalidateCapsCache();
+          }
         })
-        .catch(function (boundsErr) {
-          bootTrace("boot_bounds_async_err", {
-            message: boundsErr && boundsErr.message ? String(boundsErr.message).slice(0, 120) : "error",
-            t0: bootT0,
-          });
+        .catch(function () {
+          /* fail-closed — do not block candle bootstrap on pool bounds */
         });
     }
     const names = fillSymbolSelect(state.symbols);
@@ -11833,15 +12719,15 @@
       setStatus("No symbols from /api/research/symbols", "empty");
       return;
     }
+    if (isMultiManualMode()) {
+      await bootMultiManual(names);
+      updateMultiTradingGuard();
+      return;
+    }
     try {
       applyWorkspace(await getJson("/api/research/workspace"));
-      bootTrace("boot_workspace_ok", { t0: bootT0 });
     } catch (err) {
       setStatus(String(err.message || err), "error");
-      bootTrace("boot_workspace_err", {
-        message: err && err.message ? String(err.message).slice(0, 120) : "error",
-        t0: bootT0,
-      });
     }
     state.vp = Object.assign(
       defaultVolumeProfile(),
@@ -11860,10 +12746,13 @@
       (state.workspace && state.workspace.orderbook_levels) || {},
       readStoredOrderbookLevels()
     );
+    if (state.obl.enabled) state.obl.depth = 0;
     fillOrderbookLevelsControls();
     if (state.obl.enabled) startOrderbookLevelsRefresh();
     state.ptb = normalizeTradeBubbles(readStoredTradeBubbles());
     fillTradeBubblesControls();
+    state.opi = readStoredOpi();
+    fillOpiControls();
     const start = pickDefaultSymbol(names);
     if (!start) {
       setStatus("No selectable symbol", "empty");
@@ -11871,9 +12760,7 @@
     }
     $("researchSymbol").value = start;
     applyResearchJobSourceNote();
-    bootTrace("boot_switch_symbol_start", { symbol: start, t0: bootT0 });
     await switchSymbol(start);
-    bootTrace("boot_switch_symbol_ok", { symbol: start, initialLoadDone: !!state.initialLoadDone, t0: bootT0 });
     if (liveMicroLldV2Enabled()) {
       try {
         await refreshLiveMicroLldV2(null, { force: true });
@@ -11883,9 +12770,118 @@
         }
       }
     }
+    updateMultiTradingGuard();
+    updateViewModeButtons();
+    if (window.OpiE2eDiag && OpiE2eDiag.refreshUi) OpiE2eDiag.refreshUi();
   }
 
   window.__researchDebug = state;
+  window.OpiViewportDiag = {
+    enabled: false,
+    enable: function () {
+      this.enabled = true;
+      if (window.OpiRuntimeTrace && OpiRuntimeTrace.enable) OpiRuntimeTrace.enable();
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiViewportDiag) win.OpiViewportDiag.enabled = true;
+      } catch (err) { /* ignore */ }
+      try { console.info("[OPI] OpiViewportDiag enabled — correlate by updateId"); } catch (e) { /* ignore */ }
+      return true;
+    },
+    disable: function () {
+      this.enabled = false;
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiViewportDiag) win.OpiViewportDiag.enabled = false;
+      } catch (err) { /* ignore */ }
+      return false;
+    },
+    filterDump: function (updateId) {
+      const d = window.OpiRuntimeTrace && OpiRuntimeTrace.dump ? OpiRuntimeTrace.dump() : { merged: [] };
+      const id = Number(updateId);
+      if (!Number.isFinite(id)) return d;
+      const keep = function (row) {
+        return row && (row.updateId === id || (row.extra && row.extra.updateId === id)
+          || (row.stage && row.updateId === id));
+      };
+      return {
+        host: (d.host || []).filter(keep),
+        iframe: (d.iframe || []).filter(function (row) {
+          return keep(row) || (row.event === "opiViewport" && row.updateId === id);
+        }),
+        merged: (d.merged || []).filter(function (row) {
+          return keep(row) || row.updateId === id
+            || (row.dFrom != null && row.updateId === id);
+        }),
+      };
+    },
+  };
+  window.OpiRuntimeTrace = {
+    enable: function () {
+      opiRuntimeTraceCore.enable();
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiRuntimeTrace && win.OpiRuntimeTrace.enable) {
+          win.OpiRuntimeTrace.enable();
+        }
+      } catch (err) { /* ignore */ }
+      return true;
+    },
+    disable: function () {
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiRuntimeTrace && win.OpiRuntimeTrace.disable) {
+          win.OpiRuntimeTrace.disable();
+        }
+      } catch (err) { /* ignore */ }
+      opiRuntimeTraceCore.disable();
+      return false;
+    },
+    clear: function () {
+      opiRuntimeTraceCore.clear();
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiRuntimeTrace && win.OpiRuntimeTrace.clear) {
+          win.OpiRuntimeTrace.clear();
+        }
+      } catch (err) { /* ignore */ }
+    },
+    dump: function () {
+      let iframe = [];
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiRuntimeTrace && win.OpiRuntimeTrace.dump) {
+          iframe = win.OpiRuntimeTrace.dump();
+        }
+      } catch (err) { /* ignore */ }
+      const host = opiRuntimeTraceCore.dump();
+      const merged = host.concat(iframe).sort(function (a, b) {
+        return String(a.t).localeCompare(String(b.t));
+      });
+      return { host: host, iframe: iframe, merged: merged };
+    },
+    status: function () {
+      let iframeOn = false;
+      try {
+        const pane = state.panes["pane-0"];
+        const win = pane && pane.iframe && pane.iframe.contentWindow;
+        if (win && win.OpiRuntimeTrace && win.OpiRuntimeTrace.isEnabled) {
+          iframeOn = !!win.OpiRuntimeTrace.isEnabled();
+        }
+      } catch (err) { /* ignore */ }
+      return {
+        host: opiRuntimeTraceCore.isEnabled(),
+        iframe: iframeOn,
+        hostCount: opiRuntimeTraceCore.dump().length,
+      };
+    },
+  };
   window.__researchEnablePaneSendJsonDiag = function () {
     try { window.__researchPaneSendJsonDiag = true; } catch (e) { /* ignore */ }
     try { localStorage.setItem("research.paneSendJsonDiag", "1"); } catch (e) { /* ignore */ }
@@ -11911,12 +12907,6 @@
   };
 
   document.addEventListener("DOMContentLoaded", function () {
-    var mlbConfirmBtn = document.getElementById("mlbOrderConfirm");
-    if (mlbConfirmBtn) {
-      mlbConfirmBtn.addEventListener("click", function () {
-        if (typeof mlbOrderPending === "function") mlbOrderPending();
-      });
-    }
     boot().catch(function (err) {
       if (err && err.name === "AbortError") return;
       setStatus(String(err.message || err), "error");
