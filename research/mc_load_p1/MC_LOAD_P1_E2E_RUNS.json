@@ -1,0 +1,78 @@
+{
+  "schema_version": "mc_load_p1_v1",
+  "generated_utc": "2026-11-25",
+  "status_note": "Browser scenarios NOT_RUN in this session; server-side pane_bundle benchmarks MEASURED on host",
+  "browser_tests": [
+    {
+      "id": "A",
+      "label": "BNBUSDT 5m screenshot config (ACTIVE on, OBL on, OPI off)",
+      "status": "NOT_RUN",
+      "reason": "No authenticated browser automation to dash.immotel.de:8080 in agent session"
+    },
+    {
+      "id": "B",
+      "label": "BNBUSDT 5m ACTIVE+OBL off",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "C",
+      "label": "BNBUSDT 5m ACTIVE on, OBL off",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "D",
+      "label": "BNBUSDT 5m ACTIVE off, OBL on",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "E",
+      "label": "SOLUSDT 5m comparable",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "F",
+      "label": "BNBUSDT 5m GO-TO historical",
+      "status": "NOT_RUN"
+    }
+  ],
+  "server_benchmarks": [
+    {
+      "kind": "MEASURED",
+      "test": "pane_bundle BNBUSDT 5m liquidity.enabled=true cache miss",
+      "pane_bundle_ms": 515.55,
+      "candle_count": 1500,
+      "overlay_count": 310,
+      "cache": "miss"
+    },
+    {
+      "kind": "MEASURED",
+      "test": "pane_bundle BNBUSDT 5m liquidity.enabled=false",
+      "pane_bundle_ms": 4.14,
+      "candle_count": 1500,
+      "overlay_count": 0,
+      "cache": "hit"
+    },
+    {
+      "kind": "MEASURED",
+      "test": "resolve_candle_pack BNBUSDT 5m only",
+      "resolve_candle_pack_ms": 475.05,
+      "cache": "miss"
+    },
+    {
+      "kind": "MEASURED",
+      "test": "pane_bundle BNBUSDT 5m LLD warm run 1",
+      "pane_bundle_ms": 37.32
+    },
+    {
+      "kind": "MEASURED",
+      "test": "pane_bundle BNBUSDT 5m LLD warm run 2",
+      "pane_bundle_ms": 27.56
+    },
+    {
+      "kind": "MEASURED",
+      "test": "pane_bundle SOLUSDT 5m LLD on miss",
+      "pane_bundle_ms": 98.49,
+      "overlay_count": 315
+    }
+  ]
+}
