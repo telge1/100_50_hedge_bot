@@ -4,7 +4,7 @@
 (function (root) {
   "use strict";
 
-  var V = "research-mc-opi-p3q-v1";
+  var V = "research-mc-opi-p3s-v1";
   var MAX_EVENTS = 1800;
   var MAX_MISMATCH = 48;
   var MAX_DESYNC = 48;

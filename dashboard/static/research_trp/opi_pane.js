@@ -29,6 +29,10 @@
   var lastOpiLayoutKey = "";
   var layoutTraceGen = 0;
   var lastAppliedTsOptKey = "";
+  var opiXhairLock = false;
+  var lastOpiCrosshairTime = null;
+  var suppressOpiUntilTime = null;
+  var crosshairBridge = null;
 
   function alignDataLen() {
     try {
@@ -348,9 +352,77 @@
       lastValueVisible: false,
     });
     opiChart.subscribeCrosshairMove(function (param) {
-      hoverTime(param && param.time != null ? Number(param.time) : null);
+      if (opiXhairLock) return;
+      var unix = param && param.time != null ? Number(param.time) : null;
+      hoverTime(unix);
+      if (!crosshairBridge || !isOpiStackVisible()) return;
+      if (unix == null) {
+        if (lastOpiCrosshairTime != null) {
+          lastOpiCrosshairTime = null;
+          suppressOpiUntilTime = null;
+          if (typeof crosshairBridge.on_leave === "function") {
+            crosshairBridge.on_leave();
+          }
+        }
+        return;
+      }
+      if (suppressOpiUntilTime != null) {
+        var echoed = unix === suppressOpiUntilTime;
+        suppressOpiUntilTime = null;
+        if (echoed) {
+          lastOpiCrosshairTime = unix;
+          return;
+        }
+      }
+      if (unix === lastOpiCrosshairTime) return;
+      lastOpiCrosshairTime = unix;
+      if (typeof crosshairBridge.on_move === "function") {
+        crosshairBridge.on_move(unix);
+      }
     });
     return opiChart;
+  }
+
+  function isOpiStackVisible() {
+    var stack = $("opi-stack");
+    return !!(stack && !stack.hidden);
+  }
+
+  function hasAlignTime(unix) {
+    if (!Number.isFinite(unix) || !baseTimes.length) return false;
+    for (var i = 0; i < baseTimes.length; i++) {
+      if (baseTimes[i] === unix) return true;
+    }
+    return false;
+  }
+
+  function setSyncedCrosshair(unix) {
+    if (!opiChart || !alignCandle || !isOpiStackVisible()) return;
+    unix = Number(unix);
+    if (!hasAlignTime(unix)) {
+      clearSyncedCrosshair();
+      return;
+    }
+    suppressOpiUntilTime = unix;
+    lastOpiCrosshairTime = unix;
+    opiXhairLock = true;
+    try {
+      opiChart.setCrosshairPosition(1, unix, alignCandle);
+    } catch (err) { /* ignore */ }
+    opiXhairLock = false;
+  }
+
+  function clearSyncedCrosshair() {
+    suppressOpiUntilTime = null;
+    lastOpiCrosshairTime = null;
+    if (!opiChart) return;
+    try {
+      opiChart.clearCrosshairPosition();
+    } catch (err) { /* ignore */ }
+  }
+
+  function setCrosshairBridge(bridge) {
+    crosshairBridge = bridge || null;
   }
 
   function pushBaseKey() {
@@ -602,6 +674,8 @@
   }
 
   function clear() {
+    clearSyncedCrosshair();
+    crosshairBridge = null;
     bars = [];
     byTime = {};
     meta = {};
@@ -1418,6 +1492,9 @@
     setTimeBase: setTimeBase,
     setError: setError,
     hoverTime: hoverTime,
+    setSyncedCrosshair: setSyncedCrosshair,
+    clearSyncedCrosshair: clearSyncedCrosshair,
+    setCrosshairBridge: setCrosshairBridge,
     debugLogicalRanges: debugLogicalRanges,
     debugPlotAlignment: debugPlotAlignment,
     pickAlignmentAnchorTimes: pickAlignmentAnchorTimes,
