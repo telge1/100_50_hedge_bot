@@ -44,8 +44,9 @@ HTTP-Live (`127.0.0.1:3000`) **pd1**: gleiche SHA wie oben (ohne Restart währen
 |------|------|
 | Remote | `git@github.com:telge1/100_50_hedge_bot.git` |
 | Recovery-Branch | `recovery/mc-pool-p9-20261126` |
-| Commit (HEAD Branch) | `e3a7e87ffc748a03d2dbf2c7325efc3b5c1f6edd` |
-| Annotierter Tag | `stable-mc-pool-p9-20261126` → Commit **`e3a7e87f`** |
+| Commit (HEAD Branch + Tag^{commit}) | `5727080c23ceb66a59296596cc8db7709f78306b` |
+| Annotierter Tag-Objekt (remote) | `42e6d17b768addc3dfd8ade90fea3691224d7c99` |
+| Funktions-Commit (pd1/recovery core) | `e3a7e87ffc748a03d2dbf2c7325efc3b5c1f6edd` |
 | Push-Verifikation | `git ls-remote` Branch + Tag auf `origin` |
 
 **Primary Working Copy (Produktion):**  
