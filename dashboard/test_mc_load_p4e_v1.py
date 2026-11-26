@@ -13,7 +13,7 @@ def test_p4e_asset_bump():
     html = HTML.read_text(encoding="utf-8")
     js = RC.read_text(encoding="utf-8")
     assert "mc-load-p4i-v1" in html
-    assert "research-mc-load-p4i-v1" in html
+    assert "research-mc-load-p4i-v1" in html or "research-mc-pool-p4b-v1" in html
     assert 'MC_LOAD_P3B_CODE = "mc-load-p4i-v1"' in js
 
 

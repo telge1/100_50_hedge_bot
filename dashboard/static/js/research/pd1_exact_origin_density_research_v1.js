@@ -39,6 +39,8 @@
   let deps = null;
   let caps = null;
   let capsLoadInflight = null;
+  /** Single-flight per bounds URL (re-enable / loadCaps / refreshPane share one in-flight GET). */
+  const viewerBoundsInflight = Object.create(null);
   const inflight = new Map();
   let lastMetrics = null;
 
@@ -588,10 +590,66 @@
     );
   }
 
-  function clearCanvasOnPane(pane) {
+  function clearExactOriginVisualOnPane(pane) {
     const chart = deps && deps.api(pane);
     if (chart && chart.clearExactOriginDensity) chart.clearExactOriginDensity();
+  }
+
+  function clearCanvasOnPane(pane) {
+    clearExactOriginVisualOnPane(pane);
     if (pane) resetAllWindowStores(pane);
+  }
+
+  function activeScopeSignature(scopes) {
+    return (scopes || [])
+      .map(function (sc) {
+        return sc.timeframe + "/pd" + sc.pool_detail;
+      })
+      .join(",");
+  }
+
+  function recordPaneVisualStripState(pane) {
+    if (!pane) return;
+    bumpExactOriginLoadSerial(pane, "exact_origin_visual_off");
+    pane.exactOriginVisualStripMs = Date.now();
+    const scopes = activeScopesForPane(pane);
+    pane.exactOriginStripScopeSig = activeScopeSignature(scopes);
+    pane.exactOriginStripChartTf = paneChartTimeframe(pane);
+    pane.exactOriginStripSymbol = paneSymbolUpper(pane) || currentSymbolUpper() || "";
+    let hiMs = null;
+    try {
+      const sym = pane.exactOriginStripSymbol;
+      if (caps && scopes.length && sym) {
+        const b = dataBoundsMsForScopes(caps, scopes, sym);
+        hiMs = b.hiMs;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+    pane.exactOriginStripCapsHiMs = hiMs;
+  }
+
+  function exactOriginReenableScopeUnchanged(pane) {
+    if (!pane) return false;
+    const scopes = activeScopesForPane(pane);
+    const sig = activeScopeSignature(scopes);
+    const tf = paneChartTimeframe(pane);
+    const sym = paneSymbolUpper(pane) || currentSymbolUpper() || "";
+    if (pane.exactOriginStripScopeSig != null && pane.exactOriginStripScopeSig !== sig) return false;
+    if (pane.exactOriginStripChartTf != null && pane.exactOriginStripChartTf !== tf) return false;
+    if (pane.exactOriginStripSymbol != null && pane.exactOriginStripSymbol !== sym) return false;
+    return true;
+  }
+
+  function exactOriginReenableCapsHiAdvanced(pane, hiMsNow) {
+    if (!pane || hiMsNow == null) return false;
+    if (pane.exactOriginStripCapsHiMs == null) return false;
+    return hiMsNow > pane.exactOriginStripCapsHiMs;
+  }
+
+  /** Fail-closed: kein Segment-Repaint ohne bei OFF gespeichertes hiMs-Baseline. */
+  function exactOriginReenableFreshnessBaselineKnown(pane) {
+    return !!(pane && pane.exactOriginStripCapsHiMs != null);
   }
 
   function getMinOrigins() {
@@ -682,22 +740,71 @@
     }
   }
 
+  function normalizeViewerBoundsBody(body) {
+    if (!body) return null;
+    if (body.data_available_to) return body;
+    if (body.success) return body;
+    return null;
+  }
+
+  /**
+   * Fetch multicoin/doge viewer bounds and apply to caps (fail-closed on HTTP/parse errors).
+   * Dedupes concurrent requests for the same boundsUrl within one operation / tab.
+   */
+  async function fetchViewerBoundsAndApply(sym, traceId) {
+    const s = String(sym || "").toUpperCase();
+    if (!s || !MC4_5M_PD1_SYMBOLS[s]) return { ok: false, reason: "unsupported_symbol" };
+    const boundsUrl = viewerBoundsUrl(s);
+    if (!boundsUrl) return { ok: false, reason: "no_bounds_url" };
+    if (viewerBoundsInflight[boundsUrl]) {
+      return viewerBoundsInflight[boundsUrl];
+    }
+    const T = eoTr();
+    const work = (async function () {
+      try {
+        const bRes = await fetch(boundsUrl, { credentials: "same-origin" });
+        if (T && T.enabled()) {
+          T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
+            viewer_bounds_fetch: true,
+            bounds_symbol: s,
+            doge_bounds_http: bRes.status,
+            doge_bounds_ok: bRes.ok,
+          });
+        }
+        if (!bRes.ok) return { ok: false, http: bRes.status };
+        const body = await bRes.json().catch(function () {
+          return null;
+        });
+        const b = normalizeViewerBoundsBody(body);
+        if (!b || !b.data_available_to) return { ok: false, reason: "no_data_available_to" };
+        if (caps) applyDoge5mViewerBoundsToCaps(caps, b);
+        return { ok: true, bounds: b };
+      } catch (e) {
+        if (T && T.enabled()) {
+          T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
+            viewer_bounds_fetch_error: String(e && e.message ? e.message : e),
+          });
+        }
+        return { ok: false, reason: String(e && e.message ? e.message : e) };
+      } finally {
+        delete viewerBoundsInflight[boundsUrl];
+      }
+    })();
+    viewerBoundsInflight[boundsUrl] = work;
+    return work;
+  }
+
   async function ensurePaneViewerBounds(pane) {
     const sym = paneSymbolUpper(pane);
-    if (!sym || !MC4_5M_PD1_SYMBOLS[sym]) return;
-    const boundsUrl = viewerBoundsUrl(sym);
-    if (!boundsUrl) return;
-    try {
-      const bRes = await fetch(boundsUrl, { credentials: "same-origin" });
-      if (!bRes.ok) return;
-      const b = await bRes.json().catch(function () {
-        return null;
-      });
-      if (b && b.data_available_to) {
-        if (!caps) await loadCaps();
-        if (caps) applyDoge5mViewerBoundsToCaps(caps, b);
-      }
-    } catch (e) { /* ignore */ }
+    if (!sym || !MC4_5M_PD1_SYMBOLS[sym]) return { ok: false, reason: "unsupported" };
+    if (!caps || !caps._loadCapsReady) {
+      await loadCaps();
+      return {
+        ok: !!(caps && caps._doge5mPd1ViewerBounds && caps._doge5mPd1ViewerBounds.data_available_to),
+      };
+    }
+    const res = await fetchViewerBoundsAndApply(sym, traceIdForPane(pane));
+    return { ok: !!(res && res.ok) };
   }
 
   function maxChartZones() {
@@ -724,11 +831,28 @@
     deps.syncOverlays(pane, base.concat(zones || []));
   }
 
+  function stripPaneVisual(pane) {
+    if (!pane || !deps) return;
+    recordPaneVisualStripState(pane);
+    clearExactOriginVisualOnPane(pane);
+    deps.syncOverlays(pane, stripExact(pane.pendingOverlays || []));
+    setPanePoolStatus(pane, "off");
+  }
+
   function stripPane(pane) {
     if (!pane || !deps) return;
     clearCanvasOnPane(pane);
     deps.syncOverlays(pane, stripExact(pane.pendingOverlays || []));
     setPanePoolStatus(pane, "off");
+  }
+
+  function stripAllPanesVisual() {
+    if (!deps) return;
+    deps.visibleIds().forEach(function (pid) {
+      const pane = deps.state.panes[pid];
+      if (!pane) return;
+      stripPaneVisual(pane);
+    });
   }
 
   function stripAllPanes() {
@@ -783,52 +907,26 @@
   async function refreshDoge5mViewerBoundsIfStale(capRoot, traceId) {
     if (!capRoot || !capRoot._loadCapsReady) return capRoot;
     const sym = String(capRoot.symbol || currentSymbolUpper() || "DOGEUSDT").toUpperCase();
-    const boundsUrl = viewerBoundsUrl(sym);
-    if (!boundsUrl) return capRoot;
+    if (!viewerBoundsUrl(sym)) return capRoot;
     const now = Date.now();
     const last = capRoot._doge5mBoundsFetchedAt || 0;
     if (now - last < DOGE_5M_BOUNDS_REFRESH_MS) return capRoot;
-    const T = eoTr();
-    try {
-      const bRes = await fetch(boundsUrl, {
-        credentials: "same-origin",
-      });
-      if (T && T.enabled()) {
-        T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
-          doge_bounds_refresh: true,
-          doge_bounds_http: bRes.status,
-          doge_bounds_ok: bRes.ok,
-        });
-      }
-      if (!bRes.ok) {
-        capRoot._doge5mBoundsFetchedAt = now;
-        return capRoot;
-      }
-      const body = await bRes.json().catch(function () {
-        return null;
-      });
-      const b = body && body.data_available_to ? body : body && body.success ? body : null;
-      if (b && b.data_available_to) applyDoge5mViewerBoundsToCaps(capRoot, b);
-      else capRoot._doge5mBoundsFetchedAt = now;
-    } catch (e) {
-      capRoot._doge5mBoundsFetchedAt = now;
-      if (T && T.enabled()) {
-        T.event(traceId || traceIdForPane(referencePaneForPdUi()), "loadCaps", {
-          doge_bounds_refresh_error: String(e && e.message ? e.message : e),
-        });
-      }
-    }
+    const res = await fetchViewerBoundsAndApply(sym, traceId);
+    if (!res || !res.ok) capRoot._doge5mBoundsFetchedAt = now;
     return capRoot;
   }
 
-  async function loadCaps() {
+  async function loadCaps(opts) {
+    opts = opts || {};
     if (caps && caps._loadCapsReady) {
       const T = eoTr();
       const tid = traceIdForPane(referencePaneForPdUi()) || ensureEoTrace(referencePaneForPdUi());
       if (T && T.enabled()) {
         T.event(tid, "loadCaps", { cache: "HIT", caps_key: "module_caps_singleton" });
       }
-      await refreshDoge5mViewerBoundsIfStale(caps, tid);
+      if (!opts.skipStaleBoundsRefresh) {
+        await refreshDoge5mViewerBoundsIfStale(caps, tid);
+      }
       return caps;
     }
     if (capsLoadInflight) {
@@ -859,33 +957,14 @@
         ms: typeof performance !== "undefined" ? Math.round(performance.now() - t0) : null,
       });
     }
-  try {
-    const sym = currentSymbolUpper() || "DOGEUSDT";
-    const boundsUrl = viewerBoundsUrl(sym) || "/api/research/doge-5m-pd1-viewer-bounds";
-    const bRes = await fetch(boundsUrl, {
-      credentials: "same-origin",
-    });
-    if (T && T.enabled()) {
-      T.event(tid, "loadCaps", {
-        doge_bounds_http: bRes.status,
-        doge_bounds_ok: bRes.ok,
-        bounds_symbol: sym,
-      });
-    }
-    if (bRes.ok) {
-      const b = await bRes.json().catch(function () {
-        return null;
-      });
-      if (b && b.data_available_to) {
-        applyDoge5mViewerBoundsToCaps(caps, b);
+    try {
+      const sym = currentSymbolUpper() || "DOGEUSDT";
+      await fetchViewerBoundsAndApply(sym, tid);
+    } catch (e) {
+      if (T && T.enabled()) {
+        T.event(tid, "loadCaps", { doge_bounds_error: String(e && e.message ? e.message : e) });
       }
     }
-  } catch (e) {
-    /* fail-closed: viewer caps only */
-    if (T && T.enabled()) {
-      T.event(tid, "loadCaps", { doge_bounds_error: String(e && e.message ? e.message : e) });
-    }
-  }
     try {
       const od30Res = await fetch(
         "/api/research/doge-pd1-on-demand-viewer-bounds?timeframe=30m&pool_detail=1",
@@ -1778,6 +1857,7 @@
       return;
     }
     if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
+    if (!isPaneExactOriginEnabled(pane)) return;
 
     if (canvasOn) {
       pushCanvasDensity(pane, mergedSegments, null);
@@ -1915,9 +1995,98 @@
     setPanePoolStatus(pane, "ready", allPools.length + " pools");
   }
 
+  async function refreshPaneAfterReEnable(pane) {
+    if (!pane || !isPaneExactOriginEnabled(pane) || !paneSupports(pane)) return;
+    if (!exactOriginReenableScopeUnchanged(pane)) {
+      resetAllWindowStores(pane);
+      pane.exactOriginSegmentCache = null;
+      pane.exactOriginSweepCache = null;
+      await refreshPane(pane, { force: true });
+      return;
+    }
+    const scopes = activeScopesForPane(pane);
+    const sym = paneSymbolUpper(pane) || currentSymbolUpper() || "DOGEUSDT";
+    const boundsSync = await ensurePaneViewerBounds(pane);
+    await loadCaps({ skipStaleBoundsRefresh: true });
+    const AD = window.PD1ExactDensityTrpAdapter;
+    if (!AD) {
+      await refreshPane(pane, { force: true });
+      return;
+    }
+    const bounds = dataBoundsMsForScopes(caps, scopes, sym);
+    const hiAdvanced = exactOriginReenableCapsHiAdvanced(pane, bounds.hiMs);
+    const freshnessKnown = exactOriginReenableFreshnessBaselineKnown(pane);
+    if (!boundsSync || !boundsSync.ok || hiAdvanced || !freshnessKnown) {
+      pane.exactOriginSegmentCache = null;
+      pane.exactOriginSweepCache = null;
+    }
+    const viewSec = resolveViewSec(pane, {});
+    if (!viewSec) {
+      await refreshPane(pane, hiAdvanced ? {} : {});
+      return;
+    }
+    const win = buildWindows(viewSec, bounds.loMs, bounds.hiMs, traceIdForPane(pane));
+    if (!win.ok) {
+      await refreshPane(pane, {});
+      return;
+    }
+    const hitFromMs = win.hit.from * 1000;
+    const hitToMs = win.hit.to * 1000;
+    const loadSpan = AD.computeDensityLoadSpanMs(hitFromMs, hitToMs, bounds.loMs, bounds.hiMs);
+    const scopePlans = scopes.map(function (sc) {
+      const planner = exactOriginWindowPlannerForScope(sc);
+      const scopeKey = exactOriginScopeKeyForScope(sc, sym);
+      return {
+        store: windowStoreForScope(pane, sc),
+        planned: AD.planExactOriginLoadWindows(loadSpan.fromMs, loadSpan.toMs, bounds.loMs, bounds.hiMs, {
+          mode: planner.mode,
+          tileHours: planner.tileHours,
+          scopeKey: scopeKey,
+        }),
+      };
+    });
+    const fullyCached = scopePlans.every(function (sp) {
+      return AD.exactOriginWindowsFullyCached(sp.store, sp.planned);
+    });
+    const renderKey = viewportRenderKey(win.hit) + "|" + exactOriginScopeKeyForPane(pane);
+    const segMatch =
+      pane.exactOriginSegmentCache &&
+      pane.exactOriginSegmentCache.key === renderKey &&
+      pane.exactOriginSegmentCache.segments;
+    if (
+      isCanvasPathEnabled() &&
+      fullyCached &&
+      segMatch &&
+      !hiAdvanced &&
+      freshnessKnown &&
+      repaintPaneFromCache(pane)
+    ) {
+      const n = pane.exactOriginSegmentCache.metrics && pane.exactOriginSegmentCache.metrics.pools;
+      setPanePoolStatus(pane, "ready", n != null ? n + " pools" : undefined);
+      return;
+    }
+    await refreshPane(pane, {});
+  }
+
+  async function refreshAllAfterReEnable() {
+    if (!isMultiManual() && !isEnabled()) {
+      stripAllPanesVisual();
+      return;
+    }
+    const targets = [];
+    deps.visibleIds().forEach(function (pid) {
+      const p = deps.state.panes[pid];
+      if (p && paneSupports(p) && isPaneExactOriginEnabled(p)) targets.push(p);
+    });
+    if (!targets.length) return;
+    for (let i = 0; i < targets.length; i += 1) {
+      await refreshPaneAfterReEnable(targets[i]);
+    }
+  }
+
   async function refreshAll(opts) {
     if (!isMultiManual() && !isEnabled()) {
-      stripAllPanes();
+      stripAllPanesVisual();
       return;
     }
     const targets = [];
@@ -2062,13 +2231,13 @@
         if (!pane) return;
         pane.exactOriginEnabled = false;
         if (deps.persistPaneExactOriginFlag) deps.persistPaneExactOriginFlag(pane.id, false);
-        stripPane(pane);
+        stripPaneVisual(pane);
       });
       if (deps.syncExactOriginToolbarFromFocusPane) deps.syncExactOriginToolbarFromFocusPane();
     } else {
       const cb = deps.$("researchIndExactOriginDensity");
       if (cb && cb.checked) cb.checked = false;
-      stripAllPanes();
+      stripAllPanesVisual();
     }
     updateUiChrome();
   }
@@ -2090,12 +2259,12 @@
         disableHistoricalLmv2();
         syncPoolDetailUi(referencePaneForPdUi());
         try {
-          await refreshAll({ force: true });
+          await refreshAllAfterReEnable();
         } catch (err) {
           deps.setStatus("Exact Origin: " + (err.message || err), "error");
         }
       } else {
-        stripAllPanes();
+        stripAllPanesVisual();
       }
     });
     const hist = deps.$("researchIndHistoricalLmv2Pools");
@@ -2228,10 +2397,17 @@
     VERSION: VERSION,
     paneSupports: paneSupports,
     refreshAll: refreshAll,
+    refreshAllAfterReEnable: refreshAllAfterReEnable,
     refreshPane: refreshPane,
+    refreshPaneAfterReEnable: refreshPaneAfterReEnable,
     scheduleViewport: scheduleViewport,
     stripAllPanes: stripAllPanes,
+    stripAllPanesVisual: stripAllPanesVisual,
     stripPane: stripPane,
+    stripPaneVisual: stripPaneVisual,
+    exactOriginReenableScopeUnchanged: exactOriginReenableScopeUnchanged,
+    exactOriginReenableCapsHiAdvanced: exactOriginReenableCapsHiAdvanced,
+    exactOriginReenableFreshnessBaselineKnown: exactOriginReenableFreshnessBaselineKnown,
     isPaneExactOriginEnabled: isPaneExactOriginEnabled,
     updateUiChrome: updateUiChrome,
     disableExactOrigin: disableExactOrigin,

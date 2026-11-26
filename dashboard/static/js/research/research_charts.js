@@ -278,11 +278,17 @@
       if (PD1ExactOriginResearch.disableHistoricalLmv2) PD1ExactOriginResearch.disableHistoricalLmv2();
       if (PD1ExactOriginResearch.syncPoolDetailUi) PD1ExactOriginResearch.syncPoolDetailUi(pane);
       try {
-        await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+        if (PD1ExactOriginResearch.refreshPaneAfterReEnable) {
+          await PD1ExactOriginResearch.refreshPaneAfterReEnable(pane);
+        } else {
+          await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+        }
       } catch (err) {
         setStatus("Exact Origin (" + paneSymbol(pane) + "): " + (err.message || err), "error");
         setPaneExactOriginPoolStatus(pane, "error");
       }
+    } else if (PD1ExactOriginResearch.stripPaneVisual) {
+      PD1ExactOriginResearch.stripPaneVisual(pane);
     } else if (PD1ExactOriginResearch.stripPane) {
       PD1ExactOriginResearch.stripPane(pane);
     }

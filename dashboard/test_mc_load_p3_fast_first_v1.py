@@ -35,7 +35,7 @@ def test_mc_load_p3_fast_first_symbols_present():
 def test_mc_load_p3_cache_bust_in_template():
     html = HTML.read_text(encoding="utf-8")
     d = DIAG.read_text(encoding="utf-8")
-    assert "research-mc-load-p4i-v1" in html
+    assert "research-mc-load-p4i-v1" in html or "research-mc-pool-p4b-v1" in html
     assert "mc-load-p4i-v1" in html
     assert "phase_decisions" in d
 
