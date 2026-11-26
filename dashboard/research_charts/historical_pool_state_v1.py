@@ -316,6 +316,47 @@ def doge_5m_pd1_viewer_bounds(
     }
 
 
+def multicoin_5m_pd1_viewer_bounds(
+    symbol: str,
+    *,
+    reader: PublishedActiveReader | None = None,
+) -> dict[str, Any]:
+    """5m PD1 chart bounds for MC4 live symbols (publish SSOT only)."""
+    from .multicoin_pd1_scope_v1 import MC5E_5M_PD1_VIEWER_SYMBOLS, resolve_multicoin_pd1_scope
+    from .viewer_scope_v1 import resolve_landscape_viewer_config
+
+    sym = str(symbol or "").strip().upper()
+    if sym not in MC5E_5M_PD1_VIEWER_SYMBOLS:
+        raise HistoricalPoolStateError(
+            "INVALID_SCOPE",
+            "multicoin 5m PD1 viewer bounds not enabled for symbol",
+            {"symbol": sym, "allowed": list(MC5E_5M_PD1_VIEWER_SYMBOLS)},
+        )
+    pd_cfg = resolve_landscape_viewer_config(symbol=sym, timeframe="5m", pool_detail=1)
+    rdr = reader or PublishedActiveReader()
+    _PUBLISHED_CLOSES_CACHE.pop((pd_cfg.pipeline_line_id, pd_cfg.config_hash), None)
+    published = get_published_decision_closes(
+        rdr, pd_cfg.config_hash, pipeline_line_id=pd_cfg.pipeline_line_id
+    )
+    lo, hi = viewer_timeline_import_bounds(
+        published,
+        timeframe="5m",
+        pool_detail=1,
+        symbol=sym,
+    )
+    return {
+        "symbol": sym,
+        "timeframe": "5m",
+        "pool_detail": 1,
+        "pipeline_line_id": pd_cfg.pipeline_line_id,
+        "config_hash": pd_cfg.config_hash,
+        "data_available_from": _iso_z(lo),
+        "data_available_to": _iso_z(hi),
+        "release_source": "validated_publish_ssot",
+        "nominal_floor": _iso_z(lo),
+    }
+
+
 def doge_pd1_on_demand_viewer_bounds(*, timeframe: str, pool_detail: int = 1) -> dict[str, Any]:
     """Chart bounds for on-demand PD1 pool TFs (30m/1h/4h), not publish SSOT."""
     tf = str(timeframe or "").strip()
@@ -411,6 +452,40 @@ def viewer_timeline_import_bounds(
                 },
             )
         return closes[0], released_to
+    if tf == "5m" and pd == 1:
+        from .multicoin_pd1_scope_v1 import MC5E_5M_PD1_VIEWER_SYMBOLS, resolve_multicoin_pd1_scope
+
+        if sym in MC5E_5M_PD1_VIEWER_SYMBOLS:
+            scope = resolve_multicoin_pd1_scope(sym)
+            if sym == "XAUUSDT":
+                import_from = datetime(2026, 7, 9, 3, 0, tzinfo=timezone.utc)
+            else:
+                import_from = datetime(2026, 5, 1, 0, 0, tzinfo=timezone.utc)
+            pub_sorted = sorted(c.astimezone(timezone.utc) for c in published)
+            in_range = [c for c in pub_sorted if c >= import_from]
+            if not in_range:
+                raise HistoricalPoolStateError(
+                    "OUT_OF_SCOPE",
+                    "no published 5m PD1 closes within MC4 import window",
+                    {"symbol": sym, "import_from": _iso_z(import_from)},
+                )
+            released_to = validated_doge_5m_pd1_publish_high_water(
+                in_range,
+                pipeline_line_id=scope.pipeline_line_id,
+                config_hash=scope.config_hash,
+            )
+            closes = [c for c in in_range if c <= released_to]
+            if not closes or closes[-1] != released_to:
+                raise HistoricalPoolStateError(
+                    "INCOMPLETE_PUBLISH_TAIL",
+                    "validated MC4 chart high-water missing from publication list",
+                    {
+                        "symbol": sym,
+                        "validated_to": _iso_z(released_to),
+                        "list_max": _iso_z(in_range[-1]),
+                    },
+                )
+            return closes[0], released_to
     return static_timeline_import_bounds(published)
 
 
@@ -637,6 +712,7 @@ def load_historical_pool_state_at_close(
     database: str | None = None,
     reader: PublishedActiveReader | None = None,
     cfg_hash: str | None = None,
+    pipeline_line_id: str | None = None,
     include_remaining: bool = True,
 ) -> HistoricalPoolStateAtClose:
     from .historical_lmv2_pd_contract_v1 import resolve_historical_pd_config
@@ -645,7 +721,7 @@ def load_historical_pool_state_at_close(
     reader = reader or PublishedActiveReader()
     hcfg = resolve_historical_pd_config(pool_detail, timeframe=timeframe)
     cfg_hash = cfg_hash or hcfg.config_hash
-    line_id = hcfg.pipeline_line_id
+    line_id = str(pipeline_line_id).strip() if pipeline_line_id else hcfg.pipeline_line_id
     published = get_published_decision_closes(
         reader, cfg_hash, pipeline_line_id=line_id
     )
@@ -653,7 +729,9 @@ def load_historical_pool_state_at_close(
     if i >= len(published) or published[i] != dc:
         raise HistoricalPoolStateError("MISSING_PUBLICATION", "no published snapshot at decision_close")
     sym = symbol.upper()
-    if sym != hcfg.symbol or timeframe != hcfg.timeframe or pool_detail != hcfg.pool_detail:
+    if pipeline_line_id is None and (
+        sym != hcfg.symbol or timeframe != hcfg.timeframe or pool_detail != hcfg.pool_detail
+    ):
         raise HistoricalPoolStateError(
             "INVALID_SCOPE",
             "requested scope does not match resolved historical PD config",
@@ -664,6 +742,24 @@ def load_historical_pool_state_at_close(
                 "resolved": hcfg.to_api_dict(),
             },
         )
+    if pipeline_line_id is not None:
+        from .viewer_scope_v1 import resolve_landscape_viewer_config
+
+        resolved = resolve_landscape_viewer_config(
+            symbol=sym, timeframe=timeframe, pool_detail=pool_detail
+        )
+        if line_id != resolved.pipeline_line_id or cfg_hash != resolved.config_hash:
+            raise HistoricalPoolStateError(
+                "INVALID_SCOPE",
+                "pipeline_line_id does not match viewer config for symbol",
+                {
+                    "symbol": sym,
+                    "timeframe": timeframe,
+                    "pool_detail": pool_detail,
+                    "pipeline_line_id": line_id,
+                    "expected_pipeline_line_id": resolved.pipeline_line_id,
+                },
+            )
     own_client = client is None
     if client is None:
         ch_cfg = load_clickhouse_config()
