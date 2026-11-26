@@ -17,7 +17,7 @@
   const EOD_FIXED_TILE_48H_FLAG_KEY = "phase6xt_eod_fixed_tile_48h_v1";
   const MIN_ORIGINS_STORAGE_KEY = "phase6xt_eod_density_min_origins_v1";
   const MIN_ORIGINS_SLIDER_MAX = 10;
-  const VERSION = "pd1-mc4-multicoin-5m-v1";
+  const VERSION = "pd1-mc4h-pool-render-lifecycle-v1";
   /** MC4 — exact-origin 5m PD1 for live coins (no XRP/LINK/XAU). */
   const MC4_5M_PD1_SYMBOLS = { DOGEUSDT: 1, SOLUSDT: 1, BNBUSDT: 1 };
   /** Viewer API release matrix (no silent fallbacks). */
@@ -35,82 +35,12 @@
   const POOL_DETAIL_VALUES = [1, 5, 10];
   const MAX_CONCURRENT_WINDOW_FETCH = 2;
   const MAX_CONCURRENT_WINDOW_FETCH_1H = 3;
-  const EXACT_ORIGIN_AUTH_HINT =
-    "B – Exact Origin: Sitzung abgelaufen – bitte erneut anmelden.";
-  const EXACT_ORIGIN_GENERIC_FAIL_HINT =
-    "B – Exact Origin: window load failed (prior data retained)";
 
   let deps = null;
   let caps = null;
   let capsLoadInflight = null;
   const inflight = new Map();
   let lastMetrics = null;
-  let authSessionPaused = false;
-  let authRecoveryWatchInstalled = false;
-  let authRecoveryTimer = null;
-
-  function isAuthHttpStatus(status) {
-    return status === 401 || status === 403;
-  }
-
-  function windowHttpError(res, data) {
-    const detail =
-      (data && (data.detail || data.message)) ||
-      (typeof data === "string" ? data : null) ||
-      "window " + res.status;
-    const err = new Error(detail);
-    err.httpStatus = res.status;
-    err.authFailure = isAuthHttpStatus(res.status);
-    return err;
-  }
-
-  function exactOriginFailureHint(fetchStats) {
-    if (authSessionPaused) return EXACT_ORIGIN_AUTH_HINT;
-    if (fetchStats && fetchStats.authFailures > 0) return EXACT_ORIGIN_AUTH_HINT;
-    return EXACT_ORIGIN_GENERIC_FAIL_HINT;
-  }
-
-  function boundsProbeUrl() {
-    const sym = currentSymbolUpper() || "DOGEUSDT";
-    return viewerBoundsUrl(sym) || "/api/research/doge-5m-pd1-viewer-bounds";
-  }
-
-  async function probeSessionAuthOk() {
-    try {
-      const res = await fetch(boundsProbeUrl(), { credentials: "same-origin", method: "GET" });
-      return res.status === 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function scheduleAuthSessionRecoveryWatch() {
-    if (authRecoveryWatchInstalled || typeof window === "undefined") return;
-    authRecoveryWatchInstalled = true;
-    function onMaybeResume() {
-      if (!authSessionPaused || !isEnabled()) return;
-      if (authRecoveryTimer) clearTimeout(authRecoveryTimer);
-      authRecoveryTimer = setTimeout(function () {
-        authRecoveryTimer = null;
-        if (!authSessionPaused || !isEnabled()) return;
-        probeSessionAuthOk().then(function (ok) {
-          if (!ok) return;
-          authSessionPaused = false;
-          invalidateCapsCache();
-          refreshAll({ force: true }).catch(function () {
-            /* ignore */
-          });
-        });
-      }, 400);
-    }
-    window.addEventListener("focus", onMaybeResume);
-    document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "visible") onMaybeResume();
-    });
-    window.addEventListener("pageshow", function (ev) {
-      if (ev && ev.persisted) onMaybeResume();
-    });
-  }
 
   function eoTr() {
     return typeof window !== "undefined" ? window.DogeExactOriginTrace : null;
@@ -128,9 +58,16 @@
     return T.newTraceId();
   }
 
+  function paneSymbolUpper(pane) {
+    if (deps && typeof deps.paneSymbol === "function" && pane) {
+      const s = deps.paneSymbol(pane);
+      if (s) return String(s).toUpperCase();
+    }
+    return currentSymbolUpper();
+  }
+
   function traceContext(pane) {
-    const sym =
-      deps && deps.state && deps.state.symbol ? String(deps.state.symbol).toUpperCase() : "?";
+    const sym = pane ? paneSymbolUpper(pane) : (currentSymbolUpper() || "?");
     const chart = pane ? paneChartTimeframe(pane) : "?";
     const pool = selectedPoolTimeframe();
     const T = eoTr();
@@ -179,7 +116,23 @@
     return Math.ceil(ms / STEP_MS) * STEP_MS;
   }
 
+  function isMultiManual() {
+    return !!(deps && deps.isMultiManualMode && deps.isMultiManualMode());
+  }
+
+  function isPaneExactOriginEnabled(pane) {
+    if (!pane) return false;
+    if (isMultiManual() && deps.exactOriginEnabledForPane) {
+      return deps.exactOriginEnabledForPane(pane);
+    }
+    const cb = deps && deps.$("researchIndExactOriginDensity");
+    return !!(cb && cb.checked);
+  }
+
   function isEnabled() {
+    if (isMultiManual() && deps.focusPaneForExactOrigin) {
+      return isPaneExactOriginEnabled(deps.focusPaneForExactOrigin());
+    }
     const cb = deps && deps.$("researchIndExactOriginDensity");
     return !!(cb && cb.checked);
   }
@@ -252,9 +205,9 @@
     return 900;
   }
 
-  function exactOriginScopeKeyForScope(sc) {
+  function exactOriginScopeKeyForScope(sc, symOpt) {
     const AD = window.PD1ExactDensityTrpAdapter;
-    const sym = currentSymbolUpper() || "DOGEUSDT";
+    const sym = symOpt || currentSymbolUpper() || "DOGEUSDT";
     if (!sc) return sym + "|none";
     if (AD && AD.exactOriginScopeKey) {
       return sym + "|" + AD.exactOriginScopeKey(sc.timeframe, sc.pool_detail);
@@ -263,11 +216,12 @@
   }
 
   function exactOriginScopeKeyForPane(pane) {
+    const sym = paneSymbolUpper(pane) || "DOGEUSDT";
     const scopes = activeScopesForPane(pane);
     if (!scopes.length) return "none";
     return scopes
       .map(function (sc) {
-        return exactOriginScopeKeyForScope(sc);
+        return exactOriginScopeKeyForScope(sc, sym);
       })
       .sort()
       .join("+");
@@ -279,17 +233,14 @@
     return !!(chartTf && poolTf && chartTf !== poolTf);
   }
 
-  const ON_DEMAND_BOUNDS_STORAGE_KEYS = {
+  const ON_DEMAND_BOUNDS_STORAGE_KEY = {
     "30m": "_onDemand30mPd1ViewerBounds",
     "1h": "_onDemand1hPd1ViewerBounds",
-    "4h": "_onDemand4hPd1ViewerBounds",
   };
-
-  const ON_DEMAND_BOUNDS_FETCH_POOL_TFS = ["30m", "1h", "4h"];
 
   function onDemandPd1BoundsPatch(c, poolTf) {
     if (!c || !poolTf) return null;
-    const key = ON_DEMAND_BOUNDS_STORAGE_KEYS[String(poolTf)];
+    const key = ON_DEMAND_BOUNDS_STORAGE_KEY[String(poolTf)];
     if (!key) return null;
     const stored = c[key];
     return stored && stored.data_available_to ? stored : null;
@@ -297,7 +248,7 @@
 
   function mergeOnDemandScopeIntoCaps(capsRoot, b, poolTf) {
     if (!capsRoot || !b || !b.data_available_to) return;
-    const key = ON_DEMAND_BOUNDS_STORAGE_KEYS[poolTf];
+    const key = ON_DEMAND_BOUNDS_STORAGE_KEY[poolTf];
     if (!key) return;
     capsRoot[key] = {
       data_available_from: b.data_available_from,
@@ -340,6 +291,7 @@
       return stored;
     }
     if (
+      (currentSymbolUpper() || "DOGEUSDT") === "DOGEUSDT" &&
       deps &&
       deps.SC_HELPERS &&
       deps.SC_HELPERS.doge5mPd1ViewerBoundsActive &&
@@ -364,29 +316,52 @@
     return null;
   }
 
-  function scopeCaps(c, sc) {
+  function scopeCaps(c, sc, symOpt) {
     if (!sc) return c;
+    const sym = String(symOpt || currentSymbolUpper() || "").toUpperCase();
     let path = "root";
     let out = c;
     if (sc.timeframe === "5m" && Number(sc.pool_detail) === 1) {
-      const dogeIso = doge5mPd1BoundsPatch(c);
-      if (dogeIso && dogeIso.data_available_to) {
-        path = "doge_5m_pd1_patch";
-        out = Object.assign({}, c, {
-          data_available_from: dogeIso.data_available_from,
-          data_available_to: dogeIso.data_available_to,
-          timeframe: "5m",
-          pool_detail: 1,
-          pipeline_line_id: dogeIso.pipeline_line_id || (c && c.pipeline_line_id),
-          config_hash: dogeIso.config_hash || (c && c.config_hash),
+      const scopes = (c && c.supported_viewer_scopes) || [];
+      if (sym && sym !== "DOGEUSDT") {
+        const symMatch = scopes.find(function (s) {
+          return (
+            s &&
+            s.timeframe === "5m" &&
+            Number(s.pool_detail) === 1 &&
+            String(s.symbol || "").toUpperCase() === sym
+          );
         });
+        if (symMatch && symMatch.data_available_to) {
+          path = "capabilities_scope_symbol_match";
+          out = Object.assign({}, c, {
+            data_available_from: symMatch.data_available_from,
+            data_available_to: symMatch.data_available_to,
+            pipeline_line_id: symMatch.pipeline_line_id,
+            config_hash: symMatch.config_hash,
+            timeframe: "5m",
+            pool_detail: 1,
+            symbol: sym,
+          });
+        }
+      }
+      if (path === "root") {
+        const dogeIso = doge5mPd1BoundsPatch(c);
+        if (dogeIso && dogeIso.data_available_to) {
+          path = "doge_5m_pd1_patch";
+          out = Object.assign({}, c, {
+            data_available_from: dogeIso.data_available_from,
+            data_available_to: dogeIso.data_available_to,
+            timeframe: "5m",
+            pool_detail: 1,
+            pipeline_line_id: dogeIso.pipeline_line_id || (c && c.pipeline_line_id),
+            config_hash: dogeIso.config_hash || (c && c.config_hash),
+            symbol: "DOGEUSDT",
+          });
+        }
       }
     }
-    if (
-      path === "root" &&
-      (sc.timeframe === "30m" || sc.timeframe === "1h" || sc.timeframe === "4h") &&
-      Number(sc.pool_detail) === 1
-    ) {
+    if (path === "root" && (sc.timeframe === "30m" || sc.timeframe === "1h") && Number(sc.pool_detail) === 1) {
       const odIso = onDemandPd1BoundsPatch(c, sc.timeframe);
       if (odIso && odIso.data_available_to) {
         path = "on_demand_" + sc.timeframe + "_pd1_patch";
@@ -449,12 +424,16 @@
 
   function referencePaneForPdUi() {
     if (!deps) return null;
+    if (isMultiManual() && deps.focusPaneForExactOrigin) {
+      const focus = deps.focusPaneForExactOrigin();
+      if (focus) return focus;
+    }
     let found = null;
     deps.visibleIds().forEach(function (pid) {
       const p = deps.state.panes[pid];
-      if (p && deps.state.symbol && MC4_5M_PD1_SYMBOLS[String(deps.state.symbol).toUpperCase()]) {
-        found = p;
-      }
+      if (!p) return;
+      const sym = paneSymbolUpper(p);
+      if (sym && MC4_5M_PD1_SYMBOLS[sym]) found = found || p;
     });
     return found;
   }
@@ -517,30 +496,6 @@
     inflight.clear();
   }
 
-  async function runExactOriginPoolTfSwitch(body) {
-    const begin =
-      deps && deps.beginExactOriginViewportSuppress
-        ? deps.beginExactOriginViewportSuppress
-        : null;
-    const end = deps && deps.endExactOriginViewportSuppress ? deps.endExactOriginViewportSuppress : null;
-    const after =
-      deps && deps.refreshExactOriginAfterTfSwitch ? deps.refreshExactOriginAfterTfSwitch : null;
-    if (begin) begin();
-    try {
-      await body();
-    } finally {
-      if (end) end();
-      if (after && deps && deps.visibleIds) {
-        const todo = [];
-        deps.visibleIds().forEach(function (pid) {
-          const p = deps.state.panes[pid];
-          if (p && paneSupports(p)) todo.push(after(p));
-        });
-        await Promise.all(todo);
-      }
-    }
-  }
-
   /** Fixed 48h UTC tiles for window cache (default OFF — sliding planner). */
   function isFixedTile48hEnabled() {
     try {
@@ -576,7 +531,7 @@
   }
 
   function windowStoreForScope(pane, sc) {
-    const sk = exactOriginScopeKeyForScope(sc);
+    const sk = exactOriginScopeKeyForScope(sc, paneSymbolUpper(pane));
     if (!pane.exactOriginWindowStores) pane.exactOriginWindowStores = {};
     if (!pane.exactOriginWindowStores[sk]) {
       pane.exactOriginWindowStores[sk] = { chunks: {}, order: [], replayGen: null };
@@ -709,9 +664,40 @@
   }
 
   function paneSupports(pane) {
-    if (!isEnabled() || !deps || !pane || !deps.state.symbol) return false;
-    if (!MC4_5M_PD1_SYMBOLS[currentSymbolUpper()]) return false;
+    if (!isPaneExactOriginEnabled(pane) || !deps || !pane) return false;
+    const sym = paneSymbolUpper(pane);
+    if (!sym || !MC4_5M_PD1_SYMBOLS[sym]) return false;
     return activeScopesForPane(pane).length > 0;
+  }
+
+  function paneExactOriginUnsupported(pane) {
+    if (!isPaneExactOriginEnabled(pane) || !pane) return false;
+    const sym = paneSymbolUpper(pane);
+    return !sym || !MC4_5M_PD1_SYMBOLS[sym];
+  }
+
+  function setPanePoolStatus(pane, kind, detail) {
+    if (deps && deps.setPaneExactOriginPoolStatus) {
+      deps.setPaneExactOriginPoolStatus(pane, kind, detail);
+    }
+  }
+
+  async function ensurePaneViewerBounds(pane) {
+    const sym = paneSymbolUpper(pane);
+    if (!sym || !MC4_5M_PD1_SYMBOLS[sym]) return;
+    const boundsUrl = viewerBoundsUrl(sym);
+    if (!boundsUrl) return;
+    try {
+      const bRes = await fetch(boundsUrl, { credentials: "same-origin" });
+      if (!bRes.ok) return;
+      const b = await bRes.json().catch(function () {
+        return null;
+      });
+      if (b && b.data_available_to) {
+        if (!caps) await loadCaps();
+        if (caps) applyDoge5mViewerBoundsToCaps(caps, b);
+      }
+    } catch (e) { /* ignore */ }
   }
 
   function maxChartZones() {
@@ -738,13 +724,19 @@
     deps.syncOverlays(pane, base.concat(zones || []));
   }
 
+  function stripPane(pane) {
+    if (!pane || !deps) return;
+    clearCanvasOnPane(pane);
+    deps.syncOverlays(pane, stripExact(pane.pendingOverlays || []));
+    setPanePoolStatus(pane, "off");
+  }
+
   function stripAllPanes() {
     if (!deps) return;
     deps.visibleIds().forEach((pid) => {
       const pane = deps.state.panes[pid];
       if (!pane) return;
-      clearCanvasOnPane(pane);
-      deps.syncOverlays(pane, stripExact(pane.pendingOverlays || []));
+      stripPane(pane);
     });
   }
 
@@ -894,39 +886,32 @@
       T.event(tid, "loadCaps", { doge_bounds_error: String(e && e.message ? e.message : e) });
     }
   }
-    for (let odi = 0; odi < ON_DEMAND_BOUNDS_FETCH_POOL_TFS.length; odi += 1) {
-      const poolTf = ON_DEMAND_BOUNDS_FETCH_POOL_TFS[odi];
-      const storageKey = ON_DEMAND_BOUNDS_STORAGE_KEYS[poolTf];
-      if (!storageKey) continue;
-      try {
-        const odRes = await fetch(
-          "/api/research/doge-pd1-on-demand-viewer-bounds?timeframe=" +
-            encodeURIComponent(poolTf) +
-            "&pool_detail=1",
-          { credentials: "same-origin" }
-        );
-        if (T && T.enabled()) {
-          const ev = { on_demand_http: odRes.status, on_demand_ok: odRes.ok, pool_tf: poolTf };
-          ev["on_demand_" + poolTf.replace(/[^a-z0-9]/gi, "_") + "_http"] = odRes.status;
-          T.event(tid, "loadCaps", ev);
+    try {
+      const od30Res = await fetch(
+        "/api/research/doge-pd1-on-demand-viewer-bounds?timeframe=30m&pool_detail=1",
+        { credentials: "same-origin" }
+      );
+      if (T && T.enabled()) {
+        T.event(tid, "loadCaps", {
+          on_demand_30m_http: od30Res.status,
+          on_demand_30m_ok: od30Res.ok,
+        });
+      }
+      if (od30Res.ok) {
+        const od30 = await od30Res.json().catch(function () {
+          return null;
+        });
+        if (od30 && od30.data_available_to) {
+          mergeOnDemandScopeIntoCaps(caps, od30, "30m");
         }
-        if (odRes.ok) {
-          const odBody = await odRes.json().catch(function () {
-            return null;
-          });
-          if (odBody && odBody.data_available_to) {
-            mergeOnDemandScopeIntoCaps(caps, odBody, poolTf);
-          }
-        } else if (odRes.status === 422) {
-          caps[storageKey] = { unavailable: true };
-        }
-      } catch (odErr) {
-        if (T && T.enabled()) {
-          T.event(tid, "loadCaps", {
-            on_demand_error: String(odErr && odErr.message ? odErr.message : odErr),
-            pool_tf: poolTf,
-          });
-        }
+      } else if (od30Res.status === 422) {
+        caps._onDemand30mPd1ViewerBounds = { unavailable: true };
+      }
+    } catch (odErr) {
+      if (T && T.enabled()) {
+        T.event(tid, "loadCaps", {
+          on_demand_30m_error: String(odErr && odErr.message ? odErr.message : odErr),
+        });
       }
     }
     if (T && T.enabled() && caps) {
@@ -969,22 +954,6 @@
     return { from: Math.min(t0, t1), to: Math.max(t0, t1), source: "candles" };
   }
 
-  function poolTfPrefersChartVisibleViewport() {
-    const tf = selectedPoolTimeframe();
-    return tf === "30m" || tf === "1h" || tf === "4h";
-  }
-
-  function resolveChartVisibleViewSec(pane, source) {
-    const chart = deps.api(pane);
-    if (!chart || !chart.getVisibleTimeRange) return null;
-    const vr = chart.getVisibleTimeRange();
-    if (!vr || vr.from == null || vr.to == null) return null;
-    const from = Math.floor(Number(vr.from));
-    const to = Math.floor(Number(vr.to));
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) return null;
-    return { from: from, to: to, source: source || "chart_visible_range" };
-  }
-
   /**
    * Priority: explicit opts → replay GO-TO window → Historical viewport resolver → candles.
    */
@@ -1012,14 +981,9 @@
       const g = Math.floor(Number(deps.state.replayTargetTs));
       return { from: g - pad, to: g + pad, source: "replay_window" };
     }
-    const crossTf = chartTfDiffersFromPool(pane);
-    const onDemandPoolTf = poolTfPrefersChartVisibleViewport();
-    if (onDemandPoolTf && !crossTf) {
-      const visOnDemand = resolveChartVisibleViewSec(pane, "chart_visible_on_demand_pool_tf");
-      if (visOnDemand) return visOnDemand;
-    }
     const chart = deps.api(pane);
-    if (!crossTf && !onDemandPoolTf && deps.SC_HELPERS && deps.decisionContext && chart) {
+    const crossTf = chartTfDiffersFromPool(pane);
+    if (!crossTf && deps.SC_HELPERS && deps.decisionContext && chart) {
       const ctx = deps.decisionContext(pane);
       const vp = deps.SC_HELPERS.resolveHistoricalLmv2ViewportCloseWindow(
         pane,
@@ -1039,14 +1003,29 @@
         }
       }
     }
-    if (crossTf) {
-      const visCross = resolveChartVisibleViewSec(pane, "chart_visible_cross_pool_tf");
-      if (visCross) return visCross;
+    if (crossTf && chart && chart.getVisibleTimeRange) {
+      const vr = chart.getVisibleTimeRange();
+      if (vr && vr.from != null && vr.to != null && Number(vr.from) < Number(vr.to)) {
+        return {
+          from: Math.floor(Number(vr.from)),
+          to: Math.floor(Number(vr.to)),
+          source: "chart_visible_cross_pool_tf",
+        };
+      }
     }
-    const visChart = resolveChartVisibleViewSec(pane, "chart_visible_range");
-    if (visChart) return visChart;
     const candles = candleBoundsSec(pane);
     if (candles) return candles;
+    const chart2 = deps.api(pane);
+    if (chart2 && chart2.getVisibleTimeRange) {
+      const vr = chart2.getVisibleTimeRange();
+      if (vr && vr.from != null && vr.to != null && Number(vr.from) < Number(vr.to)) {
+        return {
+          from: Math.floor(Number(vr.from)),
+          to: Math.floor(Number(vr.to)),
+          source: "chart_visible_range",
+        };
+      }
+    }
     const T = eoTr();
     if (T && T.enabled()) {
       T.event(null, "resolveViewSec", { result: "null", chart_pool_cross: chartTfDiffersFromPool(pane) });
@@ -1192,19 +1171,16 @@
     }
     let fetched = 0;
     let failed = 0;
-    let authFailures = 0;
-    let authBatchAbort = false;
     let cursor = 0;
     async function worker() {
       while (cursor < missing.length) {
-        if (authBatchAbort) return;
         if (loadSerial !== pane.exactOriginLoadSerial) return;
         const idx = cursor;
         cursor += 1;
         const w = missing[idx];
         const ck = AD.exactOriginCacheKeyForWindow(w);
         try {
-          const data = await fetchWindow(w.fromMs, w.toMs, scope, traceIdForPane(pane));
+          const data = await fetchWindow(w.fromMs, w.toMs, scope, traceIdForPane(pane), pane);
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
           if (loadSerial !== pane.exactOriginLoadSerial) return;
           AD.touchExactOriginWindowCache(store, ck, {
@@ -1218,20 +1194,13 @@
         } catch (err) {
           if (reqReplayGen != null && deps.state.replayGen !== reqReplayGen) return;
           if (loadSerial !== pane.exactOriginLoadSerial) return;
-          if (err && err.authFailure) {
-            authFailures += 1;
-            authBatchAbort = true;
-            authSessionPaused = true;
-            scheduleAuthSessionRecoveryWatch();
-          } else {
-            AD.touchExactOriginWindowCache(store, ck, {
-              status: "error",
-              error: String(err && err.message ? err.message : err),
-              fromMs: w.fromMs,
-              toMs: w.toMs,
-              at: Date.now(),
-            });
-          }
+          AD.touchExactOriginWindowCache(store, ck, {
+            status: "error",
+            error: String(err && err.message ? err.message : err),
+            fromMs: w.fromMs,
+            toMs: w.toMs,
+            at: Date.now(),
+          });
           if (loadSerial === pane.exactOriginLoadSerial) failed += 1;
         }
       }
@@ -1244,7 +1213,6 @@
     return {
       fetched: fetched,
       failed: failed,
-      authFailures: authFailures,
       cacheHits: planned.length - missing.length,
     };
   }
@@ -1260,8 +1228,8 @@
     return AD.mergeDensityPools(lists);
   }
 
-  function clipWindowMsToScopeDataBounds(fromMs, toMs, scope) {
-    const c = scopeCaps(caps, scope);
+  function clipWindowMsToScopeDataBounds(fromMs, toMs, scope, symOpt) {
+    const c = scopeCaps(caps, scope, symOpt);
     if (!c) return { ok: true, fromMs: fromMs, toMs: toMs, clipped: false };
     let from = fromMs;
     let to = toMs;
@@ -1284,15 +1252,16 @@
     return { ok: true, fromMs: from, toMs: to, clipped: clipped };
   }
 
-  async function fetchWindow(fromMs, toMs, scope, traceId) {
+  async function fetchWindow(fromMs, toMs, scope, traceId, pane) {
     const sc = scope;
     if (!sc) throw new Error("fetchWindow requires scope");
-    const clip = clipWindowMsToScopeDataBounds(fromMs, toMs, sc);
+    const sym =
+      (pane && paneSymbolUpper(pane)) || (sc && sc.symbol) || currentSymbolUpper() || "DOGEUSDT";
+    const clip = clipWindowMsToScopeDataBounds(fromMs, toMs, sc, sym);
     if (!clip.ok) throw new Error(clip.reason || "window empty after data bounds clip");
     fromMs = clip.fromMs;
     toMs = clip.toMs;
-    const sym = currentSymbolUpper() || (sc && sc.symbol) || "DOGEUSDT";
-    const key = sym + "|" + exactOriginScopeKeyForScope(sc) + "-" + fromMs + "-" + toMs;
+    const key = sym + "|" + exactOriginScopeKeyForScope(sc, sym) + "-" + fromMs + "-" + toMs;
     if (inflight.has(key)) return inflight.get(key);
     const clientTraceId = traceId || ensureEoTrace(referencePaneForPdUi());
     const T = eoTr();
@@ -1338,7 +1307,7 @@
             server_trace: data.request_id || data.trace_id || null,
           });
         }
-        if (!res.ok) throw windowHttpError(res, data);
+        if (!res.ok) throw new Error(data.message || data.detail || "window " + res.status);
         return data;
       })
       .catch(function (err) {
@@ -1367,11 +1336,11 @@
     return { zones: zones.slice(0, cap), capped: true, dropped: zones.length - cap };
   }
 
-  function dataBoundsMsForScopes(capsRoot, scopes) {
+  function dataBoundsMsForScopes(capsRoot, scopes, symOpt) {
     let loMs = 0;
     let hiMs = Number.MAX_SAFE_INTEGER;
     scopes.forEach(function (sc) {
-      const c = scopeCaps(capsRoot, sc);
+      const c = scopeCaps(capsRoot, sc, symOpt);
       if (c && c.data_available_from) {
         const lo = Date.parse(c.data_available_from);
         if (Number.isFinite(lo)) loMs = loMs ? Math.max(loMs, lo) : lo;
@@ -1403,33 +1372,6 @@
     return !!(p.viewport || p.force || (p.fromUnix != null && p.toUnix != null));
   }
 
-  function eoRefreshViewportUnixPair(opts) {
-    const o = opts || {};
-    if (o.fromUnix == null || o.toUnix == null) return null;
-    const from = Math.floor(Number(o.fromUnix));
-    const to = Math.floor(Number(o.toUnix));
-    if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) return null;
-    return { from: from, to: to };
-  }
-
-  /** True when a coalesced pending refresh should invalidate the in-flight load_serial. */
-  function pendingRefreshMateriallyChangesInflight(inflightOpts, pending) {
-    const p = pending || {};
-    const i = inflightOpts || {};
-    if (p.force) return true;
-    const pVp = eoRefreshViewportUnixPair(p);
-    const iVp = eoRefreshViewportUnixPair(i);
-    if (pVp && iVp) {
-      return pVp.from !== iVp.from || pVp.to !== iVp.to;
-    }
-    if (pVp && !iVp) return true;
-    if (!pVp && iVp) return false;
-    if (p.viewport && !p.force && !pVp) {
-      return false;
-    }
-    return eoRefreshPendingSupersedesInflight(p);
-  }
-
   function bumpExactOriginLoadSerial(pane, reason) {
     if (!pane) return 0;
     pane.exactOriginLoadSerial = (pane.exactOriginLoadSerial || 0) + 1;
@@ -1446,16 +1388,13 @@
   async function refreshPane(pane, opts) {
     if (!pane) return;
     if (!pane._eoRefreshGate) {
-      pane._eoRefreshGate = { pending: null, inflight: null, inflightOpts: null };
+      pane._eoRefreshGate = { pending: null, inflight: null };
     }
     const gate = pane._eoRefreshGate;
     gate.pending = mergeEoRefreshOpts(gate.pending, opts);
     if (gate.inflight) {
-      const material = pendingRefreshMateriallyChangesInflight(gate.inflightOpts, gate.pending);
-      if (material) {
+      if (eoRefreshPendingSupersedesInflight(gate.pending)) {
         bumpExactOriginLoadSerial(pane, "coalesced_viewport_or_force");
-      } else {
-        gate.pending = null;
       }
       const Tc = eoTr();
       if (Tc && Tc.enabled()) {
@@ -1465,7 +1404,6 @@
           pending_from_unix:
             gate.pending && gate.pending.fromUnix != null ? gate.pending.fromUnix : null,
           pending_to_unix: gate.pending && gate.pending.toUnix != null ? gate.pending.toUnix : null,
-          material_change: material,
           load_serial: pane.exactOriginLoadSerial,
         });
       }
@@ -1473,9 +1411,7 @@
     }
     const runOpts = gate.pending || {};
     gate.pending = null;
-    gate.inflightOpts = runOpts;
     gate.inflight = refreshPaneImpl(pane, runOpts).finally(function () {
-      gate.inflightOpts = null;
       gate.inflight = null;
       if (gate.pending) {
         const nextOpts = gate.pending;
@@ -1487,7 +1423,12 @@
   }
 
   async function refreshPaneImpl(pane, opts) {
-    if (!isEnabled()) return;
+    if (!isPaneExactOriginEnabled(pane)) return;
+    if (paneExactOriginUnsupported(pane)) {
+      setPanePoolStatus(pane, "unsupported");
+      return;
+    }
+    setPanePoolStatus(pane, "loading");
     const T = eoTr();
     const tid = ensureEoTrace(pane);
     if (T && T.enabled() && tid === pane._eoTraceId) {
@@ -1510,18 +1451,7 @@
       return;
     }
     if (!paneSupports(pane)) return;
-    if (authSessionPaused) {
-      const hintPaused = deps.$("researchExactOriginDensityHint");
-      if (hintPaused) {
-        hintPaused.hidden = false;
-        hintPaused.textContent = EXACT_ORIGIN_AUTH_HINT;
-      }
-      if (pane.exactOriginSegmentCache && pane.exactOriginSegmentCache.segments) {
-        pushCanvasDensity(pane, pane.exactOriginSegmentCache.segments, pane.exactOriginSegmentCache.metrics);
-      }
-      scheduleAuthSessionRecoveryWatch();
-      return;
-    }
+    await ensurePaneViewerBounds(pane);
     const loadSerial = (pane.exactOriginLoadSerial || 0) + 1;
     pane.exactOriginLoadSerial = loadSerial;
     const reqReplayGen =
@@ -1541,7 +1471,8 @@
       });
     }
     const capsRoot = await loadCaps();
-    const bounds = dataBoundsMsForScopes(capsRoot, scopes);
+    const paneSym = paneSymbolUpper(pane) || currentSymbolUpper() || "DOGEUSDT";
+    const bounds = dataBoundsMsForScopes(capsRoot, scopes, paneSym);
     const loMs = bounds.loMs;
     const hiMs = bounds.hiMs;
     if (T && T.enabled()) {
@@ -1570,7 +1501,7 @@
       const hint = deps.$("researchExactOriginDensityHint");
       if (hint) {
         hint.hidden = false;
-        const cap0 = scopeCaps(capsRoot, scopes[0]);
+        const cap0 = scopeCaps(capsRoot, scopes[0], paneSym);
         const loIso = cap0 && cap0.data_available_from ? cap0.data_available_from.slice(0, 10) : "?";
         const hiIso = cap0 && cap0.data_available_to ? cap0.data_available_to.slice(0, 10) : "?";
         hint.textContent =
@@ -1599,27 +1530,12 @@
           hint.textContent =
             "B – Exact Origin: 30m On-Demand Bounds nicht verfügbar (API) — kein 15m-Fallback";
         } else if (
-          (selectedPoolTimeframe() === "30m" || selectedPoolTimeframe() === "1h") &&
-          capsRoot &&
-          capsRoot[ON_DEMAND_BOUNDS_STORAGE_KEYS[selectedPoolTimeframe()]] &&
-          capsRoot[ON_DEMAND_BOUNDS_STORAGE_KEYS[selectedPoolTimeframe()]].unavailable
-        ) {
-          hint.textContent =
-            "B – Exact Origin: " +
-            selectedPoolTimeframe() +
-            " On-Demand Bounds nicht verfügbar (API) — kein 15m-Fallback";
-        } else if (
-          (selectedPoolTimeframe() === "30m" || selectedPoolTimeframe() === "1h") &&
+          selectedPoolTimeframe() === "30m" &&
           loIso === "2026-04-01" &&
           hiIso.indexOf("2026-09") === 0
         ) {
           hint.textContent =
-            "B – Exact Origin: " +
-            selectedPoolTimeframe() +
-            " — veraltete Caps (Apr–Sep); On-Demand-Bounds nicht geladen · Hard-Refresh";
-        } else if (selectedPoolTimeframe() === "4h") {
-          hint.textContent =
-            "B – Exact Origin: 4h PD10 — nur historischer Publish Apr–Sep (kein Live-On-Demand); Viewport außerhalb";
+            "B – Exact Origin: 30m — veraltete Caps (Apr–Sep); On-Demand-Bounds nicht geladen · Hard-Refresh";
         }
       }
       clearCanvasOnPane(pane);
@@ -1636,14 +1552,14 @@
     scopes.forEach(function (sc) {
       const store = windowStoreForScope(pane, sc);
       if (store.replayGen !== replayGenNow) {
-        const sk = exactOriginScopeKeyForScope(sc);
+        const sk = exactOriginScopeKeyForScope(sc, paneSym);
         pane.exactOriginWindowStores[sk] = { chunks: {}, order: [], replayGen: replayGenNow };
         pane.exactOriginSweepCache = null;
       }
     });
     const loadSpan = AD.computeDensityLoadSpanMs(hitFromMs, hitToMs, loMs, hiMs);
     const scopePlans = scopes.map(function (sc) {
-      const scopeKey = exactOriginScopeKeyForScope(sc);
+      const scopeKey = exactOriginScopeKeyForScope(sc, paneSym);
       const planner = exactOriginWindowPlannerForScope(sc);
       return {
         scope: sc,
@@ -1686,7 +1602,7 @@
       return;
     }
 
-    const fetchStats = { fetched: 0, failed: 0, cacheHits: 0, authFailures: 0 };
+    const fetchStats = { fetched: 0, failed: 0, cacheHits: 0 };
     const maxFetch = maxConcurrentWindowFetch(scopes);
     for (let si = 0; si < scopePlans.length; si += 1) {
       const sp = scopePlans[si];
@@ -1703,7 +1619,6 @@
       );
       fetchStats.fetched += one.fetched;
       fetchStats.failed += one.failed;
-      fetchStats.authFailures += one.authFailures || 0;
       fetchStats.cacheHits += one.cacheHits;
       if (loadSerial !== pane.exactOriginLoadSerial) {
         const Tsup = eoTr();
@@ -1728,25 +1643,16 @@
     });
     if (!allPools.length && fetchStats.failed > 0 && fetchStats.fetched === 0) {
       const hintFail = deps.$("researchExactOriginDensityHint");
-      if (hintFail) {
+      if (hintFail && (!isMultiManual() || (deps.focusPaneForExactOrigin && pane === deps.focusPaneForExactOrigin()))) {
         hintFail.hidden = false;
-        hintFail.textContent = exactOriginFailureHint(fetchStats);
+        hintFail.textContent = "B – Exact Origin: window load failed (prior data retained)";
       }
+      setPanePoolStatus(pane, "error", "window load failed");
       if (pane.exactOriginSegmentCache && pane.exactOriginSegmentCache.segments) {
         pushCanvasDensity(pane, pane.exactOriginSegmentCache.segments, pane.exactOriginSegmentCache.metrics);
       }
       return;
     }
-    if (fetchStats.authFailures > 0) {
-      authSessionPaused = true;
-      scheduleAuthSessionRecoveryWatch();
-      const hintAuth = deps.$("researchExactOriginDensityHint");
-      if (hintAuth) {
-        hintAuth.hidden = false;
-        hintAuth.textContent = EXACT_ORIGIN_AUTH_HINT;
-      }
-    }
-    if (fetchStats.fetched > 0 && fetchStats.authFailures === 0) authSessionPaused = false;
     const ext = allPools.length
       ? {
           yMin: Math.min(...allPools.map((p) => p.bottom)) * 0.9995,
@@ -1925,6 +1831,10 @@
         lastMetrics.canvasDrawMs = drawStats.ms;
         lastMetrics.canvasSegmentsDrawn = drawStats.segmentsDrawn;
         lastMetrics.canvasSegmentsTotal = drawStats.segmentsTotal;
+        lastMetrics.canvasSkipCoordNull = drawStats.skipCoordNull;
+        lastMetrics.canvasSkipStrictCull = drawStats.skipStrictCull;
+        lastMetrics.canvasSkipOffPlot = drawStats.skipOffPlot;
+        lastMetrics.canvasSkipCanvasNotReady = drawStats.skipCanvasNotReady;
       }
       pane.exactOriginSegmentCache = {
         key: renderKey,
@@ -1961,6 +1871,10 @@
         canvas: canvasOn,
         canvas_drawn: lastMetrics.canvasSegmentsDrawn,
         canvas_segments_total: lastMetrics.canvasSegmentsTotal,
+        canvas_skip_coord_null: lastMetrics.canvasSkipCoordNull,
+        canvas_skip_strict_cull: lastMetrics.canvasSkipStrictCull,
+        canvas_skip_off_plot: lastMetrics.canvasSkipOffPlot,
+        canvas_skip_canvas_not_ready: lastMetrics.canvasSkipCanvasNotReady,
       });
     }
 
@@ -1994,12 +1908,15 @@
           line += " · CAP " + cap + " (raw " + rawZoneCount + ")";
         }
       }
-      hint.textContent = line;
+      if (!isMultiManual() || (deps.focusPaneForExactOrigin && pane === deps.focusPaneForExactOrigin())) {
+        hint.textContent = line;
+      }
     }
+    setPanePoolStatus(pane, "ready", allPools.length + " pools");
   }
 
   async function refreshAll(opts) {
-    if (!isEnabled()) {
+    if (!isMultiManual() && !isEnabled()) {
       stripAllPanes();
       return;
     }
@@ -2009,13 +1926,15 @@
       if (p && paneSupports(p)) targets.push(p);
     });
     if (!targets.length) {
-      const hint = deps.$("researchExactOriginDensityHint");
-      if (hint) {
-        hint.hidden = false;
-        hint.textContent =
-          "B – Exact Origin: DOGEUSDT — Chart-Pane TF + freigegebenes PD (15m PD1/PD5/PD10; 5m PD1/PD5/PD10)";
+      if (!isMultiManual()) {
+        const hint = deps.$("researchExactOriginDensityHint");
+        if (hint) {
+          hint.hidden = false;
+          hint.textContent =
+            "B – Exact Origin: DOGEUSDT — Chart-Pane TF + freigegebenes PD (15m PD1/PD5/PD10; 5m PD1/PD5/PD10)";
+        }
+        stripAllPanes();
       }
-      stripAllPanes();
       return;
     }
     for (let i = 0; i < targets.length; i += 1) {
@@ -2025,9 +1944,6 @@
 
   function scheduleSupersededDensityRefresh(pane, opts) {
     if (!pane) return;
-    if (pane._eoRefreshGate && pane._eoRefreshGate.inflight) {
-      return;
-    }
     const T = eoTr();
     if (T && T.enabled()) {
       T.event(traceIdForPane(pane), "scheduleSupersededDensityRefresh", {
@@ -2035,35 +1951,11 @@
         delay_ms: 48,
       });
     }
-    let nextOpts = Object.assign({}, opts || {});
-    const vis = resolveChartVisibleViewSec(pane, "chart_visible_supersede_retry");
-    if (vis) {
-      nextOpts = Object.assign(nextOpts, {
-        fromUnix: vis.from,
-        toUnix: vis.to,
-        viewport: true,
-      });
-    } else {
-      nextOpts.force = true;
-      delete nextOpts.viewport;
-    }
-    const sk =
-      (nextOpts.force ? "F|" : "") +
-      (nextOpts.fromUnix != null ? Math.floor(Number(nextOpts.fromUnix)) : "") +
-      "|" +
-      (nextOpts.toUnix != null ? Math.floor(Number(nextOpts.toUnix)) : "") +
-      "|" +
-      exactOriginScopeKeyForPane(pane);
-    if (pane._eoSupersedeScheduledKey === sk && pane.exactOriginSupersedeTimer) {
-      return;
-    }
-    pane._eoSupersedeScheduledKey = sk;
     if (pane.exactOriginSupersedeTimer) clearTimeout(pane.exactOriginSupersedeTimer);
     pane.exactOriginSupersedeTimer = setTimeout(function () {
-      pane._eoSupersedeScheduledKey = null;
       pane.exactOriginSupersedeTimer = null;
-      if (!isEnabled() || !paneSupports(pane)) return;
-      refreshPane(pane, nextOpts).catch(function (err) {
+      if (!isPaneExactOriginEnabled(pane) || !paneSupports(pane)) return;
+      refreshPane(pane, Object.assign({ viewport: true }, opts || {})).catch(function (err) {
         if (!(err && err.name === "AbortError") && deps && deps.setStatus) {
           deps.setStatus("Exact Origin: " + (err.message || err), "error");
         }
@@ -2072,8 +1964,9 @@
   }
 
   function scheduleViewport(pane, from, to) {
-    if (!isEnabled() || !paneSupports(pane)) return;
+    if (!isPaneExactOriginEnabled(pane) || !paneSupports(pane)) return;
     if (pane._suppressExactOriginViewport) return;
+    if (deps && deps.state && !deps.state.initialLoadDone) return;
     if (pane.exactOriginViewportTimer) clearTimeout(pane.exactOriginViewportTimer);
     pane.exactOriginViewportTimer = setTimeout(function () {
       pane.exactOriginViewportTimer = null;
@@ -2086,15 +1979,16 @@
   }
 
   function reapplyMinDepthFilterAllPanes() {
-    if (!isEnabled() || !deps) return;
+    if (!deps) return;
     deps.visibleIds().forEach(function (pid) {
       const pane = deps.state.panes[pid];
+      if (!pane || !isPaneExactOriginEnabled(pane)) return;
       repaintPaneFromCache(pane);
     });
   }
 
   function repaintPaneFromCache(pane) {
-    if (!isEnabled() || !pane || !paneSupports(pane)) return false;
+    if (!isPaneExactOriginEnabled(pane) || !pane || !paneSupports(pane)) return false;
     const cache = pane.exactOriginSegmentCache;
     if (!cache) return false;
     if (isCanvasPathEnabled() && cache.segments) {
@@ -2162,9 +2056,20 @@
   }
 
   function disableExactOrigin() {
-    const cb = deps.$("researchIndExactOriginDensity");
-    if (cb && cb.checked) cb.checked = false;
-    stripAllPanes();
+    if (isMultiManual()) {
+      deps.visibleIds().forEach(function (pid) {
+        const pane = deps.state.panes[pid];
+        if (!pane) return;
+        pane.exactOriginEnabled = false;
+        if (deps.persistPaneExactOriginFlag) deps.persistPaneExactOriginFlag(pane.id, false);
+        stripPane(pane);
+      });
+      if (deps.syncExactOriginToolbarFromFocusPane) deps.syncExactOriginToolbarFromFocusPane();
+    } else {
+      const cb = deps.$("researchIndExactOriginDensity");
+      if (cb && cb.checked) cb.checked = false;
+      stripAllPanes();
+    }
     updateUiChrome();
   }
 
@@ -2173,6 +2078,13 @@
     const cb = deps.$("researchIndExactOriginDensity");
     if (!cb) return;
     cb.addEventListener("change", async function () {
+      if (deps.suppressExactOriginToolbarEvent && deps.suppressExactOriginToolbarEvent()) return;
+      if (isMultiManual() && deps.setMultiPaneExactOriginEnabled) {
+        const pane = deps.focusPaneForExactOrigin && deps.focusPaneForExactOrigin();
+        if (!pane) return;
+        await deps.setMultiPaneExactOriginEnabled(pane, cb.checked, "toolbar");
+        return;
+      }
       updateUiChrome();
       if (isEnabled()) {
         disableHistoricalLmv2();
@@ -2213,13 +2125,14 @@
     }
     selectedPoolDetailInputs().forEach(function (el) {
       el.addEventListener("change", async function () {
-        if (!isEnabled()) return;
+        const focus = referencePaneForPdUi();
+        if (!focus || !isPaneExactOriginEnabled(focus)) return;
+        invalidateScopeCaches();
+        if (isMultiManual()) stripPane(focus);
+        else stripAllPanes();
         try {
-          await runExactOriginPoolTfSwitch(async function () {
-            invalidateScopeCaches();
-            stripAllPanes();
-            await refreshAll({ force: true });
-          });
+          if (isMultiManual()) await refreshPane(focus, { force: true });
+          else await refreshAll({ force: true });
         } catch (err) {
           deps.setStatus("Exact Origin: " + (err.message || err), "error");
         }
@@ -2229,25 +2142,53 @@
       .call(document.querySelectorAll('input[name="researchExactOriginPoolTimeframe"]'))
       .forEach(function (el) {
         el.addEventListener("change", async function () {
-          if (!isEnabled()) return;
+          const focus = referencePaneForPdUi();
+          if (!focus || !isPaneExactOriginEnabled(focus)) return;
+          invalidateScopeCaches();
+          if (isMultiManual()) stripPane(focus);
+          else stripAllPanes();
+          syncPoolDetailUi(referencePaneForPdUi());
           try {
-            await runExactOriginPoolTfSwitch(async function () {
-              invalidateScopeCaches();
-              stripAllPanes();
-              syncPoolDetailUi(referencePaneForPdUi());
-              await refreshAll({ force: true });
-            });
+            if (isMultiManual()) await refreshPane(focus, { force: true });
+            else await refreshAll({ force: true });
           } catch (err) {
             deps.setStatus("Exact Origin Pool-TF: " + (err.message || err), "error");
           }
         });
       });
     updateUiChrome();
-    scheduleAuthSessionRecoveryWatch();
+  }
+
+  function onPaneSymbolChange(pane) {
+    if (!pane) return;
+    clearCanvasOnPane(pane);
+    pane.exactOriginSegmentCache = null;
+    pane.exactOriginSweepCache = null;
+    bumpExactOriginLoadSerial(pane, "pane_symbol_change");
+  }
+
+  function onSymbolSwitch() {
+    if (isMultiManual()) return;
+    if (!isEnabled()) return;
+    const T = eoTr();
+    if (T && T.enabled()) {
+      T.event(null, "onSymbolSwitch", {
+        symbol: currentSymbolUpper(),
+      });
+    }
+    invalidateCapsCache();
+    invalidateScopeCaches();
+    stripAllPanes();
+    if (deps && deps.visibleIds) {
+      deps.visibleIds().forEach(function (pid) {
+        const pane = deps.state.panes[pid];
+        if (pane) bumpExactOriginLoadSerial(pane, "symbol_switch");
+      });
+    }
   }
 
   function onPaneTimeframeChange(pane) {
-    if (!isEnabled()) return;
+    if (!isPaneExactOriginEnabled(pane)) return;
     const T = eoTr();
     if (pane) pane._eoTraceId = null;
     const tid = ensureEoTrace(pane);
@@ -2257,7 +2198,8 @@
     syncPoolDetailUi(pane);
     invalidateCapsCache();
     invalidateScopeCaches();
-    stripAllPanes();
+    if (isMultiManual()) stripPane(pane);
+    else stripAllPanes();
     if (paneSupports(pane)) {
       refreshPane(pane, { force: true }).catch(function (err) {
         if (deps.setStatus) deps.setStatus("Exact Origin: " + (err.message || err), "error");
@@ -2289,6 +2231,8 @@
     refreshPane: refreshPane,
     scheduleViewport: scheduleViewport,
     stripAllPanes: stripAllPanes,
+    stripPane: stripPane,
+    isPaneExactOriginEnabled: isPaneExactOriginEnabled,
     updateUiChrome: updateUiChrome,
     disableExactOrigin: disableExactOrigin,
     disableHistoricalLmv2: disableHistoricalLmv2,
@@ -2310,18 +2254,11 @@
     MIN_ORIGINS_STORAGE_KEY: MIN_ORIGINS_STORAGE_KEY,
     syncPoolDetailUi: syncPoolDetailUi,
     onPaneTimeframeChange: onPaneTimeframeChange,
+    onSymbolSwitch: onSymbolSwitch,
+    onPaneSymbolChange: onPaneSymbolChange,
     isScopeReleased: isScopeReleased,
     activeScopesForPane: activeScopesForPane,
     invalidateCapsCache: invalidateCapsCache,
     selectedPoolTimeframe: selectedPoolTimeframe,
-    _p23AuthTestHooks: {
-      isAuthHttpStatus: isAuthHttpStatus,
-      exactOriginFailureHint: exactOriginFailureHint,
-      windowHttpError: windowHttpError,
-    },
-    _p24eTestHooks: {
-      pendingRefreshMateriallyChangesInflight: pendingRefreshMateriallyChangesInflight,
-      eoRefreshViewportUnixPair: eoRefreshViewportUnixPair,
-    },
   };
 })();

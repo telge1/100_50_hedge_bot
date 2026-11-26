@@ -342,6 +342,14 @@
     max-width: 100%;
 }
 
+.research-archive-panel-nested {
+    border-top: 1px solid #2a2e39;
+}
+
+.research-indicators-panel > summary {
+    padding-left: 0;
+}
+
 .research-archive-footer {
     border-top: none;
 }
@@ -373,6 +381,17 @@
     min-width: 168px;
     max-width: 280px;
     flex: 0 0 auto;
+}
+.research-p17aq-dock {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+}
+.research-p17aq-select {
+    min-width: 220px;
+    max-width: min(420px, 42vw);
 }
 #researchVpRows { width: 70px; }
 #researchVpDisplay { min-width: 96px; }
@@ -541,101 +560,111 @@
 }
 .trp-pane-header {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
+    flex-wrap: wrap;
     gap: 6px 8px;
-    min-height: 30px;
-    padding: 2px 8px;
+    min-height: 34px;
+    height: auto;
+    padding: 4px 8px;
     background: #1a2030;
     border-bottom: 1px solid #2a2e39;
     color: #d1d4dc;
     font-size: 12px;
     flex: 0 0 auto;
-    max-height: none;
-    overflow: visible;
-}
-.trp-draw-toolbar-pool {
-    position: absolute;
-    width: 0;
-    height: 0;
-    overflow: hidden;
-    pointer-events: none;
+    position: relative;
+    z-index: 5;
 }
 .trp-pane-draw-host {
     display: flex;
-    flex: 1 1 auto;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 5;
 }
-.trp-pane-draw-toolbar {
+.trp-pane-draw-host .trp-pane-draw-toolbar,
+.trp-pane-draw-host #trpDrawToolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
+    flex: 1 1 auto;
     min-width: 0;
 }
-.trp-pane-draw-toolbar .trp-tool-btn,
-.trp-pane-draw-toolbar .trp-text-btn {
-    height: 22px;
-}
-.trp-pane-draw-toolbar .trp-select.trp-width {
-    height: 22px;
-    min-height: 22px;
-}
-.trp-pane-draw-toolbar .trp-color {
-    width: 26px;
-    height: 22px;
-    padding: 0;
-}
-.trp-pane-nav-controls {
+.trp-pane-draw-host .trp-pane-nav-controls,
+.trp-pane-draw-host #trpPaneNavControls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    margin-left: 10px;
+    flex: 1 1 auto;
     min-width: 0;
 }
-.trp-pane-header-sep {
-    display: inline-block;
-    width: 10px;
-    flex: 0 0 10px;
-}
-.trp-pane-goto-input {
-    width: min(14rem, 32vw);
-    max-width: 220px;
-    height: 22px;
-    font-size: 11px;
-    padding: 0 6px;
-}
-.trp-pane-nav-controls .trp-text-btn {
-    height: 22px;
-    font-size: 11px;
-}
-.trp-pane-nav-controls .trp-layout-btn {
-    height: 22px;
-    min-width: 26px;
-    padding: 0 6px;
-}
-.trp-pane-nav-label {
-    font-size: 10px;
-}
-.trp-pane-nav-controls .trp-pane-min-origins {
+.trp-view-mode-group {
     display: inline-flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-left: 1.35rem;
-    gap: 4px;
+    gap: 2px;
+    border: 1px solid #2d3548;
+    border-radius: 4px;
+    overflow: hidden;
 }
-.trp-pane-nav-controls .trp-pane-min-origins[hidden] {
+.trp-view-mode-btn {
+    min-width: 4.5rem;
+    height: 22px;
+    padding: 0 8px;
+    background: #1c2330;
+    border: 0;
+    color: #8b93a7;
+    font-size: 11px;
+    cursor: pointer;
+}
+.trp-view-mode-btn.active {
+    background: #243049;
+    color: #5b8def;
+}
+.research-multi-guard {
+    margin: 6px 0 0;
+    padding: 8px 10px;
+    border: 1px solid #b45309;
+    border-radius: 6px;
+    background: rgba(180, 83, 9, 0.12);
+    color: #fcd34d;
+    font-size: 12px;
+    line-height: 1.35;
+}
+.research-multi-guard[hidden] {
     display: none !important;
 }
-.trp-pane-nav-controls .trp-pane-min-origins input[type="range"] {
-    width: 72px;
-    vertical-align: middle;
-}
 .trp-pane-symbol { font-weight: 600; }
+.trp-pane-symbol-select {
+    max-width: 8.5rem;
+    font-weight: 600;
+    background: #1c2330;
+    border: 1px solid #2d3548;
+    color: #d1d4dc;
+    border-radius: 4px;
+    font-size: 12px;
+    height: 22px;
+}
+body.research-multi-manual .research-trp-shell {
+    min-height: calc(100vh - 7rem);
+}
+body.research-multi-manual .trp-workspace.layout-4 {
+    min-height: min(78vh, 920px);
+}
+body.research-multi-manual #researchP17NavRow,
+body.research-multi-manual #researchArchivePanel,
+body.research-multi-manual .trp-toolbar-p17,
+body.research-multi-manual .research-archive-panel {
+    display: none !important;
+}
+body.research-multi-manual .trp-chrome .trp-toolbar:not(.trp-toolbar-main) {
+    display: none;
+}
+body.research-multi-manual #researchSymbolLabel,
+body.research-multi-manual #researchSymbol {
+    display: none;
+}
 .trp-pane-sep { color: #8b93a7; }
 .trp-reset,
 .trp-fs {
@@ -651,9 +680,67 @@
     border-color: #5b8def;
     color: #5b8def;
 }
+body.research-multi-manual .trp-pane-toolbar .trp-fs {
+    min-width: 30px;
+    height: 24px;
+    border-color: #4a7bc8;
+    background: #243044;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    box-shadow: 0 0 0 1px rgba(91, 141, 239, 0.15);
+}
+body.research-multi-manual .trp-pane-toolbar .trp-fs:hover {
+    border-color: #5b8def;
+    color: #fff;
+    background: #2d3d58;
+}
+body.research-multi-manual .trp-pane-toolbar .trp-fs.active {
+    color: #fff;
+    background: #1e3a5f;
+}
 .trp-workspace.pane-fs {
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr !important;
+}
+body.research-multi-tile-fs {
+    overflow: hidden;
+}
+body.research-multi-tile-fs .dashboard-header,
+body.research-multi-tile-fs .dashboard-navigation {
+    display: none !important;
+}
+body.research-multi-tile-fs .research-live-bar,
+body.research-multi-tile-fs .research-banner,
+body.research-multi-tile-fs .research-status,
+body.research-multi-tile-fs .research-selected,
+body.research-multi-tile-fs #researchMultiTradingGuard,
+body.research-multi-tile-fs .trp-footerbar {
+    display: none !important;
+}
+body.research-multi-tile-fs .dashboard-content.research-trp-shell {
+    position: fixed;
+    inset: 0;
+    z-index: 350;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    height: 100vh;
+    margin: 0;
+    padding: 8px;
+    background: #0f1218;
+    box-sizing: border-box;
+}
+body.research-multi-tile-fs .trp-chrome {
+    flex: 0 0 auto;
+}
+body.research-multi-tile-fs .trp-workspace {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: auto;
+}
+body.research-multi-tile-fs.research-multi-manual .trp-workspace.layout-4 {
+    min-height: 0;
 }
 body.research-browser-fs {
     overflow: hidden;
@@ -669,39 +756,6 @@ body.research-browser-fs .research-selected,
 body.research-browser-fs .trp-footerbar {
     display: none !important;
 }
-/* Immersive chart fullscreen: only pane headers + chart grid (tools/GO TO/LAYOUT in header) */
-body.research-chart-immersive-fs .trp-chrome,
-body.research-chart-immersive-fs .trp-dock-bar,
-body.research-chart-immersive-fs .research-live-bar,
-body.research-chart-immersive-fs .research-banner,
-#researchFullscreenHost.research-chart-immersive-fs .trp-chrome,
-#researchFullscreenHost.research-chart-immersive-fs .trp-dock-bar {
-    display: none !important;
-}
-body.research-chart-immersive-fs .research-status,
-body.research-chart-immersive-fs .research-selected,
-#researchFullscreenHost.research-chart-immersive-fs .research-status,
-#researchFullscreenHost.research-chart-immersive-fs .research-selected {
-    display: none !important;
-}
-body.research-chart-immersive-fs .research-fullscreen-host,
-body.research-chart-immersive-fs #researchChartDock {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-}
-body.research-chart-immersive-fs #researchChartDock {
-    margin-top: 0 !important;
-    border-radius: 0;
-    border: none;
-}
-body.research-chart-immersive-fs .trp-workspace {
-    flex: 1 1 auto;
-    min-height: 0 !important;
-    height: auto !important;
-    margin-top: 0 !important;
-}
 body.research-browser-fs .dashboard-content.research-trp-shell {
     position: fixed;
     inset: 0;
@@ -715,7 +769,7 @@ body.research-browser-fs .dashboard-content.research-trp-shell {
     background: #0f1218;
     box-sizing: border-box;
 }
-body.research-browser-fs:not(.research-chart-immersive-fs) .trp-chrome {
+body.research-browser-fs .trp-chrome {
     flex: 0 0 auto;
 }
 body.research-browser-fs .trp-workspace {
@@ -728,81 +782,37 @@ body.research-browser-fs .trp-workspace {
     border-color: #5b8def;
     color: #5b8def;
 }
-
-.research-fullscreen-host {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    min-width: 0;
+.trp-pane-status { margin-left: auto; color: #8b93a7; font-size: 11px; }
+.trp-pane-pool-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #a8b4cc;
+    cursor: pointer;
+    user-select: none;
 }
-
-/* Native Fullscreen API — TRP chrome + dock tools + chart workspace */
-#researchFullscreenHost:fullscreen,
-#researchFullscreenHost:-webkit-full-screen,
-#researchChartDock:fullscreen,
-#researchChartDock:-webkit-full-screen {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    background: #0f1218;
-    overflow: hidden;
-}
-#researchFullscreenHost:fullscreen .trp-chrome,
-#researchFullscreenHost:-webkit-full-screen .trp-chrome,
-#researchFullscreenHost:fullscreen .trp-dock-bar,
-#researchFullscreenHost:-webkit-full-screen .trp-dock-bar {
-    display: none !important;
-}
-#researchFullscreenHost:fullscreen .research-status,
-#researchFullscreenHost:-webkit-full-screen .research-status,
-#researchFullscreenHost:fullscreen .research-selected,
-#researchFullscreenHost:-webkit-full-screen .research-selected {
-    display: none !important;
-}
-#researchFullscreenHost:fullscreen #researchChartDock,
-#researchFullscreenHost:-webkit-full-screen #researchChartDock {
-    flex: 1 1 auto;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    margin-top: 0;
-}
-#researchFullscreenHost:fullscreen .trp-workspace,
-#researchFullscreenHost:-webkit-full-screen .trp-workspace,
-#researchChartDock:fullscreen .trp-workspace,
-#researchChartDock:-webkit-full-screen .trp-workspace {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: auto !important;
-}
-#researchChartDock:fullscreen,
-#researchChartDock:-webkit-full-screen {
-    flex: 1 1 auto;
-    min-height: 0;
-}
-#researchChartDock:fullscreen .trp-chrome,
-#researchChartDock:-webkit-full-screen .trp-chrome,
-#researchChartDock:fullscreen .trp-dock-bar,
-#researchChartDock:-webkit-full-screen .trp-dock-bar,
-#researchChartDock:fullscreen .research-status,
-#researchChartDock:-webkit-full-screen .research-status,
-#researchChartDock:fullscreen .research-selected,
-#researchChartDock:-webkit-full-screen .research-selected {
-    display: none !important;
-}
-.trp-pane-status {
-    margin-left: auto;
+.trp-pane-pool-status {
+    font-size: 10px;
     color: #8b93a7;
-    font-size: 11px;
-    flex: 0 1 auto;
-    white-space: nowrap;
+    max-width: 9rem;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 40%;
+    white-space: nowrap;
+}
+.trp-pane-pool-status-loading { color: #d4a84b; }
+.trp-pane-pool-status-ready { color: #5bc98a; }
+.trp-pane-pool-status-error { color: #e07070; }
+.trp-pane-pool-status-unsupported { color: #9a9aaa; }
+body.research-multi-manual .trp-pane.trp-pane-pool-focus .trp-pane-header {
+    box-shadow: inset 0 0 0 1px rgba(91, 141, 239, 0.65);
+    border-radius: 4px;
+}
+body.research-multi-manual .trp-exact-origin-focus-pane {
+    color: #5b8def;
+    font-size: 11px;
+    font-weight: 600;
 }
 .trp-pane-frame {
     flex: 1 1 auto;
@@ -946,4 +956,14 @@ body.research-browser-fs .trp-workspace {
     border-radius: 6px;
     background: rgba(20, 24, 35, 0.85);
     font-size: 0.85rem;
+}
+
+.research-opi-e2e-label {
+    font-weight: 600;
+    color: #f6e58d;
+}
+
+.research-opi-e2e-bar .trp-btn {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.55rem;
 }
