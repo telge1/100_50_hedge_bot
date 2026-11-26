@@ -127,6 +127,38 @@ def _cache_key(symbol: str, timeframe: str, start, end, lim) -> tuple:
     return (symbol, timeframe, start, end, lim)
 
 
+def _range_end_is_live(end) -> bool:
+    """True when ``end`` is unset or within ~30m of wall clock (live pane backfill)."""
+    if end is None:
+        return True
+    try:
+        return int(time.time()) - int(end) < 1800
+    except (TypeError, ValueError):
+        return False
+
+
+def _tail_limit_candles(candles: list, start, end, lim) -> list:
+    """Cap oversized responses without breaking pinned historical navigation.
+
+    - Unbounded ``(start,end)=(None,None)``: newest ``lim`` bars.
+    - Explicit range with **live** ``end`` (near now): newest ``lim`` bars inside the
+      window so Phase-B backfill honors ``limit`` + weeks preset.
+    - Historical pin (``end`` far in the past): return the full in-range series; do
+      not tail-trim (GO-TO / replay navigation).
+    """
+    try:
+        lim_i = int(lim)
+    except (TypeError, ValueError):
+        return candles
+    if lim_i <= 0 or len(candles) <= lim_i:
+        return candles
+    if start is None and end is None:
+        return candles[-lim_i:]
+    if _range_end_is_live(end):
+        return candles[-lim_i:]
+    return candles
+
+
 def clear_candle_cache_for_tests() -> None:
     with _cache_lock:
         _candle_cache.clear()
@@ -542,6 +574,7 @@ def load_candles(
 
 
 def _packed_from_cached(cached, sym, timeframe, src_name, start, end, lim, t0):
+    trimmed = _tail_limit_candles(cached, start, end, lim)
     return {
         "symbol": sym,
         "timeframe": timeframe,
@@ -549,11 +582,14 @@ def _packed_from_cached(cached, sym, timeframe, src_name, start, end, lim, t0):
         "aggregation": "none" if timeframe == SOURCE_TF else "trp_aggregate_strict",
         "strict_complete_buckets": timeframe != SOURCE_TF,
         "feed_ready": True,
-        "candles": candles_to_payload(cached),
+        "candles": candles_to_payload(trimmed),
         "from": start,
         "to": end,
         "limit": lim,
         "cache": "hit",
+        "cache_tail_trimmed": len(trimmed) < len(cached),
+        "cache_stored_count": len(cached),
+        "candles_returned": len(trimmed),
         "timings_ms": {"total": round((time.perf_counter() - t0) * 1000, 2)},
     }
 
@@ -637,6 +673,7 @@ def _load_candles_compute(trp, sym, timeframe, start, end, lim, src_name, cache_
             candles = candles[-lim:]
         t_agg1 = time.perf_counter()
 
+    candles = _tail_limit_candles(candles, start, end, lim)
     _cache_put(cache_key, candles, _cache_ttl(start, end))
     payload = candles_to_payload(candles)
     t1 = time.perf_counter()

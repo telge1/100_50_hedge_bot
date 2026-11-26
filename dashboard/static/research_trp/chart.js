@@ -441,6 +441,7 @@
   let oblCanvasDpr = 0;
   let oblLayoutDrawTimer = null;
   let oblLayoutDrawPending = false;
+  let oblCrosshairRaf = 0;
 
   function beginProgrammaticNav() {
     programmaticNavDepth += 1;
@@ -826,6 +827,7 @@
         const px = candleSeries.coordinateToPrice(param.point.y);
         if (px != null && !Number.isNaN(Number(px))) lastCursorPrice = Number(px);
         updateVolumeProfileHover(param.point.x, param.point.y);
+        scheduleObCrosshairRedraw();
         if (tradeBubbles.size) {
           showPtbTooltipLocal(tradeBubbleAtPoint(param.point.x, param.point.y));
         }
@@ -850,18 +852,27 @@
       if (!param || param.time == null) {
         if (lastCrosshairTime != null) {
           lastCrosshairTime = null;
+          if (window.OpiPane && OpiPane.clearSyncedCrosshair) {
+            OpiPane.clearSyncedCrosshair();
+          }
           if (typeof window.bridge.on_crosshair_leave === "function") {
             window.bridge.on_crosshair_leave();
           }
+        }
+        if (!param || !param.point) {
+          lastCursorPrice = null;
+          scheduleObCrosshairRedraw();
         }
         return;
       }
       if (param.time === lastCrosshairTime) {
         applyLocalOscCrosshair(Number(param.time));
+        applyLocalOpiCrosshair(Number(param.time));
         return;
       }
       lastCrosshairTime = param.time;
       applyLocalOscCrosshair(Number(param.time));
+      applyLocalOpiCrosshair(Number(param.time));
       if (typeof window.bridge.on_crosshair_move === "function") {
         window.bridge.on_crosshair_move(Number(param.time));
       }
@@ -1017,6 +1028,28 @@
 
     initLowerSplit();
     if (window.OpiPane && OpiPane.attach) OpiPane.attach(chart);
+    if (window.OpiPane && OpiPane.setCrosshairBridge) {
+      OpiPane.setCrosshairBridge({
+        on_move: function (unix) {
+          if (localXhairLock) return;
+          unix = Number(unix);
+          applyLocalPriceCrosshair(unix);
+          if (unix === lastCrosshairTime) return;
+          lastCrosshairTime = unix;
+          if (window.bridge && typeof window.bridge.on_crosshair_move === "function") {
+            window.bridge.on_crosshair_move(unix);
+          }
+        },
+        on_leave: function () {
+          lastCrosshairTime = null;
+          suppressUntilTime = null;
+          if (chart) chart.clearCrosshairPosition();
+          if (window.bridge && typeof window.bridge.on_crosshair_leave === "function") {
+            window.bridge.on_crosshair_leave();
+          }
+        },
+      });
+    }
     const oscEl = $("oscillator");
     if (oscEl && typeof ResizeObserver !== "undefined") {
       const oscRo = new ResizeObserver(function () {
@@ -1088,6 +1121,10 @@
     return Number(n).toFixed(digits);
   }
 
+  function legendInResearchShell() {
+    return !!(window.bridge && typeof window.bridge.on_crosshair_move === "function");
+  }
+
   function updateLegend(param) {
     const legend = $("legend");
     if (!lastPayload) {
@@ -1095,6 +1132,7 @@
       return;
     }
     const meta = lastPayload.symbol + "  " + lastPayload.timeframe;
+    const hideMeta = legendInResearchShell();
     let candle = null;
     if (param && param.seriesData && candleSeries) {
       candle = param.seriesData.get(candleSeries);
@@ -1113,7 +1151,7 @@
       if (!candle) candle = lastPayload.candles[lastPayload.candles.length - 1];
     }
     if (!candle) {
-      legend.innerHTML = '<span class="sym">' + meta + "</span>";
+      legend.innerHTML = hideMeta ? "" : '<span class="sym">' + meta + "</span>";
       return;
     }
     const cls = candle.close >= candle.open ? "up" : "dn";
@@ -1130,9 +1168,8 @@
       });
     }
     legend.innerHTML =
-      '<span class="sym">' +
-      meta +
-      '</span><span class="' +
+      (hideMeta ? "" : '<span class="sym">' + meta + "</span>") +
+      '<span class="' +
       cls +
       '">O ' +
       fmt(candle.open) +
@@ -1491,17 +1528,119 @@
     return true;
   }
 
+  function readViewportState() {
+    if (!chart) return null;
+    const candles = (lastPayload && lastPayload.candles) || [];
+    const n = candles.length;
+    const out = { barCount: n, barsAfter: null };
+    try {
+      out.logical = chart.timeScale().getVisibleLogicalRange();
+    } catch (err) {
+      out.logical = null;
+    }
+    try {
+      out.time = chart.timeScale().getVisibleRange();
+    } catch (err2) {
+      out.time = null;
+    }
+    out.barSpacing = timeScaleOption("barSpacing");
+    out.rightOffset = timeScaleOption("rightOffset");
+    if (out.logical && out.logical.to != null && n > 0) {
+      out.barsAfter = Number(out.logical.to) - (n - 1);
+    }
+    return out;
+  }
+
+  function emitViewportMutation(reason, before, after, meta) {
+    const payload = {
+      reason: reason || "unknown",
+      before: before || null,
+      after: after || null,
+      meta: meta || null,
+    };
+    try {
+      if (window.bridge && typeof window.bridge.on_viewport_mutation === "function") {
+        window.bridge.on_viewport_mutation(payload);
+      }
+    } catch (err) { /* ignore */ }
+  }
+
+  function captureViewportForRestore(snap) {
+    const fromSnap = snap || null;
+    const live = readViewportState();
+    if (!fromSnap && !live) return null;
+    const logical = (fromSnap && fromSnap.logical && fromSnap.logical.from != null && fromSnap.logical.to != null)
+      ? { from: Number(fromSnap.logical.from), to: Number(fromSnap.logical.to) }
+      : (live && live.logical ? { from: Number(live.logical.from), to: Number(live.logical.to) } : null);
+    const time = (fromSnap && fromSnap.visibleTime && fromSnap.visibleTime.from != null)
+      ? { from: Number(fromSnap.visibleTime.from), to: Number(fromSnap.visibleTime.to) }
+      : (live && live.time ? { from: Number(live.time.from), to: Number(live.time.to) } : null);
+    const barSpacing = fromSnap && fromSnap.barSpacing != null ? Number(fromSnap.barSpacing)
+      : (live && live.barSpacing != null ? live.barSpacing : null);
+    return { logical: logical, time: time, barSpacing: barSpacing };
+  }
+
+  /** Preserve kerzenfreies rightOffset: logical restore beats time-only setVisibleRange. */
+  function restoreViewportAfterDataChange(saved, barCount, reason) {
+    if (!chart || !saved) return false;
+    const before = readViewportState();
+    const lastIdx = Math.max(0, Number(barCount) - 1);
+    const preferLogical = saved.logical && saved.logical.to != null
+      && Number(saved.logical.to) > lastIdx + 0.01;
+    let mode = "none";
+    let ok = false;
+    runProgrammaticNav(function () {
+      try {
+        if (preferLogical) {
+          chart.timeScale().setVisibleLogicalRange({
+            from: Number(saved.logical.from),
+            to: Number(saved.logical.to),
+          });
+          if (saved.barSpacing != null && Number.isFinite(Number(saved.barSpacing))) {
+            chart.timeScale().applyOptions({ barSpacing: Number(saved.barSpacing) });
+          }
+          mode = "logical";
+          ok = true;
+        } else if (saved.time && saved.time.from != null && saved.time.to != null) {
+          chart.timeScale().setVisibleRange({
+            from: Number(saved.time.from),
+            to: Number(saved.time.to),
+          });
+          if (saved.barSpacing != null && Number.isFinite(Number(saved.barSpacing))) {
+            chart.timeScale().applyOptions({ barSpacing: Number(saved.barSpacing) });
+          }
+          mode = "time";
+          ok = true;
+        } else if (saved.logical) {
+          chart.timeScale().setVisibleLogicalRange({
+            from: Number(saved.logical.from),
+            to: Number(saved.logical.to),
+          });
+          if (saved.barSpacing != null && Number.isFinite(Number(saved.barSpacing))) {
+            chart.timeScale().applyOptions({ barSpacing: Number(saved.barSpacing) });
+          }
+          mode = "logical_fallback";
+          ok = true;
+        }
+      } catch (err) {
+        ok = false;
+      }
+      try {
+        syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
+      } catch (err2) { /* ignore */ }
+      syncOpiFromMain(true, reason || "restoreViewport");
+    });
+    const after = readViewportState();
+    emitViewportMutation(reason || "restoreViewport", before, after, { mode: mode, preferLogical: preferLogical });
+    return ok;
+  }
+
   function setData(payload, opts) {
     const preserveView = !!(opts && opts.preserveView);
+    const preserveViewTime = !!(opts && opts.preserveViewTime);
     const skipDefaultView = !!(opts && opts.skipDefaultView);
-    let savedRange = null;
-    if (preserveView && chart) {
-      try {
-        savedRange = chart.timeScale().getVisibleLogicalRange();
-      } catch (err) {
-        savedRange = null;
-      }
-    }
+    const snap = opts && opts.viewportSnapshot;
+    const savedViewport = preserveView && chart ? captureViewportForRestore(snap) : null;
     // TF / reload: drop measure so pan is never stuck disabled. Re-bind is
     // idempotent and covers destroy→recreate races.
     clearShiftMeasure();
@@ -1551,14 +1690,12 @@
         applyDefaultView();
       }
       resize();
-    } else if (preserveView && savedRange) {
-      try {
-        chart.timeScale().setVisibleLogicalRange(savedRange);
-      } catch (err) {
-        /* keep current view */
-      }
-      syncOscLogicalFromMain(savedRange);
-      syncOpiFromMain(true, "setData_preserveView");
+    } else if (preserveView && savedViewport) {
+      restoreViewportAfterDataChange(
+        savedViewport,
+        candles.length,
+        preserveViewTime ? "setData_preserveViewTime" : "setData_preserveView"
+      );
       resize();
     } else {
       if (replayViewLock && !replayViewLock.soft) enforceReplayViewLock();
@@ -1637,6 +1774,7 @@
     try {
       chart.setCrosshairPosition(candle.close, unixTime, candleSeries);
       applyLocalOscCrosshairUnlocked(unixTime);
+      applyLocalOpiCrosshairUnlocked(unixTime);
     } finally {
       localXhairLock = false;
     }
@@ -1647,6 +1785,9 @@
     lastCrosshairTime = null;
     if (chart) chart.clearCrosshairPosition();
     if (oscChart) oscChart.clearCrosshairPosition();
+    if (window.OpiPane && OpiPane.clearSyncedCrosshair) {
+      OpiPane.clearSyncedCrosshair();
+    }
   }
 
   function setIndicatorVisible(name, visible) {
@@ -1660,14 +1801,7 @@
     if (!chart) return;
     lastClipOverlayStats = { in: 0, out: 0, droppedExtent: 0, droppedGrid: 0 };
     const skipRangeRestore = !!(opts && opts.skipRangeRestore);
-    let savedTimeRange = null;
-    if (!skipRangeRestore) {
-      try {
-        savedTimeRange = chart.timeScale().getVisibleRange();
-      } catch (err) {
-        savedTimeRange = null;
-      }
-    }
+    const savedViewport = !skipRangeRestore ? captureViewportForRestore(null) : null;
     const wanted = {};
     const list = lastEmaOverlays.series || [];
     for (let i = 0; i < list.length; i++) {
@@ -1709,24 +1843,19 @@
       // Clip to candle extent and exact candle UTC grid (no off-grid union slots).
       series.setData(clipPointsToCandleExtent(spec.data || []));
     });
+    const candles = (lastPayload && lastPayload.candles) || [];
     if (replayViewLock) {
       // Soft: keep followLive off without yanking the visible range back.
       if (!replayViewLock.soft) enforceReplayViewLock();
     } else if (followLive && !viewManual && !skipRangeRestore) {
-      applyDefaultView();
-    } else if (savedTimeRange && savedTimeRange.from != null && savedTimeRange.to != null) {
-      runProgrammaticNav(function () {
-        try {
-          chart.timeScale().setVisibleRange({
-            from: Number(savedTimeRange.from),
-            to: Number(savedTimeRange.to),
-          });
-        } catch (err) {
-          /* ignore */
-        }
-        syncOscLogicalFromMain(chart.timeScale().getVisibleLogicalRange());
-        syncOpiFromMain(true);
-      });
+      let lr = null;
+      try { lr = chart.timeScale().getVisibleLogicalRange(); } catch (errLr) { lr = null; }
+      if (!isNearLiveLogicalRange(lr, candles.length)) {
+        applyDefaultView();
+        emitViewportMutation("setEmaOverlays_applyDefaultView", savedViewport, readViewportState(), null);
+      }
+    } else if (savedViewport) {
+      restoreViewportAfterDataChange(savedViewport, candles.length, "setEmaOverlays");
     }
     // EMA refresh must never re-fit price / recenter.
   }
@@ -4248,6 +4377,8 @@
       }
     }
 
+    paintObCrosshairCursor(ctx, w, h);
+
     // Outside-viewport coverage indicators (no bars on wrong prices).
     if (askVis.above + bidVis.above > 0) {
       ctx.fillStyle = "rgba(240, 97, 109, 0.7)";
@@ -5009,6 +5140,32 @@
       oblLayoutDrawPending = false;
       drawOrderbookLevels();
     }, 120);
+  }
+
+  /** Repaint OB panel cursor line in sync with LWC horz crosshair (no layout throttle). */
+  function scheduleObCrosshairRedraw() {
+    if (!oblSettings.enabled) return;
+    if (oblCrosshairRaf) return;
+    oblCrosshairRaf = requestAnimationFrame(function () {
+      oblCrosshairRaf = 0;
+      drawOrderbookLevels();
+    });
+  }
+
+  function paintObCrosshairCursor(ctx, w, h) {
+    if (lastCursorPrice == null) return;
+    const y = yOf(lastCursorPrice);
+    if (y == null || !Number.isFinite(y) || y < 0 || y > h) return;
+    ctx.save();
+    ctx.strokeStyle = "#5b6478";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   function overlayTimeBounds(p) {
@@ -7192,6 +7349,30 @@
     localXhairLock = false;
   }
 
+  function opiStackVisible() {
+    const stack = $("opi-stack");
+    return !!(stack && !stack.hidden);
+  }
+
+  function applyLocalOpiCrosshair(unix) {
+    if (!opiStackVisible() || localXhairLock) return;
+    localXhairLock = true;
+    try {
+      applyLocalOpiCrosshairUnlocked(unix);
+    } finally {
+      localXhairLock = false;
+    }
+  }
+
+  function applyLocalOpiCrosshairUnlocked(unix) {
+    if (!opiStackVisible() || !window.OpiPane || !OpiPane.setSyncedCrosshair) return;
+    try {
+      OpiPane.setSyncedCrosshair(Number(unix));
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
   function mergeStochOi(stoch, oi) {
     stoch = stoch || { visible: false };
     oi = oi || { visible: false };
@@ -7465,6 +7646,8 @@
       defaultVisibleBars: DEFAULT_VISIBLE_BARS,
       defaultRightOffset: DEFAULT_RIGHT_OFFSET,
       resetViewCount: resetViewCount,
+      viewManual: viewManual,
+      followLive: followLive,
       lastReset: lastResetResult,
       candlePaintPending: candlePaintPending,
       lastAppliedSize: lastAppliedSize,
@@ -7586,6 +7769,9 @@
     computeDefaultLogicalRange: computeDefaultLogicalRange,
     applyDefaultView: applyDefaultView,
     resetView: resetView,
+    isViewManual: function () {
+      return !!viewManual;
+    },
     DEFAULT_VISIBLE_BARS: DEFAULT_VISIBLE_BARS,
     DEFAULT_RIGHT_OFFSET: DEFAULT_RIGHT_OFFSET,
     computePositionStats: computePositionStats,

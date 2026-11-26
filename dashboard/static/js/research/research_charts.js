@@ -122,7 +122,7 @@
       return;
     }
     if (cb && state.opi) cb.checked = !!state.opi.enabled;
-    if (win && state.opi) win.value = String(state.opi.window_minutes || 15);
+    if (win && state.opi) win.value = String(opiWindowMinutesOrDefault(state.opi.window_minutes));
   }
 
   function clearMultiManualChrome() {
@@ -334,7 +334,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "research-mc-opi-p3q-v1";
+  const ASSET_V = "research-mc-opi-p3u-v1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
@@ -345,6 +345,12 @@
     typeof ResearchScannerCommonHelpers !== "undefined" ? ResearchScannerCommonHelpers : null;
   const VP_KEY = "research.volume_profile";
   const OPI_KEY = "research.opi.v1";
+  const OPI_WINDOW_MINUTES = [5, 15, 30, 60];
+
+  function opiWindowMinutesOrDefault(wm) {
+    const n = Number(wm) || 15;
+    return OPI_WINDOW_MINUTES.indexOf(n) >= 0 ? n : 15;
+  }
   const OBP_KEY = "research.orderbook_profile";
   const OBL_KEY = "research.orderbook_levels.v3";
   const PTB_KEY = "research.trade_bubbles";
@@ -591,6 +597,90 @@
     return row;
   }
 
+  function mcLoadDiagOn() {
+    return !!(window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.isActive && window.__MC_LOAD_DIAG__.isActive());
+  }
+
+  function mcLoadDiagSettings() {
+    const ws = state.workspace || {};
+    const obl = state.obl || {};
+    const lldOn = $("researchIndLld") && $("researchIndLld").checked;
+    return window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.snapshotSettings
+      ? window.__MC_LOAD_DIAG__.snapshotSettings({
+        workspace: ws,
+        active_pools: !!(lldOn && historicalLmv2PoolsEnabled()),
+        exact_origin: exactOriginDensityEnabled(),
+        ob_levels: !!(obl && obl.enabled),
+        opi: !!(state.opi && state.opi.enabled),
+      })
+      : {};
+  }
+
+  function mcLoadDiagEmit(name, extra) {
+    if (!mcLoadDiagOn() || !window.__MC_LOAD_DIAG__.emit) return;
+    window.__MC_LOAD_DIAG__.emit(name, extra || {});
+  }
+
+  function mcLoadDiagNoteHttp(method, url, meta) {
+    if (!mcLoadDiagOn() || !window.__MC_LOAD_DIAG__.noteRequest) return null;
+    const id = "http-" + Date.now().toString(36) + "-" + Math.floor(Math.random() * 1e6);
+    window.__MC_LOAD_DIAG__.noteRequest({
+      id: id,
+      method: method,
+      endpoint: url,
+      symbol: meta && meta.symbol,
+      timeframe: meta && meta.timeframe,
+      source_action: meta && meta.sourceAction,
+      pane: meta && meta.pane,
+    });
+    return id;
+  }
+
+  function mcLoadDiagPatchHttp(id, patch) {
+    if (!id || !mcLoadDiagOn() || !window.__MC_LOAD_DIAG__.patchRequest) return;
+    window.__MC_LOAD_DIAG__.patchRequest(id, patch);
+  }
+
+  function mcLoadDiagNoteError(err, extra) {
+    if (!mcLoadDiagOn() || !window.__MC_LOAD_DIAG__.noteError) return;
+    window.__MC_LOAD_DIAG__.noteError(err, extra || {});
+  }
+
+  function mcLoadDiagEndpointKey(url) {
+    const u = String(url || "").split("?")[0];
+    if (u.indexOf("/api/research/pane") >= 0) return "pane";
+    if (u.indexOf("/api/research/candles") >= 0) return "candles";
+    return u.replace(/^https?:\/\/[^/]+/, "") || "http";
+  }
+
+  function mcLoadDiagEmitHttp(phase, method, url, httpId, extra) {
+    const endpoint = mcLoadDiagEndpointKey(url);
+    const candleLane = endpoint === "pane" || endpoint === "candles";
+    const base = Object.assign({
+      http_id: httpId,
+      method: method,
+      url: url,
+      endpoint: endpoint,
+      via: extra && extra.via,
+    }, extra || {});
+    if (phase === "start") {
+      mcLoadDiagEmit("http_request_started", base);
+      if (candleLane) {
+        mcLoadDiagEmit("candle_request_started", Object.assign({}, base, {
+          timing_key: "candle_" + endpoint + "_request_started",
+        }));
+      }
+      return;
+    }
+    mcLoadDiagEmit("http_response_received", base);
+    if (candleLane) {
+      mcLoadDiagEmit("candle_response_received", Object.assign({}, base, {
+        timing_key: "candle_" + endpoint + "_response_received",
+      }));
+    }
+    mcLoadDiagEmit("response_parse_completed", Object.assign({ endpoint: endpoint }, base));
+  }
+
   async function mapLimit(items, limit, fn) {
     const list = items || [];
     const out = new Array(list.length);
@@ -735,11 +825,437 @@
     return (days || 30) * 86400;
   }
 
-  function historyLoadLimitForTimeframe(tf) {
+  function mcLoadHistoryWeeks() {
+    try { readHistoryFromUi(); } catch (e) { /* ignore */ }
     const uiWeeks = $("lldHistoryWeeks") ? Number(($("lldHistoryWeeks") || {}).value || 0) : 0;
-    const weeks = Math.max(1, Number(uiWeeks || (state.history && state.history.weeks) || 12) || 12);
+    return Math.max(1, Number(uiWeeks || (state.history && state.history.weeks) || 12) || 12);
+  }
+
+  function mcLoadSnapshotHistoryLimit(tf) {
+    const weeks = mcLoadHistoryWeeks();
+    const fullLimit = historyLoadLimitForTimeframe(tf || "5m");
+    const uiEl = $("lldHistoryWeeks");
+    return {
+      history_weeks: weeks,
+      full_history_limit: fullLimit,
+      lld_history_weeks_dom: uiEl ? Number(uiEl.value || 0) : null,
+      state_history_weeks: state.history && state.history.weeks != null ? state.history.weeks : null,
+    };
+  }
+
+  function mcLoadDiagPushPhaseDecision(row) {
+    if (!window.__MC_LOAD_DIAG__ || !window.__MC_LOAD_DIAG__.getLatest) return;
+    const latest = window.__MC_LOAD_DIAG__.getLatest();
+    if (!latest) return;
+    if (!Array.isArray(latest.phase_decisions)) latest.phase_decisions = [];
+    latest.phase_decisions.push(Object.assign({ wall_ms: Date.now() }, row || {}));
+  }
+
+  function mcLoadSkipEmaCatchUpAfterPaneBundle(pane, opts) {
+    if (opts && opts._historyPhaseB) {
+      const stale = paneEmaStaleVsCandles(pane, { afterPaneBundle: true });
+      if (stale) {
+        return { skip: false, reason: "history_phase_b_stale_bundle" };
+      }
+      return { skip: true, reason: "history_phase_b_bundle_ema" };
+    }
+    return { skip: false, reason: null };
+  }
+
+  function mcLoadDiagEmaSeriesSnapshot(pane, packed, tag) {
+    if (!mcLoadDiagOn()) return;
+    const ema = (packed && packed.ema) || (pane && pane.pendingEma) || { series: [] };
+    const series = ema.series || [];
+    const candles = (packed && packed.candles) || (pane && pane.pendingData && pane.pendingData.candles) || [];
+    let lastCt = null;
+    if (candles.length) lastCt = Number(candles[candles.length - 1].time);
+    const rows = series.map(function (spec) {
+      const data = spec && spec.data ? spec.data : [];
+      let lastEt = null;
+      if (data.length) lastEt = Number(data[data.length - 1].time);
+      return {
+        id: spec && spec.id,
+        visible: spec && spec.visible,
+        points: data.length,
+        last_time: lastEt,
+      };
+    });
+    let viewFrom = null;
+    let viewTo = null;
+    const chart = pane && api(pane);
+    if (chart && chart.getVisibleTimeRange) {
+      try {
+        const vr = chart.getVisibleTimeRange();
+        if (vr) {
+          viewFrom = vr.from;
+          viewTo = vr.to;
+        }
+      } catch (e) { /* ignore */ }
+    }
+    mcLoadDiagEmit("ema_series_viewport_snapshot", {
+      tag: tag || "unknown",
+      pane: pane && pane.id,
+      timeframe: pane && pane.tf,
+      candle_count: candles.length,
+      last_candle_time: lastCt,
+      ema_series: rows,
+      visible_from: viewFrom,
+      visible_to: viewTo,
+      stale_vs_candles: pane ? paneEmaStaleVsCandles(pane, { afterPaneBundle: true }) : null,
+      timing_key: tag === "after_phase_b" ? "ema_viewport_after_phase_b" : null,
+    });
+  }
+
+  function historyLoadLimitForTimeframe(tf) {
+    const weeks = mcLoadHistoryWeeks();
     const step = TF_SEC[tf] || 60;
     return Math.max(100, Math.round((weeks * 7 * 24 * 3600) / step));
+  }
+
+  function mcLoadRangeOrigin(opts, range) {
+    if (opts && opts.from != null && opts.to != null) return "opts_explicit";
+    const preset = (state.history && state.history.preset) || "30d";
+    if (preset === "rolling") return "history_preset_rolling";
+    if (!range || (range.from == null && range.to == null)) return "unbounded";
+    return "history_preset_" + preset;
+  }
+
+  const MC_LOAD_P3_ASSET = "mc-load-p4i-v1";
+  const MC_LOAD_P3B_CODE = "mc-load-p4i-v1";
+  const MC_LOAD_P3_VISIBLE_BARS = 120;
+  const MC_LOAD_P3_RANGE_BUFFER_BARS = 64;
+
+  function mcLoadFastFirstEnabled() {
+    try {
+      if (localStorage.getItem("mc.load.fastFirst") === "0") return false;
+    } catch (e) { /* ignore */ }
+    return true;
+  }
+
+  function mcLoadFullHistoryLimitReached(pane, count) {
+    const full = historyLoadLimitForTimeframe(pane && pane.tf ? pane.tf : "5m");
+    return Number(count) >= full - 5;
+  }
+
+  /** Phase-A window: visible default + EMA warmup + buffer (server trims with warmup in pane_bundle). */
+  function mcLoadFastFirstPaneRange(pane) {
+    const step = TF_SEC[pane.tf] || 60;
+    const now = Math.floor(Date.now() / 1000);
+    const warm = maxEmaWarmupBars(state.workspace || {});
+    const bars = MC_LOAD_P3_VISIBLE_BARS + warm + MC_LOAD_P3_RANGE_BUFFER_BARS;
+    const fullLimit = historyLoadLimitForTimeframe(pane.tf);
+    const limit = Math.max(200, Math.min(bars, fullLimit));
+    if (limit >= fullLimit - 5) return null;
+    return {
+      from: now - limit * step,
+      to: now,
+      limit: limit,
+    };
+  }
+
+  /** True when this load must honor an explicit history/viewport window (no Phase A). */
+  function mcLoadOptsPinsHistoryWindow(opts) {
+    if (!opts) return false;
+    if (opts._historyPhaseB) return true;
+    if (opts.jumpToUnix != null) return true;
+    if (opts.indicatorsOnly) return true;
+    const src = String(opts.sourceAction || "");
+    if (src === "go-to" || src === "tf-change-replay" || src.indexOf("go-to") === 0) return true;
+    if (opts.from != null && opts.to != null) return true;
+    return false;
+  }
+
+  function mcLoadFastFirstFallbackReason(pane, opts) {
+    if (!mcLoadFastFirstEnabled()) return "fast_first_disabled";
+    if (!pane) return "no_pane";
+    if (opts && (opts.skipFastFirst || opts._historyPhaseB)) return "opts_skip";
+    if (opts && opts.indicatorsOnly) return "indicators_only";
+    if (opts && opts.jumpToUnix != null) return "jump_to_unix";
+    if (isHistoricalReplay()) return "historical_replay";
+    if (historyBlocksLive()) return "history_blocks_live";
+    if (mcLoadOptsPinsHistoryWindow(opts)) return "explicit_history_window";
+    const src = opts && opts.sourceAction;
+    const allowed = {
+      "pane-load": true,
+      "symbol-switch": true,
+      "tf-change": true,
+      "layout-change": true,
+      "pane-symbol-switch": true,
+      "live-restore": true,
+      "multi-boot": true,
+      "reload-visible": true,
+    };
+    if (src && !allowed[src] && !(opts && opts.force)) return "source_action_" + src;
+    const spec = mcLoadFastFirstPaneRange(pane);
+    if (!spec) return "fast_window_covers_full_history";
+    return null;
+  }
+
+  function resolveMcLoadPhaseA(pane, opts) {
+    if (mcLoadFastFirstFallbackReason(pane, opts)) return null;
+    return mcLoadFastFirstPaneRange(pane);
+  }
+
+  function buildMcLoadPhaseADecision(pane, opts, range) {
+    const tf = pane && pane.tf ? pane.tf : null;
+    const fullLimit = tf ? historyLoadLimitForTimeframe(tf) : null;
+    const step = TF_SEC[tf] || 60;
+    const warm = maxEmaWarmupBars(state.workspace || {});
+    const bars = MC_LOAD_P3_VISIBLE_BARS + warm + MC_LOAD_P3_RANGE_BUFFER_BARS;
+    const requestedLimit = Math.max(200, fullLimit ? Math.min(bars, fullLimit) : bars);
+    const fallbackReason = mcLoadFastFirstFallbackReason(pane, opts || {});
+    const spec = fallbackReason ? null : mcLoadFastFirstPaneRange(pane);
+    const decision = spec ? "A" : "skip";
+    let fastFirstLs = null;
+    try { fastFirstLs = localStorage.getItem("mc.load.fastFirst"); } catch (e) { fastFirstLs = "err"; }
+    return {
+      mc_load_p3b_code: MC_LOAD_P3B_CODE,
+      mc_load_p4_code: MC_LOAD_P3B_CODE,
+      fast_first_enabled: mcLoadFastFirstEnabled(),
+      fast_first_localStorage: fastFirstLs,
+      input_from: opts && opts.from != null ? opts.from : null,
+      input_to: opts && opts.to != null ? opts.to : null,
+      input_limit: opts && opts.limit != null ? opts.limit : null,
+      resolved_range_from: range && range.from != null ? range.from : null,
+      resolved_range_to: range && range.to != null ? range.to : null,
+      history_weeks: mcLoadHistoryWeeks(),
+      history_preset: (state.history && state.history.preset) || null,
+      full_history_limit: fullLimit,
+      range_origin: mcLoadRangeOrigin(opts || {}, range),
+      is_explicit_history_pin: mcLoadOptsPinsHistoryWindow(opts || {}),
+      gotoNavViewCenterTs: state.gotoNavViewCenterTs,
+      gotoNavTargetTs: state.gotoNavTargetTs,
+      source_action: opts && opts.sourceAction,
+      decision: decision,
+      fallback_reason: fallbackReason,
+      phase_a_requested_bars: bars,
+      phase_a_requested_limit: requestedLimit,
+      phase_a_effective_limit: spec && spec.limit != null ? spec.limit : null,
+      phase_a_from: spec && spec.from != null ? spec.from : null,
+      phase_a_to: spec && spec.to != null ? spec.to : null,
+      timeframe: tf,
+      symbol: paneSymbol(pane),
+      history_blocks_live: historyBlocksLive(),
+      historical_replay: isHistoricalReplay(),
+    };
+  }
+
+  function mcLoadDiagEmitPhaseADecision(pane, opts, range, gen) {
+    const row = buildMcLoadPhaseADecision(pane, opts, range);
+    row.load_generation = gen;
+    mcLoadDiagEmit("mc_load_phase_a_decision", Object.assign({ timing_key: "mc_load_phase_a_decision" }, row));
+    mcLoadDiagPushPhaseDecision(Object.assign({ kind: "phase_a_resolve" }, row));
+    if (window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest) {
+      const latest = window.__MC_LOAD_DIAG__.getLatest();
+      if (latest && row.decision === "A" && row.source_action !== "history-phase-b") {
+        latest.phase_a_decision = row;
+      } else if (latest && (opts && opts._historyPhaseB)) {
+        latest.phase_b_decision_resolve = row;
+      }
+    }
+    try {
+      window.__MC_LOAD_PHASE_P3B__ = MC_LOAD_P3B_CODE;
+    } catch (e) { /* ignore */ }
+    return row;
+  }
+
+  function mcLoadDiagTrackPhaseRun(pane, opts, phaseA, fallbackReason, gen, reqBody) {
+    if (!window.__MC_LOAD_DIAG__ || !window.__MC_LOAD_DIAG__.getLatest) return;
+    const latest = window.__MC_LOAD_DIAG__.getLatest();
+    if (!latest) return;
+    const sym = paneSymbol(pane);
+    const limSnap = mcLoadSnapshotHistoryLimit(pane && pane.tf);
+    const isB = !!(opts && opts._historyPhaseB);
+    const row = {
+      kind: isB ? "pane_load_phase_b" : (phaseA ? "pane_load_phase_a" : "pane_load_full"),
+      load_generation: gen,
+      symbol_at_request: sym,
+      timeframe_at_request: pane && pane.tf,
+      phase_requested: phaseA ? "A" : (isB ? "B" : "full"),
+      request_limit: reqBody && reqBody.limit != null ? reqBody.limit : null,
+      history_weeks: limSnap.history_weeks,
+      full_history_limit: limSnap.full_history_limit,
+      lld_history_weeks_dom: limSnap.lld_history_weeks_dom,
+      source_action: opts && opts.sourceAction,
+    };
+    mcLoadDiagPushPhaseDecision(row);
+    if (isB) {
+      latest.phase_b_decision = Object.assign({}, latest.phase_b_decision || {}, row);
+      latest.request_completion_status = "pending";
+      return;
+    }
+    if (phaseA) {
+      latest.load_generation = gen;
+      latest.symbol_at_request = sym;
+      latest.timeframe_at_request = pane && pane.tf;
+      latest.phase_requested = "A";
+      latest.effective_fast_first = true;
+      latest.fast_first_fallback_reason = null;
+      latest.request_completion_status = "pending";
+      latest.phase_a_candle_count = null;
+      return;
+    }
+    latest.phase_requested = "full";
+    latest.fast_first_fallback_reason = fallbackReason || "unknown";
+    latest.effective_fast_first = false;
+  }
+
+  function mcLoadDiagCompletePaneRequest(latest, patch) {
+    if (!latest) return;
+    Object.assign(latest, patch || {});
+  }
+
+  function mcLoadPostLoadDeferred(opts, phaseA) {
+    if (!phaseA) return false;
+    if (!mcLoadFastFirstEnabled()) return false;
+    if (!opts || opts.indicatorsOnly || opts._historyPhaseB) return false;
+    if (isHistoricalReplay() || historyBlocksLive()) return false;
+    return true;
+  }
+
+  function applyPaneFormingFromPacked(pane, packed) {
+    if (historyBlocksLive() || !pane || !packed) return;
+    if (packed.forming) {
+      applyFormingToPane(pane, packed.forming);
+      return;
+    }
+    if (packed.live_tip && (packed.candles || []).length) {
+      const tip = packed.candles[packed.candles.length - 1];
+      applyFormingToPane(pane, {
+        time: tip.time,
+        open: tip.open,
+        high: tip.high,
+        low: tip.low,
+        close: tip.close,
+      });
+    }
+  }
+
+  function setPaneHistoryBackfillStatus(pane) {
+    const st = paneStatusEl(pane);
+    if (!st) return;
+    const rows = (pane.pendingData && pane.pendingData.candles) || [];
+    st.textContent = rows.length ? rows.length + " · ready (+history…)" : "history…";
+  }
+
+  /** Same path as toolbar ⟲ — `chartApi.resetView()` → `applyDefaultView()`. */
+  function runFinalPaneViewResetLikeToolbar(pane, paneId, gen, opts) {
+    if (!pane) return false;
+    if (pane._mcLoadFinalViewResetGen === gen) return false;
+    if (isHistoricalReplay() || historyBlocksLive()) return false;
+    if (opts && opts.jumpToUnix != null) return false;
+    const src = String((opts && opts.sourceAction) || "");
+    if (src === "go-to" || src.indexOf("go-to") === 0 || src === "tf-change-replay") return false;
+    const chart = api(pane);
+    if (!chart || !chart.resetView) return false;
+    if (chart.isViewManual && chart.isViewManual()) {
+      mcLoadDiagEmit("mc_load_final_view_reset_skipped", {
+        pane: paneId,
+        gen: gen,
+        reason: "view_manual",
+      });
+      return false;
+    }
+    pane._mcLoadFinalViewResetGen = gen;
+    mcLoadDiagEmit("mc_load_final_view_reset", {
+      pane: paneId,
+      gen: gen,
+      source: "toolbar_resetView",
+      timing_key: "mc_load_final_view_reset",
+    });
+    try {
+      const result = chart.resetView();
+      if (chart.resize) chart.resize();
+      return !!result;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function scheduleFinalPaneViewReset(pane, paneId, gen, paneGen, reqReplayGen, opts) {
+    if (!pane || !paneId) return;
+    const g = gen;
+    const pg = paneGen;
+    setTimeout(function () {
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          if (g !== state.loadGen) return;
+          if (pg !== pane.paneGen) return;
+          if (exitSupersededPaneLoad(pane, paneId, null, pg, g, reqReplayGen)) return;
+          runFinalPaneViewResetLikeToolbar(pane, paneId, g, opts || {});
+        });
+      });
+    }, 50);
+  }
+
+  function mcLoadShouldFinalizePaneView(pane, opts, wasPhaseA) {
+    if (!pane || !opts) return false;
+    if (opts.indicatorsOnly) return false;
+    if (wasPhaseA) return false;
+    if (opts._historyPhaseB) return true;
+    if (pane._mcLoadAwaitingHistoryB) return false;
+    if (opts.jumpToUnix != null) return false;
+    if (isHistoricalReplay() || historyBlocksLive()) return false;
+    return true;
+  }
+
+  function schedulePaneHistoryPhaseB(paneId, gen, reqReplayGen) {
+    const pane = state.panes[paneId];
+    if (!pane || !mcLoadFastFirstEnabled()) return;
+    if (pane._historyPhaseBScheduled) return;
+    pane._historyPhaseBScheduled = true;
+    const schedulePaneGen = pane.paneGen;
+    setTimeout(function () {
+      pane._historyPhaseBScheduled = false;
+      if (gen !== state.loadGen) return;
+      if (schedulePaneGen !== pane.paneGen) return;
+      if (mcLoadFullHistoryLimitReached(pane, (pane.pendingData && pane.pendingData.candles || []).length)) {
+        pane._mcLoadAwaitingHistoryB = false;
+        scheduleFinalPaneViewReset(pane, paneId, gen, schedulePaneGen, reqReplayGen, {
+          sourceAction: "history-phase-b-skipped-full-limit",
+        });
+        return;
+      }
+      void loadPane(paneId, {
+        gen: gen,
+        replayGen: reqReplayGen,
+        sourceAction: "history-phase-b",
+        preserveView: true,
+        skipFastFirst: true,
+        _historyPhaseB: true,
+        allowStale: true,
+      }).catch(function (err) {
+        if (!(err && err.name === "AbortError")) {
+          try { console.warn("[research] history phase B", err); } catch (e) { /* ignore */ }
+        }
+      });
+    }, 0);
+  }
+
+  async function runPaneDeferredPostLoad(pane, paneId, gen, paneGen, reqReplayGen, opts) {
+    try {
+      mcLoadDiagEmit("ensure_pane_caught_up_begin", {
+        pane: paneId,
+        deferred: true,
+        timing_key: "ensure_pane_caught_up_begin",
+      });
+      await ensurePaneCaughtUp(pane, { gen: gen, paneGen: paneGen, indicatorsOnly: false });
+      mcLoadDiagEmit("ensure_pane_caught_up_end", {
+        pane: paneId,
+        deferred: true,
+        timing_key: "ensure_pane_caught_up_end",
+      });
+      if (!exitSupersededPaneLoad(pane, paneId, null, paneGen, gen, reqReplayGen)) {
+        if (!pane._mcLoadAwaitingHistoryB && paneEmaStaleVsCandles(pane, { afterPaneBundle: true })) {
+          await refreshPaneEmaOverlays(pane, { gen: gen, sourceAction: "ema-post-catch-up" });
+        }
+      }
+    } catch (err) {
+      if (!(err && err.name === "AbortError")) {
+        try { console.warn("[research] deferred pane post-load", err); } catch (e) { /* ignore */ }
+      }
+      mcLoadDiagNoteError(err, { phase: "deferred_post_load", pane: paneId });
+    }
   }
 
   function computeHistoryRangeUnix(override) {
@@ -766,6 +1282,68 @@
       return { from: Math.floor(Number(opts.from)), to: Math.floor(Number(opts.to)) };
     }
     return computeHistoryRangeUnix();
+  }
+
+  /** Phase B in live mode: never use custom History ``to`` pinned in the past (P4E). */
+  function mcLoadHistoryPhaseBRange(pane) {
+    if (isHistoricalReplay() || historyBlocksLive()) {
+      return computeHistoryRangeUnix();
+    }
+    const limit = historyLoadLimitForTimeframe(pane && pane.tf ? pane.tf : "5m");
+    const liveR = liveRestorePaneLoadRange();
+    if (liveR.from != null && liveR.to != null) {
+      return {
+        from: Math.floor(Number(liveR.from)),
+        to: Math.floor(Number(liveR.to)),
+        limit: limit,
+      };
+    }
+    return { from: null, to: null, limit: limit };
+  }
+
+  function capturePaneViewportSnapshot(pane) {
+    const chart = api(pane);
+    if (!chart) return null;
+    const snap = { wall_ms: Date.now() };
+    try {
+      if (chart.getVisibleTimeRange) snap.visibleTime = chart.getVisibleTimeRange();
+    } catch (e) { /* ignore */ }
+    try {
+      if (chart.debugInfo) {
+        const di = chart.debugInfo();
+        if (di && di.logical) snap.logical = di.logical;
+        if (di && di.barSpacing != null) snap.barSpacing = di.barSpacing;
+        if (di && di.rightOffset != null) snap.rightOffset = di.rightOffset;
+      }
+    } catch (e2) { /* ignore */ }
+    return snap;
+  }
+
+  function mergeLiveTailCandles(existing, incoming, tf) {
+    const step = TF_SEC[tf] || 60;
+    if (!Array.isArray(existing) || !existing.length || !Array.isArray(incoming) || !incoming.length) {
+      return incoming || [];
+    }
+    const newLast = Number(incoming[incoming.length - 1].time);
+    const oldLast = Number(existing[existing.length - 1].time);
+    if (!Number.isFinite(newLast) || !Number.isFinite(oldLast)) return incoming;
+    if (newLast >= oldLast - step) return incoming;
+    const byTime = {};
+    incoming.forEach(function (c) { byTime[c.time] = c; });
+    existing.forEach(function (c) {
+      const t = Number(c.time);
+      if (Number.isFinite(t) && t > newLast) byTime[t] = c;
+    });
+    return Object.keys(byTime).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (t) { return byTime[t]; });
+  }
+
+  function clearStaleGotoNavCenterAfterLiveLoad(pane) {
+    const last = lastClosedBarTime(pane);
+    if (last == null || state.gotoNavViewCenterTs == null) return;
+    const center = Number(state.gotoNavViewCenterTs);
+    if (!Number.isFinite(center)) return;
+    if (center < last - 14 * 86400) state.gotoNavViewCenterTs = null;
   }
 
   /**
@@ -932,8 +1510,25 @@
     state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
     visibleIds().forEach(function (pid) {
       const pane = state.panes[pid];
-      if (pane) pane.paneGen += 1;
+      if (pane) abortStalePaneWork(pane);
     });
+  }
+
+  /** Cancel deferred EMA/catch-up tied to an older pane generation (TF change, abort). */
+  function abortStalePaneWork(pane) {
+    if (!pane) return;
+    pane.paneGen += 1;
+    if (pane._emaOverlayRefreshTimer) {
+      clearTimeout(pane._emaOverlayRefreshTimer);
+      pane._emaOverlayRefreshTimer = null;
+    }
+    pane._emaOverlayRefreshInflight = false;
+    if (pane._historyPhaseBScheduled) {
+      pane._historyPhaseBScheduled = false;
+    }
+    pane._mcLoadAwaitingHistoryB = false;
+    pane._mcLoadPhaseA = false;
+    pane._mcLoadFinalViewResetGen = null;
   }
 
   function paneStatusEl(pane) {
@@ -974,6 +1569,7 @@
     };
     try { console.warn("[research] pane load failure", row); } catch (e) { /* ignore */ }
     postLiveDiag(row);
+    mcLoadDiagNoteError(err, row);
   }
 
   function setPaneLoadApplyError(pane, paneGen, gen, owner, err) {
@@ -1121,6 +1717,8 @@
     }
     pane._paneLoadOwner = null;
     if (pane._paneLoadInFlight === owner) pane._paneLoadInFlight = null;
+    mcLoadDiagNoteError(err, { phase: "pane_http", pane: pane && pane.id });
+    mcLoadDiagEmit("load_incomplete", { phase: "pane_http", pane: pane && pane.id });
   }
 
   function releasePaneLoadOwner(pane, owner) {
@@ -1133,6 +1731,16 @@
     if (st && st.textContent === "loading…") {
       const rows = (pane.pendingData && pane.pendingData.candles) || [];
       if (rows.length) st.textContent = paneStatusFromPendingData(pane);
+    }
+    mcLoadDiagEmit("loading_indicator_hidden", {
+      pane: pane && pane.id,
+      status: st && st.textContent,
+    });
+    if (window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest) {
+      const latest = window.__MC_LOAD_DIAG__.getLatest();
+      if (latest && latest.frontend_timings_ms && latest.frontend_timings_ms.loading_indicator_hidden != null) {
+        latest.loading_hidden_ms = latest.frontend_timings_ms.loading_indicator_hidden;
+      }
     }
   }
 
@@ -1938,11 +2546,35 @@
       return inflightGets[url];
     }
     const pending = (async function () {
+      const httpId = mcLoadDiagNoteHttp("GET", url, meta);
+      const tFetch0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      mcLoadDiagEmitHttp("start", "GET", url, httpId, {
+        via: "getJson",
+        sourceAction: meta && meta.sourceAction,
+      });
       const res = await fetch(url, {
         credentials: "same-origin",
         signal: meta && meta.signal,
       });
+      const textT0 = typeof performance !== "undefined" ? performance.now() : Date.now();
       const body = await res.json().catch(function () { return {}; });
+      const textT1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      mcLoadDiagEmitHttp("done", "GET", url, httpId, {
+        via: "getJson",
+        httpStatus: res.status,
+        sourceAction: meta && meta.sourceAction,
+      });
+      if (httpId) {
+        mcLoadDiagPatchHttp(httpId, {
+          http_status: res.status,
+          duration_ms: Math.round(textT1 - tFetch0),
+          fetch_ms: Math.round(textT0 - tFetch0),
+          parse_ms: Math.round(textT1 - textT0),
+          coalesced: !!(info && info.coalesced),
+          candle_count: body && Array.isArray(body.candles) ? body.candles.length : null,
+          endpoint: mcLoadDiagEndpointKey(url),
+        });
+      }
       if (!res.ok) {
         const e = httpError(res, body, url);
         e.status = res.status;
@@ -2082,12 +2714,23 @@
       const reqId = diagOn ? nextPaneSendJsonReqId() : null;
       const ctx = diagOn ? paneSendJsonDiagContext(meta, payload) : null;
       if (diagOn) paneSendJsonDiagEmit(reqId, "SEND_START", ctx, {});
+      const httpId = mcLoadDiagNoteHttp(method, url, Object.assign({}, meta, {
+        symbol: (payload && payload.symbol) || state.symbol,
+        timeframe: payload && payload.timeframe,
+      }));
+      const tFetch0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      mcLoadDiagEmitHttp("start", method, url, httpId, {
+        via: "sendJson",
+        sourceAction: meta && meta.sourceAction,
+      });
       let res;
+      const headers = { "Content-Type": "application/json" };
+      if (mcLoadDiagOn()) headers["X-MC-Load-Diag"] = "1";
       try {
         res = await fetch(url, {
           method: method,
           credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
+          headers: headers,
           body: JSON.stringify(payload || {}),
           signal: meta && meta.signal,
         });
@@ -2124,6 +2767,48 @@
           httpStatus: res.status,
           candleCount: body && Array.isArray(body.candles) ? body.candles.length : null,
         });
+      }
+      const tEnd = typeof performance !== "undefined" ? performance.now() : Date.now();
+      mcLoadDiagEmitHttp("done", method, url, httpId, {
+        via: "sendJson",
+        httpStatus: res.status,
+        sourceAction: meta && meta.sourceAction,
+      });
+      if (httpId) {
+        const httpPatch = {
+          http_status: res.status,
+          duration_ms: Math.round(tEnd - tFetch0),
+          candle_count: body && Array.isArray(body.candles) ? body.candles.length : null,
+          cache: body && body.cache,
+          backend_timings_ms: body && body._diag ? body._diag : null,
+          endpoint: mcLoadDiagEndpointKey(url),
+          source_action: meta && meta.sourceAction,
+          load_phase: meta && meta.mcLoadPhase,
+          request_limit: meta && meta.mcLoadReqLimit != null ? meta.mcLoadReqLimit : null,
+          history_weeks: meta && meta.mcLoadHistoryWeeks != null ? meta.mcLoadHistoryWeeks : null,
+          request_completion_status: res.ok ? "completed" : "http_error",
+        };
+        mcLoadDiagPatchHttp(httpId, httpPatch);
+        if (mcLoadDiagOn() && window.__MC_LOAD_DIAG__.getLatest && isPanePostSendJson(url, method)) {
+          const latest = window.__MC_LOAD_DIAG__.getLatest();
+          if (latest && meta && meta.mcLoadPhase === "A") {
+            latest.phase_a_http_id = httpId;
+            latest.phase_a_candle_count = body && Array.isArray(body.candles) ? body.candles.length : null;
+            if (latest.phase_a_decision) {
+              mcLoadDiagPatchHttp(httpId, { phase_a_decision: Object.assign({}, latest.phase_a_decision) });
+            }
+          } else if (latest && meta && meta.mcLoadPhase === "B") {
+            latest.phase_b_http_id = httpId;
+            latest.phase_b_candle_count = body && Array.isArray(body.candles) ? body.candles.length : null;
+            if (latest.phase_b_decision) {
+              mcLoadDiagPatchHttp(httpId, { phase_b_decision: Object.assign({}, latest.phase_b_decision) });
+            }
+          }
+        }
+      }
+      if (mcLoadDiagOn() && window.__MC_LOAD_DIAG__.getLatest && body && body._diag) {
+        const latest = window.__MC_LOAD_DIAG__.getLatest();
+        if (latest) latest.backend_timings_ms = body._diag;
       }
       return body;
     })();
@@ -2193,6 +2878,13 @@
       on_crosshair_move: function (unix) { handleHover(pane.id, unix); },
       on_chart_click: function (unix) { handleClick(pane.id, unix); },
       on_crosshair_leave: function () { handleHoverLeft(pane.id); },
+      on_viewport_mutation: function (row) {
+        if (!mcLoadDiagOn() || !window.__MC_LOAD_DIAG__ || !window.__MC_LOAD_DIAG__.emit) return;
+        mcLoadDiagEmit("viewport_mutation", Object.assign({
+          pane: pane.id,
+          timing_key: "viewport_mutation",
+        }, row || {}));
+      },
       on_visible_range: function (from, to) {
         if (pane._suppressOverlayViewportFeedback) return;
         handleVisibleRangeForGotoNav(pane.id, from, to);
@@ -2213,6 +2905,9 @@
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
     };
+    if (win.document && win.document.body) {
+      win.document.body.classList.add("research-legend-compact");
+    }
   }
 
   function toolMode() {
@@ -4988,6 +5683,7 @@
       iframe.src = "/static/research_trp/pane.html?v=" + ASSET_V;
       tfSel.addEventListener("change", function () {
         pane.tf = tfSel.value;
+        abortStalePaneWork(pane);
         if (isHistoricalReplay() && state.replayWindow && state.replayTargetTs != null) {
           const rw = state.replayWindow;
           const reqReplayGen = state.replayGen;
@@ -5015,34 +5711,22 @@
           } else if (state.gotoNavTargetTs != null && Number.isFinite(Number(state.gotoNavTargetTs))) {
             center = Math.floor(Number(state.gotoNavTargetTs));
           }
-          if (center == null) {
-            loadPane(pid, { force: true, sourceAction: "tf-change" }).catch(function (err) {
-              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+          const target = center;
+          const gen = state.loadGen;
+          const needJump = !isHistoricalReplay() && Number.isFinite(target);
+          const win = needJump && typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.gotoLoadWindow
+            ? ResearchGotoTime.gotoLoadWindow(target)
+            : null;
+          const pad = win && win.viewPad != null ? win.viewPad : 4 * 3600;
+          loadPane(pid, { force: true, sourceAction: "tf-change", gen: gen }).then(function () {
+            if (gen !== state.loadGen || !needJump) return;
+            return whenReady(pane, 8000).then(function () {
+              if (gen !== state.loadGen) return;
+              return jumpChartsToUnix(target, pad);
             });
-          } else {
-            const range = navPaneLoadRangeForFreeNav(center);
-            const fallback = resolvePaneLoadRange({});
-            const useRange = range.from != null && range.to != null ? range : fallback;
-            const target = center;
-            const gen = state.loadGen;
-            const needJump = !isHistoricalReplay() && Number.isFinite(target);
-            const win = needJump && typeof ResearchGotoTime !== "undefined" && ResearchGotoTime.gotoLoadWindow
-              ? ResearchGotoTime.gotoLoadWindow(target)
-              : null;
-            const pad = win && win.viewPad != null ? win.viewPad : 4 * 3600;
-            loadPane(pid, Object.assign({
-              force: true,
-              sourceAction: "tf-change",
-            }, useRange.from != null && useRange.to != null ? { from: useRange.from, to: useRange.to } : {})).then(function () {
-              if (gen !== state.loadGen || !needJump) return;
-              return whenReady(pane, 8000).then(function () {
-                if (gen !== state.loadGen) return;
-                return jumpChartsToUnix(target, pad);
-              });
-            }).catch(function (err) {
-              setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
-            });
-          }
+          }).catch(function (err) {
+            setStatus("TF-Wechsel fehlgeschlagen: " + (err.message || err), "error");
+          });
         }
         if (exactOriginEnabledForPane(pane) && window.PD1ExactOriginResearch) {
           PD1ExactOriginResearch.onPaneTimeframeChange(pane);
@@ -6489,7 +7173,9 @@
     try {
       const raw = localStorage.getItem(OPI_KEY);
       if (!raw) return defaultOpi();
-      return Object.assign(defaultOpi(), JSON.parse(raw));
+      const merged = Object.assign(defaultOpi(), JSON.parse(raw));
+      merged.window_minutes = opiWindowMinutesOrDefault(merged.window_minutes);
+      return merged;
     } catch (e) {
       return defaultOpi();
     }
@@ -6611,7 +7297,7 @@
     const win = $("researchOpiWindow");
     if (!state.opi) state.opi = defaultOpi();
     if (cb) cb.checked = !!state.opi.enabled;
-    if (win) win.value = String(state.opi.window_minutes || 15);
+    if (win) win.value = String(opiWindowMinutesOrDefault(state.opi.window_minutes));
   }
 
   function opiNoPublicTradesMessage(symbol) {
@@ -6969,7 +7655,7 @@
     const visStart = Number(range.firstCandle);
     const visEnd = Number(range.lastCandle) + step;
     if (!(visEnd > visStart)) return;
-    const wm = Number(state.opi.window_minutes) || 15;
+    const wm = opiWindowMinutesOrDefault(state.opi.window_minutes);
     const asOf = resolveOpiAsOfUnix(visEnd);
     const reqSymbol = sym;
     const reqTf = pane.tf;
@@ -8723,6 +9409,24 @@
   }
 
   /** Pane candle span for indicator recompute (warmup before first visible bar). */
+  function paneEmaCatchUpRange(pane, opts) {
+    if (opts && opts.afterHistoryPhaseB) {
+      const step = TF_SEC[pane.tf] || 60;
+      const warm = maxEmaWarmupBars(state.workspace || {});
+      const now = Math.floor(Date.now() / 1000);
+      const limit = historyLoadLimitForTimeframe(pane.tf);
+      const liveR = liveRestorePaneLoadRange();
+      let from = liveR && liveR.from != null ? Math.floor(Number(liveR.from)) : null;
+      if (from == null) from = now - (limit + warm) * step;
+      return {
+        from: from - warm * step,
+        to: now,
+        limit: Math.min(PANE_EMA_RELOAD_LIMIT_CAP, limit + warm + 5),
+      };
+    }
+    return paneIndicatorReloadRange(pane);
+  }
+
   function paneIndicatorReloadRange(pane) {
     const candles = (pane.pendingData && pane.pendingData.candles) || [];
     if (!candles.length) return null;
@@ -8739,14 +9443,15 @@
     };
   }
 
-  function paneEmaStaleVsCandles(pane) {
+  function paneEmaStaleVsCandles(pane, meta) {
     if (isHistoricalReplay()) return false;
     const series = (pane.pendingEma && pane.pendingEma.series) || [];
     const candles = (pane.pendingData && pane.pendingData.candles) || [];
     if (!series.length || !candles.length) return false;
-    const lastC = Number(candles[candles.length - 1].time);
-    if (!Number.isFinite(lastC)) return false;
     const step = TF_SEC[pane.tf] || 60;
+    const anchor = lastClosedBarTime(pane);
+    const lastC = anchor != null ? anchor : Number(candles[candles.length - 1].time);
+    if (!Number.isFinite(lastC)) return false;
     let maxEmaT = null;
     series.forEach(function (spec) {
       const data = spec.data || [];
@@ -8755,7 +9460,8 @@
       if (Number.isFinite(t)) maxEmaT = maxEmaT == null ? t : Math.max(maxEmaT, t);
     });
     if (maxEmaT == null) return true;
-    return maxEmaT < lastC - step * 2;
+    if (meta && meta.afterPaneBundle && maxEmaT >= lastC - step) return false;
+    return maxEmaT < lastC - step;
   }
 
   function scheduleRefreshPaneEmaOverlays(pane, opts) {
@@ -8777,10 +9483,20 @@
     if (!pane || !state.symbol || isHistoricalReplay()) return;
     const ws = state.workspace || {};
     if (!ws.ema || !(ws.ema.lines && ws.ema.lines.length)) return;
-    const range = paneIndicatorReloadRange(pane);
+    if (pane._mcLoadAwaitingHistoryB) {
+      mcLoadDiagPushPhaseDecision({
+        kind: "ema_catch_up",
+        skipped: true,
+        skip_reason: "awaiting_history_phase_b",
+        source_action: (opts && opts.sourceAction) || "ema-refresh",
+      });
+      return;
+    }
+    const range = paneEmaCatchUpRange(pane, opts);
     if (!range) return;
     const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
     if (pane._emaOverlayRefreshInflight) return;
+    const emaPaneGen = pane.paneGen;
     pane._emaOverlayRefreshInflight = true;
     try {
       await loadPane(pane.id, {
@@ -8791,7 +9507,9 @@
         to: range.to,
         limit: range.limit,
         skipEmaRangeRestore: true,
+        afterHistoryPhaseB: !!(opts && opts.afterHistoryPhaseB),
         sourceAction: (opts && opts.sourceAction) || "ema-candle-span-sync",
+        signal: state.loadAbort && state.loadAbort.signal,
       });
     } finally {
       pane._emaOverlayRefreshInflight = false;
@@ -8799,6 +9517,10 @@
   }
 
   function mergePollCandlesIntoPane(pane, incoming, packed) {
+    if (pane._historyPhaseBInflight) return lastClosedBarTime(pane);
+    if (packed && packed.timeframe && String(packed.timeframe) !== String(pane.tf)) {
+      return lastClosedBarTime(pane);
+    }
     const step = TF_SEC[pane.tf] || 60;
     const nowSec = Math.floor(Date.now() / 1000);
     const oldTip = (pane.pendingData.candles || [])[(pane.pendingData.candles || []).length - 1] || null;
@@ -8851,7 +9573,11 @@
     if (packed && packed.forming) {
       applyFormingToPane(pane, packed.forming);
     }
-    if (incoming && incoming.length && (prevClosedOpen !== nextClosedOpen || paneEmaStaleVsCandles(pane))) {
+    if (
+      !pane._mcLoadAwaitingHistoryB &&
+      incoming && incoming.length &&
+      (prevClosedOpen !== nextClosedOpen || paneEmaStaleVsCandles(pane, { afterPaneBundle: true }))
+    ) {
       opiTracePush("scheduleRefreshPaneEmaOverlays", {
         source: "ema-after-candle-merge",
       });
@@ -8980,6 +9706,7 @@
     if (!pane || !sym || isHistoricalReplay() || historyBlocksLive()) return;
     if (opts && opts.indicatorsOnly) return;
     const gen = opts && opts.gen != null ? opts.gen : state.loadGen;
+    const reqPaneGen = opts && opts.paneGen != null ? opts.paneGen : pane.paneGen;
     const lag = paneClosedTipLagSec(pane);
     const step = TF_SEC[pane.tf] || 60;
     if (lag == null || lag <= step * 2) return;
@@ -8994,8 +9721,11 @@
       pane: paneId,
       timeframe: pane.tf,
       start: last,
+      signal: (opts && opts.signal) || (state.loadAbort && state.loadAbort.signal),
     });
     if (gen !== state.loadGen) return;
+    if (reqPaneGen !== pane.paneGen) return;
+    if (packed.timeframe && String(packed.timeframe) !== String(pane.tf)) return;
     const incoming = packed.candles || [];
     if (!incoming.length) return;
     mergePollCandlesIntoPane(pane, incoming, packed);
@@ -9047,21 +9777,26 @@
   }
 
   function applyPaneBundle(pane, packed, opts) {
+    let candleRows = packed.candles || [];
+    if (opts && opts._historyPhaseB && pane.pendingData && !opts.indicatorsOnly) {
+      candleRows = mergeLiveTailCandles(pane.pendingData.candles || [], candleRows, pane.tf);
+    }
     const payload = {
       symbol: packed.symbol,
       timeframe: packed.timeframe,
       is_demo: false,
-      candles: packed.candles || [],
+      candles: candleRows,
     };
-    const nextFp = candleFingerprint(packed.candles || []);
+    const nextFp = candleFingerprint(candleRows);
     const skipCandles = !!(opts && opts.indicatorsOnly && pane.pendingData);
     const preserveView = !!(opts && (opts.preserveView || opts.indicatorsOnly));
+    const preserveViewTime = !!(opts && opts.preserveViewTime);
     const skipDefaultView = !!(opts && opts.skipDefaultView);
     if (!skipCandles) {
-      pane.lastTimes = new Set((packed.candles || []).map(function (c) { return c.time; }));
+      pane.lastTimes = new Set(candleRows.map(function (c) { return c.time; }));
       pane.pendingData = payload;
       pane.candleFp = nextFp;
-      pane.closedFp = closedCandleFingerprint(packed.candles || [], pane.tf);
+      pane.closedFp = closedCandleFingerprint(candleRows, pane.tf);
       updatePaneLoadStatusFromBundle(pane, packed, skipCandles);
     }
     pane.pendingEma = packed.ema || { series: [] };
@@ -9088,15 +9823,42 @@
     const chart = api(pane);
     if (chart) {
       if (!skipCandles) {
+        mcLoadDiagEmit("candle_normalization_completed", {
+          count: (payload.candles || []).length,
+        });
+        mcLoadDiagEmit("chart_setdata_started", {
+          count: (payload.candles || []).length,
+          timing_key: "chart_setdata_started",
+        });
+        const tSet0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        const viewportSnapshot = (opts && opts.viewportSnapshot) || capturePaneViewportSnapshot(pane);
+        if (preserveViewTime) {
+          mcLoadDiagEmit("chart_setdata_viewport_mode", { mode: "preserve_time", pane: pane.id });
+        }
         chart.setData(payload, {
           preserveView: preserveView,
+          preserveViewTime: preserveViewTime,
           skipDefaultView: skipDefaultView,
+          viewportSnapshot: viewportSnapshot,
         });
+        const tSet1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+        mcLoadDiagEmit("chart_setdata_completed", {
+          count: (payload.candles || []).length,
+          timing_key: "chart_setdata_completed",
+          setdata_wall_ms: Math.round(tSet1 - tSet0),
+        });
+        if (mcLoadDiagOn() && window.__MC_LOAD_DIAG__.markRenderProxy) {
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              window.__MC_LOAD_DIAG__.markRenderProxy("double_raf_after_setData");
+            });
+          });
+        }
         pane.phase = "DATA_READY";
       }
       if (!preserveView && chart.resize) chart.resize();
       chart.setEmaOverlays(pane.pendingEma, {
-        skipRangeRestore: !!(opts && opts.skipEmaRangeRestore),
+        skipRangeRestore: !!(opts && opts.skipEmaRangeRestore) || preserveView || preserveViewTime,
       });
       chart.setLowerPane(pane.pendingLower);
       if (chart.setOiPane) chart.setOiPane(pane.pendingOi || { id: "open_interest", visible: false });
@@ -9122,7 +9884,10 @@
     const paneGen = ++pane.paneGen;
     const owner = registerPaneLoadOwner(pane, paneId, paneGen, gen);
     const ws = state.workspace || {};
-    const range = resolvePaneLoadRange(opts || {});
+    const range = (opts && opts._historyPhaseB)
+      ? mcLoadHistoryPhaseBRange(pane)
+      : resolvePaneLoadRange(opts || {});
+    if (opts && opts._historyPhaseB) pane._historyPhaseBInflight = true;
     const reqBody = {
       symbol: sym,
       timeframe: pane.tf,
@@ -9133,8 +9898,35 @@
       liquidity: ws.liquidity || { enabled: false },
       allow_stale: !!(opts && opts.allowStale),
     };
-    if (range.from != null) reqBody.from = range.from;
-    if (range.to != null) reqBody.to = range.to;
+    const phaseDecision = mcLoadDiagEmitPhaseADecision(pane, opts || {}, range, gen);
+    const phaseFallback = phaseDecision.fallback_reason;
+    const phaseA = phaseDecision.decision === "A"
+      ? {
+        from: phaseDecision.phase_a_from,
+        to: phaseDecision.phase_a_to,
+        limit: phaseDecision.phase_a_effective_limit,
+      }
+      : null;
+    if (phaseA) {
+      reqBody.from = phaseA.from;
+      reqBody.to = phaseA.to;
+      reqBody.limit = phaseA.limit;
+      pane._mcLoadPhaseA = true;
+      pane._mcLoadAwaitingHistoryB = true;
+      mcLoadDiagEmit("mc_load_phase_a_begin", {
+        pane: paneId,
+        limit: phaseA.limit,
+        from: phaseA.from,
+        to: phaseA.to,
+        timing_key: "mc_load_phase_a_begin",
+      });
+    } else {
+      pane._mcLoadPhaseA = false;
+      if (range.from != null) reqBody.from = range.from;
+      if (range.to != null) reqBody.to = range.to;
+      if (opts && opts._historyPhaseB && range.limit != null) reqBody.limit = range.limit;
+    }
+    mcLoadDiagTrackPhaseRun(pane, opts || {}, phaseA, phaseFallback, gen, reqBody);
     if (
       state.liquidityLocationAsOf &&
       ws.liquidity &&
@@ -9144,60 +9936,148 @@
       reqBody.liquidity_location_as_of = state.liquidityLocationAsOf;
     }
     const statusEl = paneStatusEl(pane);
-    if (statusEl) statusEl.textContent = "loading…";
+    if (statusEl) {
+      if (opts && opts._historyPhaseB) setPaneHistoryBackfillStatus(pane);
+      else statusEl.textContent = "loading…";
+    }
+    mcLoadDiagEmit("load_started", {
+      pane: paneId,
+      symbol: sym,
+      timeframe: pane.tf,
+      gen: gen,
+      phase: phaseA ? "A" : (opts && opts._historyPhaseB ? "B" : "full"),
+      sourceAction: (opts && opts.sourceAction) || "pane-load",
+    });
     let packed;
     try {
       packed = await sendJson("/api/research/pane", "POST", reqBody, {
       sourceAction: (opts && opts.sourceAction) || "pane-load",
       pane: paneId,
       timeframe: pane.tf,
+      mcLoadPhase: phaseA ? "A" : (opts && opts._historyPhaseB ? "B" : "full"),
+      mcLoadReqLimit: reqBody.limit,
+      mcLoadHistoryWeeks: mcLoadHistoryWeeks(),
       signal: (opts && opts.signal) || (state.loadAbort && state.loadAbort.signal),
     });
     } catch (err) {
+      if (opts && opts._historyPhaseB) pane._historyPhaseBInflight = false;
       if (err && err.name === "AbortError") {
+        mcLoadDiagCompletePaneRequest(
+          window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest
+            ? window.__MC_LOAD_DIAG__.getLatest()
+            : null,
+          { request_completion_status: "aborted" }
+        );
         discardPaneLoadResult(pane, paneId, owner);
         return;
       }
+      mcLoadDiagCompletePaneRequest(
+        window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest
+          ? window.__MC_LOAD_DIAG__.getLatest()
+          : null,
+        { request_completion_status: "failed" }
+      );
       setPaneLoadHttpError(pane, paneGen, gen, owner, err);
       throw err;
     }
-    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
+    if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
+      if (opts && opts._historyPhaseB) pane._historyPhaseBInflight = false;
+      return;
+    }
     if (packed.timeframe && packed.timeframe !== pane.tf) {
       discardPaneLoadResult(pane, paneId, owner);
       return;
     }
+    mcLoadDiagEmit("chart_iframe_ready_wait_begin", { pane: paneId });
     await whenReady(pane, 8000);
+    mcLoadDiagEmit("chart_iframe_ready_wait_end", { pane: paneId, ready: !!api(pane) });
     if (exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) return;
     const bundleOpts = {
       indicatorsOnly: !!(opts && opts.indicatorsOnly),
       // GO TO: never restore the previous live logical range onto a much longer
       // series (looks like the chart was "squeezed"). Jump sets the camera after.
       preserveView: !!(opts && opts.preserveView) || (isHistoricalReplay() && !(opts && opts.jumpToUnix != null)),
+      preserveViewTime: !!(opts && opts._historyPhaseB),
       skipDefaultView: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay(),
       skipEmaRangeRestore: !!(opts && opts.jumpToUnix != null) || isHistoricalReplay() ||
-        !!(opts && opts.skipEmaRangeRestore),
+        !!(opts && opts.skipEmaRangeRestore) || !!(opts && opts._historyPhaseB),
     };
+    if (opts && opts._historyPhaseB) {
+      mcLoadDiagEmaSeriesSnapshot(pane, null, "before_phase_b_apply");
+    }
+    const viewportSnapshot = (opts && opts._historyPhaseB) ? capturePaneViewportSnapshot(pane) : null;
     try {
-      applyPaneBundle(pane, packed, bundleOpts);
+      applyPaneBundle(pane, packed, Object.assign({}, bundleOpts, {
+        _historyPhaseB: !!(opts && opts._historyPhaseB),
+        viewportSnapshot: viewportSnapshot,
+      }));
+      if (opts && opts._historyPhaseB) {
+        pane._mcLoadAwaitingHistoryB = false;
+      }
     } catch (applyErr) {
+      if (opts && opts._historyPhaseB) pane._historyPhaseBInflight = false;
       if (paneLoadOwnerIsCurrent(pane, owner) && !paneLoadGenerationStale(pane, paneGen, gen, reqReplayGen)) {
         logPaneLoadFailure(paneId, pane, owner, applyErr, "applyPaneBundle");
         setPaneLoadApplyError(pane, paneGen, gen, owner, applyErr);
       }
       return;
     }
+    let paneLoadReleasedEarly = false;
     if (!(opts && opts.indicatorsOnly)) {
-      try {
-        await ensurePaneCaughtUp(pane, { gen: gen, indicatorsOnly: false });
+      const deferPost = mcLoadPostLoadDeferred(opts || {}, phaseA);
+      if (deferPost) {
+        applyPaneFormingFromPacked(pane, packed);
         if (!exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
           seedLiveViewportForPane(pane, opts);
         }
-        if (paneEmaStaleVsCandles(pane)) {
-          await refreshPaneEmaOverlays(pane, { gen: gen, sourceAction: "ema-post-catch-up" });
+        mcLoadDiagEmit("first_candles_owner_release", {
+          pane: paneId,
+          phase: pane._mcLoadPhaseA ? "A" : "full",
+          effective_fast_first: !!pane._mcLoadPhaseA,
+          phase_executed: pane._mcLoadPhaseA ? "A" : "full",
+          timing_key: "first_candles_owner_release",
+        });
+        releasePaneLoadOwner(pane, owner);
+        paneLoadReleasedEarly = true;
+        void runPaneDeferredPostLoad(pane, paneId, gen, paneGen, reqReplayGen, opts || {});
+        if (pane._mcLoadPhaseA) {
+          schedulePaneHistoryPhaseB(paneId, gen, reqReplayGen);
         }
-      } catch (err) {
-        if (!(err && err.name === "AbortError")) {
-          try { console.warn("[research] pane gap-backfill", err); } catch (e) { /* ignore */ }
+      } else {
+        try {
+          mcLoadDiagEmit("ensure_pane_caught_up_begin", { pane: paneId });
+          await ensurePaneCaughtUp(pane, { gen: gen, paneGen: paneGen, indicatorsOnly: false });
+          mcLoadDiagEmit("ensure_pane_caught_up_end", { pane: paneId });
+          if (!exitSupersededPaneLoad(pane, paneId, owner, paneGen, gen, reqReplayGen)) {
+            seedLiveViewportForPane(pane, opts);
+          }
+          const emaSkip = mcLoadSkipEmaCatchUpAfterPaneBundle(pane, opts || {});
+          const emaStale = paneEmaStaleVsCandles(pane, { afterPaneBundle: true });
+          mcLoadDiagEmit("ema_catch_up_decision", {
+            stale: emaStale,
+            skipped: emaSkip.skip,
+            skip_reason: emaSkip.reason,
+            source_action: "ema-post-catch-up",
+            timing_key: "ema_catch_up_decision",
+          });
+          mcLoadDiagPushPhaseDecision({
+            kind: "ema_post_catch_up",
+            stale: emaStale,
+            skipped: emaSkip.skip,
+            skip_reason: emaSkip.reason,
+            source_action: (opts && opts.sourceAction) || "pane-load",
+          });
+          if (!emaSkip.skip && emaStale) {
+            await refreshPaneEmaOverlays(pane, {
+              gen: gen,
+              sourceAction: "ema-post-catch-up",
+              afterHistoryPhaseB: !!(opts && opts._historyPhaseB),
+            });
+          }
+        } catch (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] pane gap-backfill", err); } catch (e) { /* ignore */ }
+          }
         }
       }
     }
@@ -9269,24 +10149,21 @@
         }
       }
     }
-    if (force && !(opts && opts.jumpToUnix != null) && (opts && opts.sourceAction) !== "go-to") {
+    if (
+      force &&
+      !(opts && opts.jumpToUnix != null) &&
+      (opts && opts.sourceAction) !== "go-to" &&
+      !(opts && opts.indicatorsOnly) &&
+      !(opts && opts._historyPhaseB) &&
+      !pane._mcLoadPhaseA &&
+      !pane._mcLoadAwaitingHistoryB
+    ) {
       const ready = api(pane);
       if (ready && ready.resetView) ready.resetView();
     }
-    // Stamp live tip immediately so higher TFs don't sit on a frozen closed bar.
-    if (!historyBlocksLive()) {
-      if (packed.forming) {
-        applyFormingToPane(pane, packed.forming);
-      } else if (packed.live_tip && (packed.candles || []).length) {
-        const tip = packed.candles[packed.candles.length - 1];
-        applyFormingToPane(pane, {
-          time: tip.time,
-          open: tip.open,
-          high: tip.high,
-          low: tip.low,
-          close: tip.close,
-        });
-      }
+    // Stamp live tip (skipped when already applied on fast-first deferred path).
+    if (!historyBlocksLive() && !paneLoadReleasedEarly) {
+      applyPaneFormingFromPacked(pane, packed);
     }
     scheduleVolumeProfile(pane);
     scheduleOpi(pane);
@@ -9305,15 +10182,89 @@
     ) {
       const chartApi = api(pane);
       if (chartApi && chartApi.layoutOverlays) chartApi.layoutOverlays();
-      try {
-        await PD1ExactOriginResearch.refreshPane(pane, { force: !!(opts && opts.force) });
-      } catch (err) {
-        if (!(err && err.name === "AbortError")) {
-          try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
+      const exactOriginRun = function () {
+        return PD1ExactOriginResearch.refreshPane(pane, { force: !!(opts && opts.force) });
+      };
+      if (paneLoadReleasedEarly) {
+        mcLoadDiagEmit("exact_origin_refresh_begin", { pane: paneId, deferred_async: true });
+        void exactOriginRun().then(function () {
+          mcLoadDiagEmit("exact_origin_refresh_end", { pane: paneId, deferred_async: true });
+        }).catch(function (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
+          }
+        });
+      } else {
+        try {
+          mcLoadDiagEmit("exact_origin_refresh_begin", { pane: paneId });
+          await exactOriginRun();
+          mcLoadDiagEmit("exact_origin_refresh_end", { pane: paneId });
+        } catch (err) {
+          if (!(err && err.name === "AbortError")) {
+            try { console.warn("[research] exact-origin pane load", err); } catch (e) { /* ignore */ }
+          }
         }
       }
     }
-    releasePaneLoadOwner(pane, owner);
+    mcLoadDiagEmit("all_optional_layers_scheduled", { pane: paneId });
+    if (!paneLoadReleasedEarly) {
+      releasePaneLoadOwner(pane, owner);
+    }
+    if (opts && opts._historyPhaseB) pane._historyPhaseBInflight = false;
+    if (opts && opts._historyPhaseB && packed) {
+      mcLoadDiagEmaSeriesSnapshot(pane, packed, "after_phase_b");
+      clearStaleGotoNavCenterAfterLiveLoad(pane);
+      const emaStillStale = paneEmaStaleVsCandles(pane, { afterPaneBundle: true });
+      mcLoadDiagEmit("mc_load_phase_b_complete", {
+        pane: paneId,
+        count: (pane.pendingData && pane.pendingData.candles || []).length,
+        ema_stale: emaStillStale,
+        timing_key: "mc_load_phase_b_complete",
+      });
+      mcLoadDiagCompletePaneRequest(
+        window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest
+          ? window.__MC_LOAD_DIAG__.getLatest()
+          : null,
+        {
+          phase_executed: "B",
+          request_completion_status: emaStillStale ? "completed_ema_stale" : "completed",
+          phase_b_candle_count: (pane.pendingData && pane.pendingData.candles || []).length,
+          ema_stale: emaStillStale,
+        }
+      );
+    }
+    if (mcLoadDiagOn() && window.__MC_LOAD_DIAG__.getLatest && packed && !(opts && opts._historyPhaseB)) {
+      const latestDiag = window.__MC_LOAD_DIAG__.getLatest();
+      if (latestDiag && pane._mcLoadPhaseA) {
+        mcLoadDiagCompletePaneRequest(latestDiag, {
+          phase_executed: "A",
+          request_completion_status: "completed",
+          phase_a_candle_count: Array.isArray(packed.candles) ? packed.candles.length : null,
+        });
+      } else if (latestDiag) {
+        mcLoadDiagCompletePaneRequest(latestDiag, {
+          phase_executed: "full",
+          effective_fast_first: false,
+          request_completion_status: "completed",
+        });
+      }
+    }
+    const wasPhaseA = !!pane._mcLoadPhaseA;
+    pane._mcLoadPhaseA = false;
+    if (mcLoadShouldFinalizePaneView(pane, opts || {}, wasPhaseA)) {
+      scheduleFinalPaneViewReset(pane, paneId, gen, paneGen, reqReplayGen, opts || {});
+    }
+    if (window.__MC_LOAD_DIAG__ && window.__MC_LOAD_DIAG__.getLatest && packed) {
+      const latest = window.__MC_LOAD_DIAG__.getLatest();
+      if (latest) {
+        latest.candle_count = Array.isArray(packed.candles) ? packed.candles.length : null;
+        if (opts && opts._historyPhaseB) {
+          latest.history_phase_b_count = latest.candle_count;
+        } else if (wasPhaseA) {
+          latest.initial_fast_count = latest.candle_count;
+        }
+      }
+    }
   }
 
   async function refreshIndicatorsVisible(sourceAction) {
@@ -9666,7 +10617,11 @@
       const now = Date.now();
       if (now - (pane._lastFormingSetDataAt || 0) >= 400) {
         pane._lastFormingSetDataAt = now;
-        chart.setData(pane.pendingData, { preserveView: true, skipDefaultView: true });
+        chart.setData(pane.pendingData, {
+          preserveView: true,
+          skipDefaultView: true,
+          viewportSnapshot: capturePaneViewportSnapshot(pane),
+        });
         painted = true;
         emit("setdata_fallback", { unchanged: unchanged });
       }
@@ -9853,6 +10808,7 @@
     const gen = ++state.loadGen;
     state.loadAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
     state.symbol = next;
+    mcLoadDiagEmit("symbol_selected", { symbol: next, load_gen: gen });
     state.gotoNavViewCenterTs = null;
     state.gotoNavTargetTs = null;
     state.scannerCommonCache = {};
@@ -10416,7 +11372,7 @@
       opiWin.addEventListener("change", function () {
         if (isMultiManualMode()) return;
         if (!state.opi) state.opi = defaultOpi();
-        state.opi.window_minutes = Number(opiWin.value) || 15;
+        state.opi.window_minutes = opiWindowMinutesOrDefault(opiWin.value);
         persistOpi();
         if (state.opi.enabled) scheduleOpi(state.panes["pane-0"]);
       });
