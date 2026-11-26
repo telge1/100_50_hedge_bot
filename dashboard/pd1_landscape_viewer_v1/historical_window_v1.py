@@ -190,7 +190,10 @@ def landscape_capabilities(
     supported: list[dict[str, Any]] = []
     for tf, pd in sorted(ALLOWED_VIEWER_SCOPES):
         try:
-            hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
+            if sym != SYMBOL and tf == "5m" and pd == PD1_POOL_DETAIL:
+                hcfg = resolve_landscape_viewer_config(symbol=sym, timeframe=tf, pool_detail=pd)
+            else:
+                hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
             slo, shi = _scope_bounds(hcfg)
             supported.append(
                 {
@@ -310,6 +313,9 @@ def _load_members(
         load_kw: dict[str, Any] = {
             "pool_detail": hcfg.pool_detail,
             "timeframe": hcfg.timeframe,
+            "symbol": hcfg.symbol,
+            "cfg_hash": hcfg.config_hash,
+            "pipeline_line_id": hcfg.pipeline_line_id,
             "client": client,
             "database": db,
         }
@@ -549,8 +555,7 @@ def build_landscape_window(
             vis_to,
             client=client,
             database=db,
-            pool_detail=hcfg.pool_detail,
-            timeframe=hcfg.timeframe,
+            hcfg=hcfg,
         )
         if pre is not None:
             phase5s_prefill = {
@@ -560,6 +565,15 @@ def build_landscape_window(
                 "clickhouse_query_count": pre.stats.get("clickhouse_query_count"),
                 "prefill_ms": round((time.perf_counter() - t_prefill) * 1000, 1),
             }
+            for extra in (
+                "closes_reused",
+                "closes_missing",
+                "member_prefill_reuse_active",
+                "member_prefill_low_copy_active",
+                "reuse_store_stats",
+            ):
+                if extra in pre.stats:
+                    phase5s_prefill[extra] = pre.stats[extra]
     t_life = time.perf_counter()
     pools_full = _build_lifetimes(grid, cache, client, db, hcfg, slot_minutes)
     t_life_done = time.perf_counter()

@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from . import ALLOWED_DATA_FILES, NAV_ACTIVE, VIEWER_ROOT
@@ -88,7 +88,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         return FileResponse(_viewer_file(f"data/{filename}"), media_type="application/json")
 
     @router.get("/live-charts/viewer/api/capabilities")
-    async def pd1_viewer_capabilities(user: dict = Depends(require_auth)):
+    async def pd1_viewer_capabilities(
+        user: dict = Depends(require_auth),
+        symbol: str | None = Query(None, description="Viewer symbol (optional)"),
+    ):
         from research_charts.historical_pool_state_v1 import HistoricalPoolStateError
 
         from .module_hot_reload_v1 import ensure_pd1_landscape_modules_current
@@ -97,7 +100,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         from .historical_window_v1 import landscape_capabilities, landscape_window_from_state_err
 
         try:
-            return await asyncio.to_thread(landscape_capabilities)
+            sym = str(symbol).strip().upper() if symbol and str(symbol).strip() else None
+            return await asyncio.to_thread(landscape_capabilities, symbol=sym)
         except HistoricalPoolStateError as exc:
             err = landscape_window_from_state_err(exc)
             return _window_error(err.code, err.message, err.details)
@@ -122,6 +126,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             pool_detail = int(pool_detail_raw) if pool_detail_raw is not None else 1
             response_mode = body.get("response_mode") or body.get("compute_mode")
             client_trace_id = body.get("trace_id") or body.get("client_trace_id")
+            symbol_raw = body.get("symbol")
+            symbol = str(symbol_raw).strip().upper() if symbol_raw else None
             return await asyncio.to_thread(
                 get_landscape_window_response,
                 from_utc=str(from_utc),
@@ -131,6 +137,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 response_mode=response_mode,
                 request_id=str(client_trace_id) if client_trace_id else None,
                 client_trace_id=str(client_trace_id) if client_trace_id else None,
+                symbol=symbol,
             )
         except LandscapeWindowError as exc:
             from .window_request_trace_v1 import log_doge_exact_origin_window_complete

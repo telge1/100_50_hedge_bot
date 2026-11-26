@@ -43,6 +43,22 @@ def _on_demand_ch1m_scope(timeframe: str, pool_detail: int) -> OnDemandCh1mPd1Sc
     return on_demand_ch1m_scope_for_timeframe(timeframe)
 
 
+def _normalize_window_symbol(symbol: str | None) -> str:
+    from research_charts.historical_lmv2_pd_contract_v1 import HISTORICAL_SYMBOL
+    from research_charts.multicoin_pd1_scope_v1 import assert_symbol_allowed
+
+    if symbol is None or not str(symbol).strip():
+        return HISTORICAL_SYMBOL
+    try:
+        return assert_symbol_allowed(symbol)
+    except ValueError as exc:
+        raise LandscapeWindowError(
+            "INVALID_SYMBOL",
+            str(exc),
+            {"symbol": str(symbol).strip().upper()},
+        ) from exc
+
+
 def _key_parts(
     *,
     from_utc: str,
@@ -50,8 +66,10 @@ def _key_parts(
     timeframe: str,
     pool_detail: int,
     compute_mode: str,
+    symbol: str | None = None,
 ) -> WindowCacheKeyParts:
-    from research_charts.historical_lmv2_pd_contract_v1 import resolve_viewer_historical_scope
+    from research_charts.historical_pool_state_v1 import HistoricalPoolStateError
+    from research_charts.viewer_scope_v1 import resolve_landscape_viewer_config
 
     tf = str(timeframe or "").strip()
     pd = int(pool_detail)
@@ -81,9 +99,14 @@ def _key_parts(
             f"{tf} on-demand supports PD1 only",
             {"timeframe": tf, "pool_detail": pd},
         )
-    hcfg = resolve_viewer_historical_scope(timeframe=timeframe, pool_detail=pool_detail)
+    sym = _normalize_window_symbol(symbol)
+    try:
+        hcfg = resolve_landscape_viewer_config(symbol=sym, timeframe=tf, pool_detail=pd)
+    except HistoricalPoolStateError as exc:
+        err = landscape_window_from_state_err(exc)
+        raise LandscapeWindowError(err.code, err.message, err.details) from exc
     return WindowCacheKeyParts(
-        symbol="DOGEUSDT",
+        symbol=str(hcfg.symbol),
         from_utc=str(from_utc),
         to_utc=str(to_utc),
         timeframe=str(hcfg.timeframe),
@@ -102,6 +125,7 @@ def _build_uncached(
     timeframe: str,
     pool_detail: int,
     compute_mode: str,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     tf = str(timeframe or "").strip()
     pd = int(pool_detail)
@@ -122,9 +146,11 @@ def _build_uncached(
         )
     try:
         density_only = compute_mode == COMPUTE_MODE_EXACT_ORIGIN_V1
+        sym = _normalize_window_symbol(symbol)
         return build_landscape_window(
             from_utc,
             to_utc,
+            symbol=sym,
             timeframe=tf,
             pool_detail=pd,
             density_only=density_only,
@@ -149,6 +175,7 @@ def get_landscape_window_response(
     response_mode: str | None = None,
     request_id: str | None = None,
     client_trace_id: str | None = None,
+    symbol: str | None = None,
 ) -> dict[str, Any]:
     rid = request_id or new_request_id()
     t0 = time.perf_counter()
@@ -159,6 +186,7 @@ def get_landscape_window_response(
         timeframe=timeframe,
         pool_detail=pool_detail,
         compute_mode=compute_mode,
+        symbol=symbol,
     )
     digest = parts.digest()
     if doge_exact_origin_trace_enabled():
@@ -265,6 +293,7 @@ def get_landscape_window_response(
             timeframe=timeframe,
             pool_detail=pool_detail,
             compute_mode=compute_mode,
+            symbol=symbol,
         )
         if payload_cache_eligible(payload):
             store_cached_window(digest, payload)
