@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, Depends, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .boundary import (
     INDICATOR_CONTRACTS,
@@ -73,6 +74,11 @@ from .ob1000_on_demand import (
     lease_release,
     load_ob1000_levels,
     freshness_from_payload,
+)
+from .ob_full_lifecycle import (
+    FullCollectorStartError,
+    IncompatibleFullCollectorError,
+    ensure_full_collector_for_depth,
 )
 from .live_diag import clear_live_diag, record_live_diag, snapshot_live_diag
 from .public_trades_profile import (
@@ -154,6 +160,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             )
         )
 
+    @router.get("/live-charts/research-multi")
+    async def research_multi_charts_page(user: dict = Depends(require_auth)):
+        return RedirectResponse(url="/live-charts/research?view=multi", status_code=307)
+
     @router.get("/api/research/symbols")
     async def api_research_symbols(user: dict = Depends(require_auth)):
         rows = list_symbols()
@@ -175,6 +185,21 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return {"success": True, **bounds}
         except HistoricalPoolStateError as exc:
             return _error(422, exc.code, exc.message)
+
+    @router.get("/api/research/multicoin-5m-pd1-viewer-bounds")
+    async def api_research_multicoin_5m_pd1_viewer_bounds(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(..., description="SOLUSDT or BNBUSDT"),
+    ):
+        from .historical_pool_state_v1 import HistoricalPoolStateError, multicoin_5m_pd1_viewer_bounds
+
+        try:
+            bounds = await asyncio.to_thread(multicoin_5m_pd1_viewer_bounds, symbol)
+            return {"success": True, **bounds}
+        except HistoricalPoolStateError as exc:
+            return _error(422, exc.code, exc.message)
+        except ValueError as exc:
+            return _error(400, "invalid_symbol", str(exc))
 
     @router.get("/api/research/doge-pd1-on-demand-viewer-bounds")
     async def api_research_doge_pd1_on_demand_viewer_bounds(
@@ -284,7 +309,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         start: int = Query(..., description="UTC unix seconds, inclusive"),
         end: int = Query(..., description="UTC unix seconds, exclusive"),
         as_of: Optional[int] = Query(None, description="Causal cursor UTC unix; default=end"),
-        mode: str = Query("large_medium"),
+        mode: str = Query("all"),
     ):
         """Causal public-trade bubbles for the visible chart window (layer-only).
 
@@ -367,7 +392,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         start: int = Query(..., description="UTC unix seconds, inclusive"),
         end: int = Query(..., description="UTC unix seconds, exclusive"),
         as_of: Optional[int] = Query(None),
-        window_minutes: int = Query(15, description="Rolling wall-clock minutes: 15, 30, or 60"),
+        window_minutes: int = Query(15, description="Rolling wall-clock minutes: 5, 15, 30, or 60"),
     ):
         """Orderflow Price Impact for visible range (Single-Chart). Aggregated only."""
         try:
@@ -401,7 +426,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "orderflow_price_impact_failed", str(exc))
         return payload
 
-
+    @router.get("/api/research/orderbook-profile")
     async def api_research_orderbook_profile(
         user: dict = Depends(require_auth),
         symbol: str = Query(...),
@@ -538,6 +563,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         op = str(body.get("op") or "acquire")
         try:
             if op == "acquire":
+                await asyncio.to_thread(ensure_full_collector_for_depth, body.get("depth"))
                 payload = await asyncio.to_thread(
                     lease_acquire,
                     symbol=str(body.get("symbol") or ""),
@@ -546,6 +572,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                     depth=body.get("depth"),
                 )
             elif op == "heartbeat":
+                await asyncio.to_thread(ensure_full_collector_for_depth, body.get("depth"))
                 payload = await asyncio.to_thread(
                     lease_heartbeat,
                     lease_id=str(body.get("lease_id") or ""),
@@ -562,6 +589,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 return _error(400, "invalid_op", f"unknown op {op}")
         except Ob1000DisabledError:
             return _error(503, "disabled", "on-demand OB1000 disabled")
+        except IncompatibleFullCollectorError:
+            return _error(503, "collector_not_full_capable", "running collector has no FULL book")
+        except FullCollectorStartError as exc:
+            return _error(503, "collector_start_failed", str(exc))
         except Ob1000CollectorUnavailableError:
             return _error(503, "collector_unavailable", "collector socket unavailable")
         except Ob1000CapacityError:
@@ -583,10 +614,15 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     ):
         sym = str(symbol or "").strip().upper()
         try:
+            await asyncio.to_thread(ensure_full_collector_for_depth, depth)
             payload = await asyncio.to_thread(load_ob1000_levels, sym, lease_id=lease_id, depth=depth)
             payload = freshness_from_payload(payload)
         except Ob1000DisabledError:
             return _error(503, "disabled", "on-demand OB1000 disabled")
+        except IncompatibleFullCollectorError:
+            return _error(503, "collector_not_full_capable", "running collector has no FULL book")
+        except FullCollectorStartError as exc:
+            return _error(503, "collector_start_failed", str(exc))
         except Ob1000CollectorUnavailableError:
             return _error(503, "collector_unavailable", "collector socket unavailable")
         except Ob1000CapacityError:
@@ -603,13 +639,16 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
 
     @router.post("/api/research/pane")
     async def api_research_pane(
+        request: Request,
         user: dict = Depends(require_auth),
         body: dict[str, Any] = Body(default_factory=dict),
     ):
         tf = str(body.get("timeframe") or "5m")
         if tf not in SUPPORTED_TIMEFRAMES:
             return _error(400, "invalid_timeframe", f"unsupported timeframe {tf}")
+        diag_hdr = request.headers.get("x-mc-load-diag", "").strip() == "1"
         try:
+            t0 = time.perf_counter() if diag_hdr else None
             payload = await asyncio.to_thread(
                 pane_bundle,
                 str(body.get("symbol") or ""),
@@ -624,6 +663,11 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 allow_stale=bool(body.get("allow_stale")),
                 liquidity_location_as_of=body.get("liquidity_location_as_of"),
             )
+            if diag_hdr and t0 is not None and isinstance(payload, dict):
+                payload["_diag"] = {
+                    "pane_bundle_wall_ms": round((time.perf_counter() - t0) * 1000, 2),
+                    "measured_scope": "pane_bundle_total_including_ch_lld",
+                }
         except KeyError:
             return _error(404, "unknown_symbol", "no 1m candles for symbol")
         except ValueError as exc:
