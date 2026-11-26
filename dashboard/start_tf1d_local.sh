@@ -7,6 +7,8 @@ DASH="$ROOT/dashboard"
 VENV="$ROOT/.venv/bin/python"
 export PYTHONPATH="$ROOT:$DASH:/home/telgenbuescher/projects/pools+ob+delta_bot:/home/telgenbuescher/projects/pools+ob+delta_bot/backtester/short"
 export POOLS_OB_DELTA_BOT_ROOT="/home/telgenbuescher/projects/pools+ob+delta_bot"
+# MC-MULTI: Phase-5S batch prefill for PD1 window (rollback: unset — see research/mc_multi_batch_reader_rollback.md)
+export HISTORICAL_LMV2_BATCH_READER=1
 
 if pgrep -f "$ROOT/.venv/bin/python app.py" >/dev/null 2>&1 || ss -tlnp 2>/dev/null | grep -q ':3000.*python'; then
   echo "Dashboard already listening on :3000"; exit 1

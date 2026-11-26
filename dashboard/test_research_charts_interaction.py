@@ -30,6 +30,8 @@ from research_charts.workspace_session import (  # noqa: E402
 
 HOST_JS = DASHBOARD_ROOT / "static" / "js" / "research" / "research_charts.js"
 TRP_JS = DASHBOARD_ROOT / "static" / "research_trp" / "chart.js"
+OPI_PANE_JS = DASHBOARD_ROOT / "static" / "research_trp" / "opi_pane.js"
+PANE_HTML = DASHBOARD_ROOT / "static" / "research_trp" / "pane.html"
 PAGE_HTML = DASHBOARD_ROOT / "templates" / "research_charts.html"
 
 EMA_LINE = {
@@ -157,6 +159,46 @@ def test_host_coalesce_and_hidden_pane_and_poll_after_initial():
     merge = host[host.index("function mergePollCandlesIntoPane") : host.index("function scheduleGotoNavViewportPrefetch")]
     assert "byTime[t] = Object.assign({}, cur)" in merge
     assert "Math.max(Number(cur.high), Number(oldTip.high))" not in merge
+
+
+def test_mc_opi_p3h_sync_race_fix():
+    trp = TRP_JS.read_text(encoding="utf-8")
+    opi = OPI_PANE_JS.read_text(encoding="utf-8")
+    page = PAGE_HTML.read_text(encoding="utf-8")
+    pane = PANE_HTML.read_text(encoding="utf-8")
+    host = HOST_JS.read_text(encoding="utf-8")
+    sub = trp[trp.index("subscribeVisibleLogicalRangeChange(function (range)") :]
+    sub = sub[: sub.index("markViewManual")]
+    assert "OpiPane.sync(range, true)" in sub
+    assert "stickToLiveEdge" in trp
+    assert 'syncOpiFromMain(true, "stickToLiveEdge")' in trp
+    assert "var syncGen = 0" in opi
+    assert "if (myGen !== syncGen) return" in opi
+    early = opi[opi.index("paintedOnBase") : opi.index("baseTimes = next")]
+    assert "sync(null, true)" in early
+    assert "research-mc-opi-p3i-v1" in page or "research-mc-opi-p3h-v1" in page
+
+
+def test_mc_opi_p3i_data_apply_viewport():
+    """Regression: OPI bar-only apply must not re-push alignCandle setData (viewport reset)."""
+    opi = OPI_PANE_JS.read_text(encoding="utf-8")
+    page = PAGE_HTML.read_text(encoding="utf-8")
+    host = HOST_JS.read_text(encoding="utf-8")
+    pane = PANE_HTML.read_text(encoding="utf-8")
+    assert "needsPushBase" in opi
+    assert "lastPushBaseKey" in opi
+    assert "barsOnly" in opi
+    assert "reassertMainLogical" in opi
+    assert "paintSeries_after_setData" in opi or "after_paintSeries_setData" in opi
+    assert "opiViewport" in opi
+    assert "function paintAll(opts)" in opi
+    assert "!barsOnly && needsPushBase()" in opi
+    assert "paintAll({ barsOnly: true })" in opi
+    assert "paintAll({ barsOnly:" in opi
+    assert "needsLayoutResize" in opi
+    assert "research-mc-opi-p3i-v1" in host
+    assert "research-mc-opi-p3i-v1" in page
+    assert "research-mc-opi-p3i-v1" in pane
 
 
 def test_host_generation_guard():
