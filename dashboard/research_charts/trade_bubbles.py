@@ -161,7 +161,7 @@ def aggregate(
     *,
     symbol: str,
     as_of: datetime,
-    mode: str = "large_medium",
+    mode: str = "all",
 ) -> list[dict[str, Any]]:
     as_of = _utc(as_of)
     tick = tick_size(symbol)
@@ -274,7 +274,7 @@ def load_bubbles_payload(
     start: datetime,
     end: datetime,
     as_of: datetime | None = None,
-    mode: str = "large_medium",
+    mode: str = "all",
 ) -> dict[str, Any]:
     symbol = str(symbol).strip().upper()
     start, end = _utc(start), _utc(end)

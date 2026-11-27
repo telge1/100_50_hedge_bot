@@ -16,7 +16,7 @@ from typing import Any
 from .orderflow_indicators import TF_SECONDS, floor_open, load_orderflow
 from .public_trades_profile import NO_PUBLIC_TRADE_SYMBOLS
 from .service import load_candles
-WINDOW_MINUTES_ALLOWED = (15, 30, 60)
+WINDOW_MINUTES_ALLOWED = (5, 15, 30, 60)
 MIN_TOTAL_USDT = Decimal("10000")
 MIN_ABS_DELTA_USDT = Decimal("1000")
 MAX_VISIBLE_SECONDS = 6 * 3600

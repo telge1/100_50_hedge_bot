@@ -305,7 +305,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         start: int = Query(..., description="UTC unix seconds, inclusive"),
         end: int = Query(..., description="UTC unix seconds, exclusive"),
         as_of: Optional[int] = Query(None, description="Causal cursor UTC unix; default=end"),
-        mode: str = Query("large_medium"),
+        mode: str = Query("all"),
     ):
         """Causal public-trade bubbles for the visible chart window (layer-only).
 
@@ -388,7 +388,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         start: int = Query(..., description="UTC unix seconds, inclusive"),
         end: int = Query(..., description="UTC unix seconds, exclusive"),
         as_of: Optional[int] = Query(None),
-        window_minutes: int = Query(15, description="Rolling wall-clock minutes: 15, 30, or 60"),
+        window_minutes: int = Query(15, description="Rolling wall-clock minutes: 5, 15, 30, or 60"),
     ):
         """Orderflow Price Impact for visible range (Single-Chart). Aggregated only."""
         try:

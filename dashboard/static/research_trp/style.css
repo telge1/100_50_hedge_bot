@@ -361,15 +361,26 @@ body {
 #overlay {
   position: absolute;
   z-index: 3;
-  top: 10px;
+  top: 8px;
   left: 12px;
   right: 12px;
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: flex-start;
   gap: 6px;
   pointer-events: none;
+}
+
+body.research-legend-compact #overlay {
+  justify-content: flex-end;
+}
+
+body.research-legend-compact #legend {
+  max-width: min(62vw, 720px);
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 #legend {
