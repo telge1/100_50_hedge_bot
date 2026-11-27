@@ -176,6 +176,21 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         except HistoricalPoolStateError as exc:
             return _error(422, exc.code, exc.message)
 
+    @router.get("/api/research/multicoin-5m-pd1-viewer-bounds")
+    async def api_research_multicoin_5m_pd1_viewer_bounds(
+        user: dict = Depends(require_auth),
+        symbol: str = Query(..., description="SOLUSDT or BNBUSDT"),
+    ):
+        from .historical_pool_state_v1 import HistoricalPoolStateError, multicoin_5m_pd1_viewer_bounds
+
+        try:
+            bounds = await asyncio.to_thread(multicoin_5m_pd1_viewer_bounds, symbol)
+            return {"success": True, **bounds}
+        except HistoricalPoolStateError as exc:
+            return _error(422, exc.code, exc.message)
+        except ValueError as exc:
+            return _error(400, "invalid_symbol", str(exc))
+
     @router.get("/api/research/doge-pd1-on-demand-viewer-bounds")
     async def api_research_doge_pd1_on_demand_viewer_bounds(
         user: dict = Depends(require_auth),
