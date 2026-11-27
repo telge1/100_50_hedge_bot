@@ -3115,6 +3115,10 @@ app.include_router(
 app.include_router(_build_wall_decision_router(require_auth=require_auth))
 
 
+from research_charts.pane_gzip_middleware_v1 import ResearchPaneGzipMiddleware  # noqa: E402
+
+app.add_middleware(ResearchPaneGzipMiddleware)
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Redirect to login if not authenticated, else dashboard"""
