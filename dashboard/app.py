@@ -620,6 +620,9 @@ def _is_circuit_breaker_exempt(path: str) -> bool:
         return True
     if path.startswith("/api/research/forming-bar"):
         return True
+    # One lease per pane; cold subscribes block for seconds. ob1000_on_demand enforces OB_V3_ON_DEMAND_MAX_ACTIVE.
+    if path == "/api/research/ob1000/lease":
+        return True
     # Research chart reads poll frequently; transient CH slowness must not block the UI for 60s.
     if path.startswith("/api/research/candles"):
         return True

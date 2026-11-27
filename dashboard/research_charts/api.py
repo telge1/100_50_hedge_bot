@@ -71,8 +71,14 @@ from .ob1000_on_demand import (
     lease_acquire,
     lease_heartbeat,
     lease_release,
+            await asyncio.to_thread(ensure_full_collector_for_depth, depth)
     load_ob1000_levels,
     freshness_from_payload,
+)
+from .ob_full_lifecycle import (
+    FullCollectorStartError,
+    IncompatibleFullCollectorError,
+    ensure_full_collector_for_depth,
 )
 from .live_diag import clear_live_diag, record_live_diag, snapshot_live_diag
 from .public_trades_profile import (
@@ -416,6 +422,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             return _error(500, "orderflow_price_impact_failed", str(exc))
         return payload
 
+    @router.get("/api/research/orderbook-profile")
 
     async def api_research_orderbook_profile(
         user: dict = Depends(require_auth),
@@ -554,6 +561,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         try:
             if op == "acquire":
                 payload = await asyncio.to_thread(
+                await asyncio.to_thread(ensure_full_collector_for_depth, body.get("depth"))
                     lease_acquire,
                     symbol=str(body.get("symbol") or ""),
                     session_id=str(body.get("session_id") or user.get("username") or "dashboard"),
@@ -577,6 +585,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 return _error(400, "invalid_op", f"unknown op {op}")
         except Ob1000DisabledError:
             return _error(503, "disabled", "on-demand OB1000 disabled")
+        except IncompatibleFullCollectorError:
+            return _error(503, "collector_not_full_capable", "running collector has no FULL book")
+        except FullCollectorStartError as exc:
+            return _error(503, "collector_start_failed", str(exc))
         except Ob1000CollectorUnavailableError:
             return _error(503, "collector_unavailable", "collector socket unavailable")
         except Ob1000CapacityError:
@@ -598,6 +610,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
     ):
         sym = str(symbol or "").strip().upper()
         try:
+            await asyncio.to_thread(ensure_full_collector_for_depth, depth)
             payload = await asyncio.to_thread(load_ob1000_levels, sym, lease_id=lease_id, depth=depth)
             payload = freshness_from_payload(payload)
         except Ob1000DisabledError:

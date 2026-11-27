@@ -259,7 +259,7 @@ DEFAULT_ORDERBOOK_PROFILE = {
 
 DEFAULT_ORDERBOOK_LEVELS = {
     "enabled": False,
-    "depth": 1000,  # research default: live OB1000; 0=FULL, 200=archive
+    "depth": 0,  # checkbox is the original FULL book; 1000 and 200 stay selectable
     "mode": "aggregated",
     "scale": "sqrt",
     "width_px": 140,
