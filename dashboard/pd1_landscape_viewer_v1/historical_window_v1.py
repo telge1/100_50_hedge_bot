@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 import json
 import os
 import time
+from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -190,7 +192,10 @@ def landscape_capabilities(
     supported: list[dict[str, Any]] = []
     for tf, pd in sorted(ALLOWED_VIEWER_SCOPES):
         try:
-            hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
+            if sym != SYMBOL and tf == "5m" and pd == PD1_POOL_DETAIL:
+                hcfg = resolve_landscape_viewer_config(symbol=sym, timeframe=tf, pool_detail=pd)
+            else:
+                hcfg = resolve_viewer_historical_scope(timeframe=tf, pool_detail=pd)
             slo, shi = _scope_bounds(hcfg)
             supported.append(
                 {
@@ -310,6 +315,9 @@ def _load_members(
         load_kw: dict[str, Any] = {
             "pool_detail": hcfg.pool_detail,
             "timeframe": hcfg.timeframe,
+            "symbol": hcfg.symbol,
+            "cfg_hash": hcfg.config_hash,
+            "pipeline_line_id": hcfg.pipeline_line_id,
             "client": client,
             "database": db,
         }
@@ -329,6 +337,91 @@ def _load_members(
     return cache[key]
 
 
+def _apply_member_window(
+    by_pool: dict[str, dict[str, Any]],
+    w0: datetime,
+    w1: datetime,
+    members: list[dict],
+) -> None:
+    """Same segment join as a full lifetime scan. Latest membership wins bounds."""
+    seg = [_iso(w0), _iso(w1)]
+    for m in members:
+        pid = m["pool_id"]
+        if pid not in by_pool:
+            by_pool[pid] = {**_pool_row(m), "segments": [seg[:]]}
+            continue
+        pl = by_pool[pid]
+        pl.update(
+            {
+                "bottom": float(m["lower_bound"]),
+                "top": float(m["upper_bound"]),
+                "strength": m.get("strength"),
+                "strength_class": m.get("strength_class") or "Weak",
+            }
+        )
+        last = pl["segments"][-1]
+        if last[1] == seg[0] or parse_decision_iso(last[1]) + timedelta(minutes=5) == w0:
+            last[1] = seg[1]
+        else:
+            pl["segments"].append(seg[:])
+
+
+def _scan_lifetime_windows(
+    grid: list[datetime],
+    slot_minutes: int,
+) -> tuple[list[tuple[datetime, datetime, datetime]], tuple[datetime, datetime, datetime]]:
+    closed: list[tuple[datetime, datetime, datetime]] = []
+    win_start = grid[0]
+    prev_dc: datetime | None = None
+    for dt in grid:
+        dc = _causal_decision_close(dt, slot_minutes)
+        if prev_dc is not None and dc != prev_dc:
+            closed.append((win_start, dt - timedelta(minutes=5), prev_dc))
+            win_start = dt
+        prev_dc = dc
+    if prev_dc is None:
+        raise LandscapeWindowError("INVALID_REQUEST", "empty lifetime grid")
+    return closed, (win_start, grid[-1], prev_dc)
+
+
+def _retarget_open_segment_end(
+    by_pool: dict[str, dict[str, Any]],
+    old_end: datetime,
+    new_end: datetime,
+) -> None:
+    old_iso = _iso(old_end)
+    new_iso = _iso(new_end)
+    for pl in by_pool.values():
+        segs = pl.get("segments") or []
+        if segs and segs[-1][1] == old_iso:
+            segs[-1][1] = new_iso
+
+
+def _sorted_pools(by_pool: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(by_pool.values(), key=lambda x: x["pool_id"])
+
+
+def _build_lifetimes_state(
+    grid: list[datetime],
+    cache: dict[str, list[dict]],
+    client: Any,
+    db: str,
+    hcfg: HistoricalPdConfig,
+    slot_minutes: int,
+) -> tuple[dict[str, dict[str, Any]], datetime, datetime, datetime]:
+    """Full scan. Returns mutable pools plus the open window cursor."""
+    closed, (open_start, open_end, open_dc) = _scan_lifetime_windows(grid, slot_minutes)
+
+    def load(dc: datetime) -> list[dict]:
+        return _load_members(cache, dc, client, db, hcfg)
+
+    by_pool: dict[str, dict[str, Any]] = {}
+    for w0, w1, dc in closed:
+        _apply_member_window(by_pool, w0, w1, load(dc))
+    _apply_member_window(by_pool, open_start, open_end, load(open_dc))
+    return by_pool, open_start, open_dc, open_end
+
+
 def _build_lifetimes(
     grid: list[datetime],
     cache: dict[str, list[dict]],
@@ -338,43 +431,109 @@ def _build_lifetimes(
     slot_minutes: int,
 ) -> list[dict[str, Any]]:
     """ACTIVE intervals on 5m timeline; membership constant between publication slots."""
-    by_pool: dict[str, dict[str, Any]] = {}
-    windows: list[tuple[datetime, datetime, list[dict]]] = []
-    win_start = grid[0]
-    prev_dc: datetime | None = None
-    for dt in grid:
+    by_pool, _open_start, _open_dc, _open_end = _build_lifetimes_state(
+        grid, cache, client, db, hcfg, slot_minutes
+    )
+    return _sorted_pools(by_pool)
+
+
+def resume_open_lifetimes(
+    by_pool: dict[str, dict[str, Any]],
+    open_start: datetime,
+    open_dc: datetime,
+    open_end: datetime,
+    new_dts: list[datetime],
+    slot_minutes: int,
+    load_member,
+) -> tuple[dict[str, dict[str, Any]], datetime, datetime, datetime]:
+    """Continue an already-materialized open window. Does not replay warmup steps.
+
+    A pool still active at open_end is retargeted or replaced from the new
+    decision close. Pools that already ended stay as stored.
+    """
+    current_end = open_end
+    current_dc = open_dc
+    current_start = open_start
+    for dt in new_dts:
         dc = _causal_decision_close(dt, slot_minutes)
-        if prev_dc is not None and dc != prev_dc:
-            windows.append(
-                (win_start, dt - timedelta(minutes=5), _load_members(cache, prev_dc, client, db, hcfg))
-            )
-            win_start = dt
-        prev_dc = dc
-    windows.append((win_start, grid[-1], _load_members(cache, prev_dc, client, db, hcfg)))
+        if current_dc is not None and dc != current_dc:
+            current_start = dt
+            current_dc = dc
+            _apply_member_window(by_pool, dt, dt, load_member(dc))
+            current_end = dt
+        else:
+            _retarget_open_segment_end(by_pool, current_end, dt)
+            current_end = dt
+            current_dc = dc
+    return by_pool, current_start, current_dc, current_end
 
-    for w0, w1, members in windows:
-        seg = [_iso(w0), _iso(w1)]
-        for m in members:
-            pid = m["pool_id"]
-            if pid not in by_pool:
-                by_pool[pid] = {**_pool_row(m), "segments": [seg[:]]}
-            else:
-                pl = by_pool[pid]
-                pl.update(
-                    {
-                        "bottom": float(m["lower_bound"]),
-                        "top": float(m["upper_bound"]),
-                        "strength": m.get("strength"),
-                        "strength_class": m.get("strength_class") or "Weak",
-                    }
-                )
-                last = pl["segments"][-1]
-                if last[1] == seg[0] or parse_decision_iso(last[1]) + timedelta(minutes=5) == w0:
-                    last[1] = seg[1]
-                else:
-                    pl["segments"].append(seg[:])
 
-    return sorted(by_pool.values(), key=lambda x: x["pool_id"])
+_LIFETIME_RESUME_MAX = 8
+_LIFETIME_RESUME: OrderedDict[tuple, dict[str, Any]] = OrderedDict()
+
+
+def clear_lifetime_resume_for_tests() -> None:
+    _LIFETIME_RESUME.clear()
+
+
+def seed_lifetime_resume_from_payload(payload: dict[str, Any], symbol: str) -> bool:
+    """Install a cursor built in a child process so the next 5m step stays local."""
+    prov = payload.get("provenance") or {}
+    if not prov.get("resume_open_end") or not prov.get("pipeline_line_id"):
+        return False
+    by_pool = {
+        str(pool["pool_id"]): copy.deepcopy(pool)
+        for pool in (payload.get("pools") or [])
+        if pool.get("pool_id") is not None
+    }
+    key = (
+        str(symbol).upper(),
+        str(prov["pipeline_line_id"]),
+        str(prov["config_hash"]),
+        str(prov["timeframe"]),
+        int(prov["pool_detail"]),
+        str(prov["resume_grid_start"]),
+        str(prov["resume_vis_from"]),
+    )
+    _store_lifetime_resume(
+        key,
+        {
+            "grid_start": _parse_utc(prov["resume_grid_start"]),
+            "vis_from": _parse_utc(prov["resume_vis_from"]),
+            "open_start": _parse_utc(prov["resume_open_start"]),
+            "open_dc": _parse_utc(prov["resume_open_dc"]),
+            "open_end": _parse_utc(prov["resume_open_end"]),
+            "by_pool": by_pool,
+        },
+    )
+    return True
+
+
+def _resume_key(hcfg: HistoricalPdConfig, grid_start: datetime, vis_from: datetime) -> tuple:
+    return (
+        str(hcfg.symbol).upper(),
+        str(hcfg.pipeline_line_id),
+        str(hcfg.config_hash),
+        str(hcfg.timeframe),
+        int(hcfg.pool_detail),
+        _iso(grid_start),
+        _iso(vis_from),
+    )
+
+
+def _lookup_lifetime_resume(key: tuple) -> dict[str, Any] | None:
+    ent = _LIFETIME_RESUME.get(key)
+    if ent is None:
+        return None
+    _LIFETIME_RESUME.move_to_end(key)
+    return ent
+
+
+def _store_lifetime_resume(key: tuple, entry: dict[str, Any]) -> None:
+    _LIFETIME_RESUME[key] = entry
+    _LIFETIME_RESUME.move_to_end(key)
+    while len(_LIFETIME_RESUME) > _LIFETIME_RESUME_MAX:
+        _LIFETIME_RESUME.popitem(last=False)
 
 
 def _clip_segments_to_window(pools: list[dict], vis_from: datetime, vis_to: datetime) -> list[dict]:
@@ -453,7 +612,8 @@ def build_landscape_window(
     member_cache: dict[str, list[dict]] | None = None,
     density_only: bool = False,
     expose_pools_full: bool = False,
-) -> dict[str, Any]:
+    resume_only: bool = False,
+) -> dict[str, Any] | None:
     global _LAST_PROFILE, _profile_ctx
     try:
         if symbol or pipeline_line_id:
@@ -521,6 +681,24 @@ def build_landscape_window(
             {"max_5m_bars": MAX_5M_BARS, "requested_5m_steps": visible_5m_steps},
         )
 
+    resume_key = _resume_key(hcfg, grid[0], vis_from) if grid else None
+    resume_entry = _lookup_lifetime_resume(resume_key) if resume_key is not None else None
+    can_resume = bool(
+        density_only
+        and resume_entry is not None
+        and resume_entry["grid_start"] == grid[0]
+        and resume_entry["vis_from"] == vis_from
+        and vis_to >= resume_entry["open_end"]
+    )
+    delta_steps: list[datetime] = []
+    if can_resume and resume_entry is not None:
+        delta_steps = [t for t in grid if t > resume_entry["open_end"]]
+        if delta_steps and delta_steps[0] != resume_entry["open_end"] + timedelta(minutes=5):
+            can_resume = False
+            delta_steps = []
+    if resume_only and not can_resume:
+        return None
+
     cfg = load_clickhouse_config()
     own_client = client is None
     if client is None:
@@ -539,30 +717,93 @@ def build_landscape_window(
 
     cache: dict[str, list[dict]] = member_cache if member_cache is not None else {}
     phase5s_prefill: dict[str, Any] | None = None
+    lifetime_resume = False
+    lifetime_delta_steps = 0
     t_prefill = time.perf_counter()
-    if historical_lmv2_batch_reader_enabled():
-        from .historical_window_batch_v1 import prefill_member_cache_phase5s
+    if can_resume and resume_entry is not None and resume_key is not None:
+        lifetime_resume = True
+        lifetime_delta_steps = len(delta_steps)
+        by_pool = copy.deepcopy(resume_entry["by_pool"])
 
-        pre = prefill_member_cache_phase5s(
-            cache,
-            context_from,
-            vis_to,
-            client=client,
-            database=db,
-            pool_detail=hcfg.pool_detail,
-            timeframe=hcfg.timeframe,
+        def _load_delta(dc: datetime) -> list[dict]:
+            return _load_members(cache, dc, client, db, hcfg)
+
+        by_pool, open_start, open_dc, open_end = resume_open_lifetimes(
+            by_pool,
+            resume_entry["open_start"],
+            resume_entry["open_dc"],
+            resume_entry["open_end"],
+            delta_steps,
+            slot_minutes,
+            _load_delta,
         )
-        if pre is not None:
-            phase5s_prefill = {
-                "active": True,
-                "decision_closes": pre.decision_closes,
-                "cache_keys_filled": pre.cache_keys_filled,
-                "clickhouse_query_count": pre.stats.get("clickhouse_query_count"),
-                "prefill_ms": round((time.perf_counter() - t_prefill) * 1000, 1),
-            }
-    t_life = time.perf_counter()
-    pools_full = _build_lifetimes(grid, cache, client, db, hcfg, slot_minutes)
-    t_life_done = time.perf_counter()
+        _store_lifetime_resume(
+            resume_key,
+            {
+                "grid_start": grid[0],
+                "vis_from": vis_from,
+                "open_start": open_start,
+                "open_dc": open_dc,
+                "open_end": open_end,
+                "by_pool": copy.deepcopy(by_pool),
+            },
+        )
+        pools_full = _sorted_pools(by_pool)
+        t_life_done = time.perf_counter()
+        phase5s_prefill = {
+            "active": False,
+            "lifetime_resume": True,
+            "delta_steps": lifetime_delta_steps,
+            "prefill_ms": 0.0,
+        }
+        t_life = t_prefill
+    else:
+        if historical_lmv2_batch_reader_enabled():
+            from .historical_window_batch_v1 import prefill_member_cache_phase5s
+
+            pre = prefill_member_cache_phase5s(
+                cache,
+                context_from,
+                vis_to,
+                client=client,
+                database=db,
+                hcfg=hcfg,
+            )
+            if pre is not None:
+                phase5s_prefill = {
+                    "active": True,
+                    "decision_closes": pre.decision_closes,
+                    "cache_keys_filled": pre.cache_keys_filled,
+                    "clickhouse_query_count": pre.stats.get("clickhouse_query_count"),
+                    "prefill_ms": round((time.perf_counter() - t_prefill) * 1000, 1),
+                }
+                for extra in (
+                    "closes_reused",
+                    "closes_missing",
+                    "member_prefill_reuse_active",
+                    "member_prefill_low_copy_active",
+                    "reuse_store_stats",
+                ):
+                    if extra in pre.stats:
+                        phase5s_prefill[extra] = pre.stats[extra]
+        t_life = time.perf_counter()
+        by_pool, open_start, open_dc, open_end = _build_lifetimes_state(
+            grid, cache, client, db, hcfg, slot_minutes
+        )
+        if density_only and resume_key is not None:
+            _store_lifetime_resume(
+                resume_key,
+                {
+                    "grid_start": grid[0],
+                    "vis_from": vis_from,
+                    "open_start": open_start,
+                    "open_dc": open_dc,
+                    "open_end": open_end,
+                    "by_pool": copy.deepcopy(by_pool),
+                },
+            )
+        pools_full = _sorted_pools(by_pool)
+        t_life_done = time.perf_counter()
     pools = _clip_segments_to_window(pools_full, vis_from, vis_to)
 
     vis_grid = [t for t in grid if vis_from <= t <= vis_to]
@@ -614,13 +855,22 @@ def build_landscape_window(
             "membership_slot_minutes": slot_minutes,
             "context_from": _iso(context_from),
             "membership_loader": (
-                "phase5s_episode_walk_batch_cache"
-                if phase5s_prefill
+                "lifetime_resume_v1"
+                if lifetime_resume
+                else "phase5s_episode_walk_batch_cache"
+                if phase5s_prefill and phase5s_prefill.get("active")
                 else "load_historical_pool_state_at_close"
             ),
             "remaining": False,
             "density_only": density_only,
-            "phase5s_batch_reader_active": phase5s_prefill is not None,
+            "lifetime_resume": lifetime_resume,
+            "lifetime_delta_steps": lifetime_delta_steps,
+            "resume_grid_start": _iso(grid[0]),
+            "resume_vis_from": _iso(vis_from),
+            "resume_open_start": _iso(open_start),
+            "resume_open_dc": _iso(open_dc),
+            "resume_open_end": _iso(open_end),
+            "phase5s_batch_reader_active": bool(phase5s_prefill and phase5s_prefill.get("active")),
             **(
                 {"phase5s_batch_stats": phase5s_prefill}
                 if phase5s_prefill
@@ -647,6 +897,9 @@ def build_landscape_window(
     timing = {
         "clickhouse_candles": round((t_ch_done - t_ch) * 1000, 1),
         "build_lifetimes": round((t_life_done - t_life) * 1000, 1),
+        "lifetime_resume": lifetime_resume,
+        "lifetime_delta_steps": lifetime_delta_steps,
+        "phase5s_prefill": None if not phase5s_prefill else phase5s_prefill.get("prefill_ms"),
         "build_clusters_by_dc": round((t_cl_done - t_cl) * 1000, 1),
         "json_serialize": round((t_json_done - t_json) * 1000, 1),
         "total": round((t_done - t0) * 1000, 1),

@@ -18,6 +18,17 @@
   };
   const DEFAULT_TFS_MULTI = { "pane-0": "5m", "pane-1": "5m", "pane-2": "5m", "pane-3": "5m" };
   const MC4_5M_PD1_SYMBOLS = { DOGEUSDT: 1, SOLUSDT: 1, BNBUSDT: 1 };
+  const POOL_DATA_SYMBOLS = {
+    BNBUSDT: 1,
+    DOGEUSDT: 1,
+    HYPEUSDT: 1,
+    LINKUSDT: 1,
+    LITUSDT: 1,
+    QNTUSDT: 1,
+    SOLUSDT: 1,
+    XAUUSDT: 1,
+    ZECUSDT: 1,
+  };
   const PANE_SYMBOLS_KEY = "research.pane_symbols.v1";
   const PANE_EXACT_ORIGIN_KEY = "research.pane_exact_origin.v1";
   const VIEW_MODE_KEY = "research.view_mode.v1";
@@ -227,6 +238,7 @@
       ready: "Pools: Ready",
       error: "Pools: Error",
       unsupported: "Pools: Unsupported",
+      outside: "Pools bis",
     };
     el.textContent = detail ? (labels[kind] || kind) + " · " + detail : (labels[kind] || kind);
     el.className = "trp-pane-pool-status trp-pane-pool-status-" + kind;
@@ -278,11 +290,17 @@
       if (PD1ExactOriginResearch.disableHistoricalLmv2) PD1ExactOriginResearch.disableHistoricalLmv2();
       if (PD1ExactOriginResearch.syncPoolDetailUi) PD1ExactOriginResearch.syncPoolDetailUi(pane);
       try {
-        await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+        if (PD1ExactOriginResearch.refreshPaneAfterReEnable) {
+          await PD1ExactOriginResearch.refreshPaneAfterReEnable(pane);
+        } else {
+          await PD1ExactOriginResearch.refreshPane(pane, { force: true });
+        }
       } catch (err) {
         setStatus("Exact Origin (" + paneSymbol(pane) + "): " + (err.message || err), "error");
         setPaneExactOriginPoolStatus(pane, "error");
       }
+    } else if (PD1ExactOriginResearch.stripPaneVisual) {
+      PD1ExactOriginResearch.stripPaneVisual(pane);
     } else if (PD1ExactOriginResearch.stripPane) {
       PD1ExactOriginResearch.stripPane(pane);
     }
@@ -2891,7 +2909,7 @@
         scheduleVolumeProfile(pane, from, to);
         scheduleOpi(pane, from, to);
         scheduleOrderbookProfile(pane, from, to);
-        scheduleOrderbookLevels(pane);
+        scheduleOrderbookLevels(pane, { reason: "viewport" });
         scheduleTradeBubbles(pane, from, to);
         scheduleBtD23SetupScanner(pane, from, to);
         scheduleBtD26DynamicSelector(pane, from, to);
@@ -5854,6 +5872,18 @@
     });
   }
 
+  function isMultiGridFs() {
+    return document.body.classList.contains("research-multi-grid-fs");
+  }
+
+  function setMultiGridFs(on) {
+    if (on && state.paneFs) exitMultiPaneTileFullscreen();
+    document.body.classList.toggle("research-multi-grid-fs", !!on);
+    const btn = $("researchMultiGridFsBtn");
+    if (btn) btn.classList.toggle("active", !!on);
+    requestAnimationFrame(resizeVisibleChartsWithOb);
+  }
+
   function exitMultiPaneTileFullscreen() {
     state.paneFs = null;
     document.body.classList.remove("research-multi-tile-fs");
@@ -6403,6 +6433,9 @@
   }
 
   function parseOb1000ApiError(err) {
+    if (window.ResearchOrderbookGuard) {
+      return window.ResearchOrderbookGuard.classifyOb1000Error(err);
+    }
     if (!err) return null;
     const msg = String(err.message || err);
     if (msg.indexOf("symbol_not_in_pilot") >= 0 ||
@@ -6417,8 +6450,11 @@
     if (msg.indexOf("collector_unavailable") >= 0 || msg.indexOf("503") >= 0) {
       return { code: "collector_unavailable", status: 503 };
     }
-    if (msg.indexOf("capacity_reached") >= 0 || msg.indexOf("429") >= 0) {
+    if (msg.indexOf("capacity_reached") >= 0) {
       return { code: "capacity_reached", status: 429 };
+    }
+    if (msg.indexOf("Too many concurrent requests") >= 0 || msg.indexOf("429") >= 0) {
+      return { code: "rate_limited", status: 429 };
     }
     return { code: "error", message: msg };
   }
@@ -6446,6 +6482,7 @@
     if (err && err.code === "symbol_not_in_pilot") return "NOT_PILOT";
     if (err && err.code === "disabled") return "DISABLED";
     if (err && (err.code === "collector_unavailable" || err.status === 503)) return "OFFLINE";
+    if (err && err.code === "rate_limited") return "RATE_LIMITED";
     if (err && err.code === "capacity_reached") return "CAPACITY";
     const sub = payload && payload.subscription_state ? String(payload.subscription_state) : "starting";
     if (sub === "capacity") return "CAPACITY";
@@ -6682,7 +6719,7 @@
       stopOb1000Lease();
     }
     startOrderbookLevelsRefresh();
-    visibleIds().forEach(function (pid) { scheduleOrderbookLevels(state.panes[pid]); });
+    scheduleVisibleOrderbookLevelsStaggered();
   }
 
   function oblSettingsPayload() {
@@ -6717,20 +6754,46 @@
     }
   }
 
-  function scheduleOrderbookLevels(pane) {
+  function orderbookRefreshIntervalMs() {
+    if (!isOnDemandBookMode()) return OBL_REFRESH_MS;
+    return oblDataDepth() === 0 ? OBL_FULL_REFRESH_MS : OBL1000_REFRESH_MS;
+  }
+
+  function scheduleOrderbookLevels(pane, opts) {
     if (!pane) return;
+    const reason = opts && opts.reason;
+    if (reason === "viewport" && window.ResearchOrderbookGuard) {
+      const interval = orderbookRefreshIntervalMs();
+      if (window.ResearchOrderbookGuard.viewportSkipsOrderbookFetch({
+        inflight: !!pane.oblInflight,
+        timerPending: !!pane.oblTimer,
+        lastOkAt: pane._oblLastOkAt,
+      }, Date.now(), interval)) {
+        return;
+      }
+    }
     if (pane.oblTimer) clearTimeout(pane.oblTimer);
+    const delay = opts && opts.delayMs != null ? opts.delayMs : 200;
     pane.oblTimer = setTimeout(function () {
       pane.oblTimer = null;
       refreshPaneOrderbookLevels(pane);
-    }, 200);
+    }, delay);
+  }
+
+  function scheduleVisibleOrderbookLevelsStaggered() {
+    const ids = visibleIds();
+    const interval = orderbookRefreshIntervalMs();
+    ids.forEach(function (pid, index) {
+      const delay = window.ResearchOrderbookGuard
+        ? window.ResearchOrderbookGuard.staggerOffsetMs(index, ids.length, interval)
+        : Math.round((index * interval) / Math.max(1, ids.length));
+      scheduleOrderbookLevels(state.panes[pid], { delayMs: delay, reason: "interval" });
+    });
   }
 
   function refreshOrderbookLevelsVisible() {
     if (!state.obl || !state.obl.enabled) return;
-    visibleIds().forEach(function (pid) {
-      scheduleOrderbookLevels(state.panes[pid]);
-    });
+    scheduleVisibleOrderbookLevelsStaggered();
   }
 
   function stopOrderbookLevelsRefresh() {
@@ -6786,6 +6849,21 @@
     return String(reqSymbol).toUpperCase() === paneSymbol(pane);
   }
 
+  const oblSymbolFetch = Object.create(null);
+
+  function fetchObLevelsShared(url, pane, symbol, depth, sourceAction) {
+    const key = String(symbol || "").toUpperCase() + "|" + String(depth);
+    if (oblSymbolFetch[key]) return oblSymbolFetch[key];
+    const pending = getJson(url, {
+      signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
+      sourceAction: sourceAction,
+    }).finally(function () {
+      if (oblSymbolFetch[key] === pending) delete oblSymbolFetch[key];
+    });
+    oblSymbolFetch[key] = pending;
+    return pending;
+  }
+
   async function refreshPaneOrderbookLevels(pane) {
     const reqSymbolBoot = paneSymbol(pane);
     if (!pane || !state.obl || (!state.obl.enabled && !isMultiManualMode()) || !reqSymbolBoot) {
@@ -6833,10 +6911,7 @@
         url += "&lease_id=" + encodeURIComponent(paneLease.leaseId);
       }
       try {
-        let body = await getJson(url, {
-          signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
-          sourceAction: "ob1000-levels",
-        });
+        let body = await fetchObLevelsShared(url, pane, reqSymbol, reqDepth, "ob1000-levels");
         if (gen !== pane.oblGen) return;
         if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
         const emptyBook = !(body.bids && body.bids.length) && !(body.asks && body.asks.length);
@@ -6852,10 +6927,7 @@
             if (paneLease.leaseId) {
               retryUrl += "&lease_id=" + encodeURIComponent(paneLease.leaseId);
             }
-            body = await getJson(retryUrl, {
-              signal: pane.oblAbort ? pane.oblAbort.signal : undefined,
-              sourceAction: "ob1000-levels-retry",
-            });
+            body = await fetchObLevelsShared(retryUrl, pane, reqSymbol, reqDepth, "ob1000-levels-retry");
             if (gen !== pane.oblGen) return;
             if (!oblSymbolStillCurrent(pane, reqSymbol) || oblDataDepth() !== reqDepth) return;
           }
@@ -6890,12 +6962,13 @@
             String((body.bids && body.bids.length) || 0) + "|" + String((body.asks && body.asks.length) || 0) + "|" +
             String(body.ui_state || "") + "|" + String(body.raw_bid_count || "") + "|" + String(body.raw_ask_count || "") + "|" +
             String(body.depth) + "|" + String(body.book_mode || "");
-          if (!stillEmpty) {
+            if (!stillEmpty) {
             if (pane._oblPaintSig !== sig) {
               live.setOrderbookLevels(body, oblSettingsPayload());
               pane._oblPaintSig = sig;
             }
             pane._oblHadLive = true;
+            pane._oblLastOkAt = Date.now();
           } else if (!pane._oblHadLive) {
             live.setOrderbookLevels(body, oblSettingsPayload());
             pane._oblPaintSig = sig;
@@ -6919,7 +6992,10 @@
           setStatus(oblDepthLabel(reqDepth) + " ungültiges Symbol (aktuell " + reqSymbol + ")", "empty");
         }
         // Keep last painted book on transient errors (except explicit not-pilot/offline/disabled).
-        if (uiState === "NOT_PILOT" || uiState === "OFFLINE" || uiState === "DISABLED" || uiState === "CAPACITY") {
+        const clearBook = window.ResearchOrderbookGuard
+          ? window.ResearchOrderbookGuard.clearsOrderbook(uiState)
+          : (uiState === "NOT_PILOT" || uiState === "OFFLINE" || uiState === "DISABLED" || uiState === "CAPACITY");
+        if (clearBook) {
           const live = api(pane);
           if (live && live.setOrderbookLevels) {
             live.setOrderbookLevels(oblEmptyPayload(reqSymbol, reqDepth, uiState), oblSettingsPayload());
@@ -9818,7 +9894,7 @@
       )
       : packed.overlays || [];
     const symEl = pane.el.querySelector(".trp-pane-symbol");
-    if (symEl) symEl.textContent = packed.symbol || state.symbol;
+    if (symEl && symEl.tagName !== "SELECT") symEl.textContent = packed.symbol || state.symbol;
     if (skipCandles) updatePaneLoadStatusFromBundle(pane, packed, skipCandles);
     const chart = api(pane);
     if (chart) {
@@ -10900,9 +10976,27 @@
     scheduleOrderbookLevels(pane);
   }
 
+  function symbolHasPoolData(sym) {
+    return !!POOL_DATA_SYMBOLS[String(sym || "").toUpperCase()];
+  }
+
+  function compareSymbolNames(a, b) {
+    const ap = symbolHasPoolData(a) ? 0 : 1;
+    const bp = symbolHasPoolData(b) ? 0 : 1;
+    if (ap !== bp) return ap - bp;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function symbolMenuLabel(sym, row) {
+    const name = String(sym || "").toUpperCase();
+    if (symbolHasPoolData(name)) return name + " · pools";
+    if (row && row.collector_configured) return name + " · live";
+    return name;
+  }
+
   function fillPaneSymbolSelects(names) {
     if (!isMultiManualMode()) return;
-    const list = names || [];
+    const list = (names || []).slice().sort(compareSymbolNames);
     PANE_IDS.forEach(function (pid) {
       const pane = state.panes[pid];
       if (!pane) return;
@@ -10912,7 +11006,7 @@
       list.forEach(function (sym) {
         const opt = document.createElement("option");
         opt.value = sym;
-        opt.textContent = sym;
+        opt.textContent = symbolMenuLabel(sym);
         sel.appendChild(opt);
       });
       if (pane.symbol && list.indexOf(pane.symbol) >= 0) sel.value = pane.symbol;
@@ -10968,6 +11062,14 @@
         window.location.assign(url);
       });
     });
+    const gridFsBtn = $("researchMultiGridFsBtn");
+    if (gridFsBtn) {
+      gridFsBtn.addEventListener("click", function () {
+        if (isMultiManualMode()) setMultiGridFs(!isMultiGridFs());
+      });
+    }
+    const gridFsExit = $("researchMultiGridFsExit");
+    if (gridFsExit) gridFsExit.addEventListener("click", function () { setMultiGridFs(false); });
   }
 
   async function hydrateResearchWorkspaceFromServer() {
@@ -11035,8 +11137,8 @@
       startPoll();
       visibleIds().forEach(function (pid) {
         syncMultiPaneObLayout(state.panes[pid]);
-        scheduleOrderbookLevels(state.panes[pid]);
       });
+      scheduleVisibleOrderbookLevelsStaggered();
       if (window.PD1ExactOriginResearch) {
         try {
           for (let i = 0; i < PANE_IDS.length; i += 1) {
@@ -11067,7 +11169,7 @@
     const list = (rows || [])
       .map(function (row) { return row && row.symbol ? String(row.symbol).toUpperCase() : ""; })
       .filter(Boolean)
-      .sort();
+      .sort(compareSymbolNames);
     const bySym = {};
     (rows || []).forEach(function (row) {
       if (row && row.symbol) bySym[String(row.symbol).toUpperCase()] = row;
@@ -11076,7 +11178,7 @@
     list.forEach(function (sym) {
       const opt = document.createElement("option");
       opt.value = sym;
-      opt.textContent = bySym[sym] && bySym[sym].collector_configured ? sym + " · live" : sym;
+      opt.textContent = symbolMenuLabel(sym, bySym[sym]);
       sel.appendChild(opt);
     });
     return list;
@@ -13590,6 +13692,10 @@
           setBrowserFs(false);
           restoreWorkspaceGeomFromFs();
           syncPaneFullscreenButtons();
+          return;
+        }
+        if (isMultiGridFs()) {
+          setMultiGridFs(false);
           return;
         }
         handleChartKey("escape");

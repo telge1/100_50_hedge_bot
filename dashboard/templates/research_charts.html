@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Charts - Multi-Symbol Hedge Bot</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/research.css?v=research-pane-header-v1">
+    <link rel="stylesheet" href="/static/css/research.css?v=research-pool-symbols-menu-v1">
 </head>
 <body>
     <div class="dashboard-container research-trp-page">
@@ -53,6 +53,7 @@
                         <button type="button" class="trp-view-mode-btn active" data-view="single" aria-pressed="true">Single</button>
                         <button type="button" class="trp-view-mode-btn" data-view="multi" aria-pressed="false">Multi 2×2</button>
                     </div>
+                    <button type="button" class="trp-multi-grid-fs-btn" id="researchMultiGridFsBtn" title="Alle 4 Kacheln Vollbild" aria-label="Alle 4 Kacheln Vollbild">⛶ 4×</button>
                     <label class="trp-check" title="Crosshair über alle Panes synchronisieren"><input type="checkbox" id="researchCrosshairSync" checked> Crosshair</label>
                 </div>
 
@@ -456,6 +457,7 @@
             </div><!-- #researchFullscreenHost -->
         </div>
     </div>
+    <button type="button" class="trp-multi-grid-fs-exit" id="researchMultiGridFsExit" title="Vollbild beenden (Esc)">✕ Vollbild beenden</button>
 
     <div class="trp-modal" id="modalEma" hidden>
         <div class="trp-modal-card trp-modal-wide">
@@ -755,12 +757,13 @@
     {% elif request.query_params.get('pd1') == 'mc6a-lit-hype-v1' %}
     <script src="/static/js/research/mc6a/pd1_exact_origin_density_research_v1.mc6a_lit_hype_v1.js?v=pd1-mc6a-lit-hype-v1"></script>
     {% else %}
-    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-mc-multi-pane-pools-v5"></script>
+    <script src="/static/js/research/pd1_exact_origin_density_research_v1.js?v=pd1-mc-pool-live-span-v1"></script>
     {% endif %}
     <!-- frozen overlay cache markers: bt-d95-three-month-overlay-v1 bt-d105-d100a-june-overlay-v1 bt-d111-d108-aug-structural-sl-overlay-v1 long-v3-phase3g-sept-sl-cap-v1 -->
     <script src="/static/js/research/research_opi_e2e_diag.js?v=research-mc-opi-p3s-v1"></script>
     <script src="/static/js/research/mc_load_diag_v1.js?v=mc-load-p4i-v1"></script>
-    <script src="/static/js/research/research_charts.js?v=research-mc-load-p4i-v1"></script>
+    <script src="/static/js/research/research_orderbook_guard_v1.js?v=ob-guard-v1"></script>
+    <script src="/static/js/research/research_charts.js?v=research-ob-guard-v1"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
