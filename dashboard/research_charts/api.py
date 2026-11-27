@@ -71,7 +71,6 @@ from .ob1000_on_demand import (
     lease_acquire,
     lease_heartbeat,
     lease_release,
-            await asyncio.to_thread(ensure_full_collector_for_depth, depth)
     load_ob1000_levels,
     freshness_from_payload,
 )
@@ -427,7 +426,6 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         return payload
 
     @router.get("/api/research/orderbook-profile")
-
     async def api_research_orderbook_profile(
         user: dict = Depends(require_auth),
         symbol: str = Query(...),
@@ -564,8 +562,8 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
         op = str(body.get("op") or "acquire")
         try:
             if op == "acquire":
-                payload = await asyncio.to_thread(
                 await asyncio.to_thread(ensure_full_collector_for_depth, body.get("depth"))
+                payload = await asyncio.to_thread(
                     lease_acquire,
                     symbol=str(body.get("symbol") or ""),
                     session_id=str(body.get("session_id") or user.get("username") or "dashboard"),
@@ -573,6 +571,7 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                     depth=body.get("depth"),
                 )
             elif op == "heartbeat":
+                await asyncio.to_thread(ensure_full_collector_for_depth, body.get("depth"))
                 payload = await asyncio.to_thread(
                     lease_heartbeat,
                     lease_id=str(body.get("lease_id") or ""),
@@ -619,6 +618,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
             payload = freshness_from_payload(payload)
         except Ob1000DisabledError:
             return _error(503, "disabled", "on-demand OB1000 disabled")
+        except IncompatibleFullCollectorError:
+            return _error(503, "collector_not_full_capable", "running collector has no FULL book")
+        except FullCollectorStartError as exc:
+            return _error(503, "collector_start_failed", str(exc))
         except Ob1000CollectorUnavailableError:
             return _error(503, "collector_unavailable", "collector socket unavailable")
         except Ob1000CapacityError:
