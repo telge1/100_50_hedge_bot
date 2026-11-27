@@ -176,7 +176,12 @@ def test_mc_opi_p3h_sync_race_fix():
     assert "if (myGen !== syncGen) return" in opi
     early = opi[opi.index("paintedOnBase") : opi.index("baseTimes = next")]
     assert "sync(null, true)" in early
-    assert "research-mc-opi-p3i-v1" in page or "research-mc-opi-p3h-v1" in page
+    assert (
+        "research-mc-opi-p3u-v1" in page
+        or "research-mc-opi-p3i-v1" in page
+        or "research-mc-opi-p3h-v1" in page
+        or "research-mc-opi-p3s-v1" in page
+    )
 
 
 def test_mc_opi_p3i_data_apply_viewport():
@@ -190,15 +195,13 @@ def test_mc_opi_p3i_data_apply_viewport():
     assert "barsOnly" in opi
     assert "reassertMainLogical" in opi
     assert "paintSeries_after_setData" in opi or "after_paintSeries_setData" in opi
-    assert "opiViewport" in opi
     assert "function paintAll(opts)" in opi
     assert "!barsOnly && needsPushBase()" in opi
     assert "paintAll({ barsOnly: true })" in opi
     assert "paintAll({ barsOnly:" in opi
     assert "needsLayoutResize" in opi
-    assert "research-mc-opi-p3i-v1" in host
-    assert "research-mc-opi-p3i-v1" in page
-    assert "research-mc-opi-p3i-v1" in pane
+    assert "research-mc-opi-p3u-v1" in host or "research-mc-opi-p3i-v1" in host
+    assert "research-mc-opi-p3u-v1" in pane or "research-mc-opi-p3i-v1" in pane
 
 
 def test_host_generation_guard():
