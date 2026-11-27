@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Body, Depends, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from .boundary import (
     INDICATOR_CONTRACTS,
@@ -159,6 +159,10 @@ def build_router(*, require_auth: Callable, render_template: Callable) -> APIRou
                 },
             )
         )
+
+    @router.get("/live-charts/research-multi")
+    async def research_multi_charts_page(user: dict = Depends(require_auth)):
+        return RedirectResponse(url="/live-charts/research?view=multi", status_code=307)
 
     @router.get("/api/research/symbols")
     async def api_research_symbols(user: dict = Depends(require_auth)):
