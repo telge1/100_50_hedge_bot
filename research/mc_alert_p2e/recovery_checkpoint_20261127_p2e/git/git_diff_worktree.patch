@@ -1,0 +1,1785 @@
+diff --git a/config/live_universe.json b/config/live_universe.json
+index 3bb433c..15f039a 100644
+--- a/config/live_universe.json
++++ b/config/live_universe.json
+@@ -7,6 +7,7 @@
+   "symbols": [
+     "APTUSDT",
+     "DOGEUSDT",
++    "BNBUSDT",
+     "SOLUSDT",
+     "XRPUSDT",
+     "AVAXUSDT",
+diff --git a/deploy/systemd/bybit-live-1m-collector.service b/deploy/systemd/bybit-live-1m-collector.service
+index fe14eae..857f520 100644
+--- a/deploy/systemd/bybit-live-1m-collector.service
++++ b/deploy/systemd/bybit-live-1m-collector.service
+@@ -1,26 +1,36 @@
+ [Unit]
+-Description=Bybit Live 1m Collector + Shadow Signals (signal_generator)
++Description=Bybit Live 1m candles + public trades collector (signal_generator)
+ After=network-online.target
+ Wants=network-online.target
++StartLimitIntervalSec=120
++StartLimitBurst=30
+ 
+ [Service]
+ Type=simple
+ WorkingDirectory=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves
+ EnvironmentFile=-/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.env
+-# Supervisor lives inside run_live_collector_service.py:
+-# - desired_state=RUNNING → restart collector after crash
+-# - desired_state=STOPPED → stay idle (no immediate collector restart)
+-# Process-level Restart=on-failure only recovers the supervisor itself.
++Environment=PYTHONUNBUFFERED=1
++# Supervisor inside run_live_collector_service.py:
++# - desired_state=RUNNING → restart inner collector after crash
++# - desired_state=STOPPED → stay idle (process kept alive for systemd Restart=always)
++# Process-level Restart=always recovers the whole supervisor after OOM/kill/exit.
+ ExecStart=/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/.venv/bin/python \
+   scripts/run_live_collector_service.py \
+   --live-universe config/live_universe.json \
++  --candle-universe /home/telgenbuescher/projects/orderbook_analyse/config/universe_tradeable_51.json \
+   --api-host 127.0.0.1 \
+   --api-port 8787 \
+-  --default-desired RUNNING
+-Restart=on-failure
+-RestartSec=5
++  --default-desired RUNNING \
++  --enable-public-trades \
++  --public-trade-queue-maxsize 100000 \
++  --public-trade-batch-size 2000 \
++  --public-trade-spool-dir results/live_collector/public_trade_spool
++Restart=always
++RestartSec=2
+ KillSignal=SIGTERM
+-TimeoutStopSec=60
++TimeoutStopSec=90
++StandardOutput=append:/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/logs/bybit_live_1m_collector.systemd.log
++StandardError=append:/home/telgenbuescher/projects/Signal_Generator_Ralf/signal_generator_stoch_waves/logs/bybit_live_1m_collector.systemd.log
+ 
+ [Install]
+-WantedBy=multi-user.target
++WantedBy=default.target
+diff --git a/scripts/run_live_collector_service.py b/scripts/run_live_collector_service.py
+index 628e7b5..471926e 100644
+--- a/scripts/run_live_collector_service.py
++++ b/scripts/run_live_collector_service.py
+@@ -109,8 +109,14 @@ def build_parser() -> argparse.ArgumentParser:
+             "insert into orderbook_analysis.public_trades_canonical. Default off."
+         ),
+     )
+-    p.add_argument("--public-trade-queue-maxsize", type=int, default=5000)
+-    p.add_argument("--public-trade-batch-size", type=int, default=500)
++    p.add_argument("--public-trade-queue-maxsize", type=int, default=100_000)
++    p.add_argument("--public-trade-batch-size", type=int, default=2_000)
++    p.add_argument(
++        "--public-trade-spool-dir",
++        type=str,
++        default="results/live_collector/public_trade_spool",
++        help="Durable overflow WAL for public trades when the in-memory queue saturates.",
++    )
+     p.add_argument(
+         "--lock-file",
+         type=Path,
+@@ -266,6 +272,10 @@ async def run_supervised(args: argparse.Namespace) -> int:
+                 service.health = idle_health
+                 idle_health.desired_state = ds
+                 idle_health.set_state(CollectorState.STOPPED, reason="desired_STOPPED")
++                # Idle-wait (do not exit): systemd Restart=always would otherwise
++                # restart-loop on intentional STOPPED. SIGTERM still sets stop_main
++                # via handlers registered above / re-armed after collector start.
++                logger.info("desired_state=%s → idle wait", ds)
+                 try:
+                     await asyncio.wait_for(stop_main.wait(), timeout=2.0)
+                     break
+@@ -308,11 +318,22 @@ async def run_supervised(args: argparse.Namespace) -> int:
+                 signal_shutdown_drain_s=args.signal_shutdown_drain_s,
+                 public_trade_queue_maxsize=args.public_trade_queue_maxsize,
+                 public_trade_batch_size=args.public_trade_batch_size,
++                public_trade_spool_dir=args.public_trade_spool_dir,
+                 **symbol_kwargs,
+             )
+             collector.health.invalid_symbols = invalid_meta
+             service.health = collector.health
+             install_signal_handlers(collector, loop)
++            # Re-arm supervisor SIGTERM/SIGINT so process can exit (collector
++            # handlers alone only stop the inner run loop).
++            for sig_name in ("SIGINT", "SIGTERM"):
++                sig = getattr(signal_mod, sig_name, None)
++                if sig is None:
++                    continue
++                try:
++                    loop.add_signal_handler(sig, _sig)
++                except NotImplementedError:
++                    pass
+             logger.info(
+                 "collector start candle_symbols=%s signal_symbols=%s "
+                 "public_trade_symbols=%s db=%s desired=%s",
+diff --git a/scripts/run_public_trades_7d_backfill.py b/scripts/run_public_trades_7d_backfill.py
+index 0fb71e2..186b9ea 100644
+--- a/scripts/run_public_trades_7d_backfill.py
++++ b/scripts/run_public_trades_7d_backfill.py
+@@ -1,13 +1,14 @@
+ #!/usr/bin/env python3
+-"""51-coin × 7 UTC-day Bybit public-trade backfill (no collector restart).
++"""Bybit public-trade archive backfill (no collector restart).
+ 
+-Examples:
+-  python scripts/run_public_trades_7d_backfill.py --mode preflight
+-  python scripts/run_public_trades_7d_backfill.py --mode check-sources
+-  python scripts/run_public_trades_7d_backfill.py --mode storage-gate
++Legacy 7-day (unchanged defaults when dates are omitted):
+   python scripts/run_public_trades_7d_backfill.py --mode backfill
+-  python scripts/run_public_trades_7d_backfill.py --mode audit
+-  python scripts/run_public_trades_7d_backfill.py --mode candle-reconcile
++
++Parameterized window:
++  python scripts/run_public_trades_7d_backfill.py --mode backfill \\
++    --start-date 2026-07-19 --end-date-exclusive 2026-08-18 \\
++    --universe-file config/universe_tradeable_51.json --workers 1 \\
++    --run-dir results/public_trades_backfill_30d/<run_id>
+ """
+ 
+ from __future__ import annotations
+@@ -16,6 +17,7 @@ import argparse
+ import csv
+ import json
+ import logging
++import os
+ import sys
+ import time
+ from datetime import date, datetime, timezone
+@@ -25,7 +27,6 @@ from typing import Any
+ ROOT = Path(__file__).resolve().parents[1]
+ sys.path.insert(0, str(ROOT / "src"))
+ 
+-from signal_generator.bybit.live.candle_universe import load_candle_universe  # noqa: E402
+ from signal_generator.bybit.public_trades.audit import (  # noqa: E402
+     VOLUME_REL_TOL,
+     reconcile_symbol_day,
+@@ -39,6 +40,7 @@ from signal_generator.bybit.public_trades.backfill_runner import (  # noqa: E402
+     BackfillRunner,
+     check_sources,
+     project_7d_storage,
++    seed_full_canonical_days,
+     seed_pilot_audited,
+ )
+ from signal_generator.bybit.public_trades.downloader import (  # noqa: E402
+@@ -50,6 +52,12 @@ from signal_generator.bybit.public_trades.downloader import (  # noqa: E402
+ )
+ from signal_generator.bybit.public_trades.manifest import write_json  # noqa: E402
+ from signal_generator.bybit.public_trades.urls import daily_url, utc_day_bounds  # noqa: E402
++from signal_generator.bybit.public_trades.window import (  # noqa: E402
++    BackfillCliError,
++    BackfillPlan,
++    load_universe_symbols,
++    resolve_backfill_plan,
++)
+ from signal_generator.config import get_clickhouse_settings  # noqa: E402
+ from signal_generator.db.client import ClickHouseClient  # noqa: E402
+ from signal_generator.db.public_trades import CanonicalPublicTradeRepository  # noqa: E402
+@@ -74,7 +82,6 @@ PILOT_PAIRS = [
+     ("LITUSDT", "2026-08-15"),
+     ("LITUSDT", "2026-08-16"),
+ ]
+-COLLECTOR_PID = 1738842
+ 
+ 
+ def _iso(ts: datetime | None) -> str:
+@@ -85,45 +92,40 @@ def _iso(ts: datetime | None) -> str:
+     return ts.astimezone(timezone.utc).isoformat()
+ 
+ 
+-def load_universe() -> list[str]:
+-    symbols = load_candle_universe(UNIVERSE_PATH)
+-    if len(symbols) != 51:
+-        raise SystemExit(f"PUBLIC_TRADES_7D_BACKFILL_BLOCKED: universe size {len(symbols)} != 51")
++def load_universe(path: Path | None = None) -> list[str]:
++    symbols = load_universe_symbols(path or UNIVERSE_PATH)
+     if "XAUUSDT" in symbols:
+-        raise SystemExit("PUBLIC_TRADES_7D_BACKFILL_BLOCKED: XAUUSDT in universe")
++        raise SystemExit("PUBLIC_TRADES_BACKFILL_BLOCKED: XAUUSDT in universe")
+     return symbols
+ 
+ 
+-def expected_jobs(symbols: list[str]) -> list[tuple[str, str]]:
+-    days = [d.isoformat() for d in BACKFILL_DAYS]
+-    jobs = iter_backfill_jobs(symbols, days)
+-    if len(jobs) != EXPECTED_FILES:
+-        raise SystemExit(
+-            f"PUBLIC_TRADES_7D_BACKFILL_BLOCKED: expected {EXPECTED_FILES} files, got {len(jobs)}"
+-        )
+-    return jobs
++def expected_jobs(symbols: list[str], days: list[date]) -> list[tuple[str, str]]:
++    return iter_backfill_jobs(symbols, [d.isoformat() for d in days])
+ 
+ 
+ def collector_snapshot() -> dict[str, Any]:
+     import json as json_lib
+     import urllib.request
+ 
+-    pid_path = Path(f"/proc/{COLLECTOR_PID}")
+-    alive = pid_path.exists()
+-    cmd = ""
+-    start = ""
+-    if alive:
+-        cmd = Path(f"/proc/{COLLECTOR_PID}/cmdline").read_bytes().replace(b"\0", b" ").decode()
+-        try:
+-            start = Path(f"/proc/{COLLECTOR_PID}/stat").read_text().split()[21]
+-        except OSError:
+-            start = ""
+-    status: dict[str, Any] = {
+-        "pid": COLLECTOR_PID,
+-        "alive": alive,
+-        "cmd": cmd.strip(),
+-        "start_ticks": start,
+-    }
++    status: dict[str, Any] = {"pids": [], "alive": False}
++    try:
++        import subprocess
++
++        proc = subprocess.run(
++            ["pgrep", "-af", "run_live_collector"],
++            capture_output=True,
++            text=True,
++            check=False,
++        )
++        lines = [
++            ln
++            for ln in proc.stdout.splitlines()
++            if "run_live_collector" in ln and "pgrep" not in ln
++        ]
++        status["pgrep"] = lines
++        status["alive"] = bool(lines)
++    except Exception as exc:  # noqa: BLE001
++        status["pgrep_error"] = str(exc)[:200]
+     try:
+         with urllib.request.urlopen(
+             "http://127.0.0.1:8787/api/collector/status", timeout=5
+@@ -182,18 +184,91 @@ def archive_unique_count(client: ClickHouseClient) -> int:
+     return int(q.result_rows[0][0])
+ 
+ 
+-def ensure_manifest(results: Path, symbols: list[str]) -> BackfillManifestStore:
++def query_coverage(
++    client: ClickHouseClient,
++    *,
++    symbols: list[str],
++    start: datetime,
++    end: datetime,
++) -> list[dict[str, Any]]:
++    q = client.query(
++        """
++        SELECT
++          symbol,
++          toString(toDate(trade_ts, 'UTC')) AS utc_day,
++          uniqExact(trade_id) AS logical_unique,
++          min(trade_ts) AS min_ts,
++          max(trade_ts) AS max_ts,
++          groupUniqArray(source) AS sources
++        FROM orderbook_analysis.public_trades_canonical
++        WHERE trade_ts >= {start:DateTime64(3, 'UTC')}
++          AND trade_ts < {end:DateTime64(3, 'UTC')}
++          AND symbol IN {symbols:Array(String)}
++        GROUP BY symbol, utc_day
++        ORDER BY symbol, utc_day
++        """,
++        parameters={"start": start, "end": end, "symbols": symbols},
++    )
++    out: list[dict[str, Any]] = []
++    for row in q.result_rows:
++        out.append(
++            {
++                "symbol": str(row[0]),
++                "utc_day": str(row[1]),
++                "logical_unique": int(row[2]),
++                "min_ts": row[3],
++                "max_ts": row[4],
++                "sources": list(row[5] or []),
++            }
++        )
++    return out
++
++
++def ensure_manifest(
++    results: Path,
++    symbols: list[str],
++    days: list[date],
++    *,
++    expected_files: int,
++) -> BackfillManifestStore:
+     store = BackfillManifestStore(results / "backfill_manifest.csv")
+-    for symbol, utc_date in expected_jobs(symbols):
++    for symbol, utc_date in expected_jobs(symbols, days):
+         store.ensure(symbol, utc_date, daily_url(symbol, date.fromisoformat(utc_date)))
+-    if len(store.rows) != EXPECTED_FILES:
++    present = {(r.symbol, r.utc_date) for r in store.as_rows()}
++    missing = [
++        (s, d.isoformat())
++        for s in symbols
++        for d in days
++        if (s, d.isoformat()) not in present
++    ]
++    if missing:
+         raise SystemExit(
+-            f"PUBLIC_TRADES_7D_BACKFILL_BLOCKED: manifest size {len(store.rows)} != {EXPECTED_FILES}"
++            "PUBLIC_TRADES_BACKFILL_BLOCKED: "
++            f"manifest missing {len(missing)} requested jobs"
+         )
+     store.save()
+     return store
+ 
+ 
++def acquire_run_lock(path: Path) -> Any:
++    import fcntl
++
++    path.parent.mkdir(parents=True, exist_ok=True)
++    fd = open(path, "a+", encoding="utf-8")
++    try:
++        fcntl.flock(fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
++    except BlockingIOError as exc:
++        fd.close()
++        raise SystemExit(
++            f"PUBLIC_TRADES_BACKFILL_BLOCKED: another backfill holds {path}"
++        ) from exc
++    fd.seek(0)
++    fd.truncate()
++    fd.write(f"pid={os.getpid()}\nstarted={_iso(datetime.now(timezone.utc))}\n")
++    fd.flush()
++    return fd
++
++
+ def run_preflight(results: Path, client: ClickHouseClient) -> dict[str, Any]:
+     import shutil
+     import subprocess
+@@ -220,6 +295,7 @@ def run_preflight(results: Path, client: ClickHouseClient) -> dict[str, Any]:
+         "branch": git_branch,
+         "head": git_head,
+         "git_status_short": git_status.strip().splitlines(),
++        "python": sys.executable,
+         "collector": collector_snapshot(),
+         "disk_free_bytes": disk.free,
+         "disk_total_bytes": disk.total,
+@@ -232,7 +308,13 @@ def run_preflight(results: Path, client: ClickHouseClient) -> dict[str, Any]:
+     return out
+ 
+ 
+-def run_check_sources(results: Path, manifest: BackfillManifestStore) -> dict[str, Any]:
++def run_check_sources(
++    results: Path,
++    manifest: BackfillManifestStore,
++    *,
++    expected_files: int,
++    strict: bool,
++) -> dict[str, Any]:
+     result = check_sources(manifest, transport=HttpxTransport(), sleep_s=0.03)
+     write_csv(results / "source_availability.csv", result.rows)
+     write_json(
+@@ -244,10 +326,10 @@ def run_check_sources(results: Path, manifest: BackfillManifestStore) -> dict[st
+             "total_content_length": result.total_content_length,
+         },
+     )
+-    if result.ok != EXPECTED_FILES or result.missing:
++    if strict and (result.ok != expected_files or result.missing):
+         raise SystemExit(
+             "PUBLIC_TRADES_7D_BACKFILL_BLOCKED: "
+-            f"ok={result.ok} missing={result.missing} expected={EXPECTED_FILES}"
++            f"ok={result.ok} missing={result.missing} expected={expected_files}"
+         )
+     return {
+         "ok": result.ok,
+@@ -277,7 +359,12 @@ def run_backfill(
+     manifest: BackfillManifestStore,
+     repo: CanonicalPublicTradeRepository,
+     *,
++    expected_files: int,
+     max_files: int | None = None,
++    seed_pilot: bool = False,
++    coverage_rows: list[dict[str, Any]] | None = None,
++    max_consecutive_errors: int = 5,
++    job_keys: set[tuple[str, str]] | None = None,
+ ) -> dict[str, Any]:
+     runner = BackfillRunner(
+         cache_dir=results / "cache",
+@@ -287,8 +374,17 @@ def run_backfill(
+         batch_size=3000,
+         pause_ms=50,
+     )
+-    seed_pilot_audited(manifest, repo, pilot_pairs=PILOT_PAIRS)
+-    rows = [r for r in manifest.as_rows() if r.status != "AUDITED"]
++    if seed_pilot:
++        seed_pilot_audited(manifest, repo, pilot_pairs=PILOT_PAIRS)
++    if coverage_rows:
++        seed_full_canonical_days(manifest, coverage_rows)
++    skip_status = {"AUDITED", "ARCHIVE_UNAVAILABLE"}
++    rows = [
++        r
++        for r in manifest.as_rows()
++        if r.status not in skip_status
++        and (job_keys is None or (r.symbol, r.utc_date) in job_keys)
++    ]
+     if max_files is not None:
+         rows = rows[:max_files]
+     t0 = time.perf_counter()
+@@ -296,24 +392,33 @@ def run_backfill(
+     errors: list[dict[str, str]] = []
+     imported_trades = 0
+     skipped = 0
+-    total = EXPECTED_FILES
++    consecutive_errors = 0
++    total = expected_files
+     already = sum(1 for r in manifest.as_rows() if r.status == "AUDITED")
+     for i, row in enumerate(rows, start=1):
+         assert_disk_free(results)
+         started = time.perf_counter()
+         try:
+             row = runner.process_file(row)
+-            runner.audit_file(
+-                row,
+-                cache_path=results / "cache" / f"{row.symbol}{row.utc_date}.csv.gz",
+-            )
+-            imported_trades += row.inserted_rows
+-            skipped += row.skipped_existing_rows
+-            completed += 1
++            if row.status == "ARCHIVE_UNAVAILABLE":
++                consecutive_errors = 0
++            elif row.status != "AUDITED":
++                runner.audit_file(
++                    row,
++                    cache_path=results / "cache" / f"{row.symbol}{row.utc_date}.csv.gz",
++                )
++                imported_trades += row.inserted_rows
++                skipped += row.skipped_existing_rows
++                completed += 1
++                consecutive_errors = 0
++            else:
++                completed += 1
++                consecutive_errors = 0
+         except (PublicTradeDownloadError, Exception) as exc:  # noqa: BLE001
+             logger.exception("file failed %s %s", row.symbol, row.utc_date)
++            consecutive_errors += 1
+             try:
+-                if row.status not in {"FAILED", "MISSING", "AUDITED"}:
++                if row.status not in {"FAILED", "MISSING", "AUDITED", "ARCHIVE_UNAVAILABLE"}:
+                     manifest.set_status(row, "FAILED", error=str(exc)[:400])
+             except Exception:  # noqa: BLE001
+                 pass
+@@ -322,6 +427,11 @@ def run_backfill(
+             )
+             if "DISK_HARD_STOP" in str(exc) or "empty trdMatchID" in str(exc):
+                 raise
++            if consecutive_errors >= max_consecutive_errors:
++                raise SystemExit(
++                    "PUBLIC_TRADES_BACKFILL_BLOCKED: "
++                    f"{consecutive_errors} consecutive file failures"
++                )
+         elapsed = time.perf_counter() - t0
+         done = already + completed
+         remaining_files = max(0, total - done)
+@@ -365,17 +475,23 @@ def run_global_audit(
+     manifest: BackfillManifestStore,
+     repo: CanonicalPublicTradeRepository,
+     client: ClickHouseClient,
++    *,
++    days: list[date],
++    expected_files: int,
++    strict: bool,
+ ) -> dict[str, Any]:
+     summary = manifest.summary()
+-    failed = summary.get("FAILED", 0) + summary.get("MISSING", 0)
++    failed = summary.get("FAILED", 0)
++    missing = summary.get("MISSING", 0)
++    unavailable = summary.get("ARCHIVE_UNAVAILABLE", 0)
+     audited = summary.get("AUDITED", 0)
+-    if audited != EXPECTED_FILES or failed:
++    if strict and (audited != expected_files or failed or missing):
+         raise SystemExit(
+             "PUBLIC_TRADES_7D_BACKFILL_BLOCKED_AUDIT: "
+-            f"AUDITED={audited} FAILED/MISSING={failed} expected={EXPECTED_FILES}"
++            f"AUDITED={audited} FAILED={failed} MISSING={missing} expected={expected_files}"
+         )
+-    start, _ = utc_day_bounds(BACKFILL_DAYS[0])
+-    _, end = utc_day_bounds(BACKFILL_DAYS[-1])
++    start, _ = utc_day_bounds(days[0])
++    _, end = utc_day_bounds(days[-1])
+     counts = repo.physical_and_logical_counts(start=start, end=end)
+     by_day = repo.count_by_symbol_day(start=start, end=end)
+     coverage_rows = [
+@@ -383,20 +499,27 @@ def run_global_audit(
+     ]
+     write_csv(results / "coverage_by_symbol_day.csv", coverage_rows)
+     symbols = sorted({r.symbol for r in manifest.as_rows()})
+-    days = {d.isoformat() for d in BACKFILL_DAYS}
++    day_set = {d.isoformat() for d in days}
+     by_sym_days: dict[str, set[str]] = {}
+     for s, d, _n in by_day:
+         by_sym_days.setdefault(s, set()).add(d)
+     missing_cov = []
++    unavailable_keys = {
++        (r.symbol, r.utc_date)
++        for r in manifest.as_rows()
++        if r.status == "ARCHIVE_UNAVAILABLE"
++    }
+     for s in symbols:
+         have = by_sym_days.get(s, set())
+-        for d in sorted(days):
+-            if d not in have:
++        for d in sorted(day_set):
++            if d not in have and (s, d) not in unavailable_keys:
+                 missing_cov.append({"symbol": s, "utc_date": d})
+     archive_n = archive_unique_count(client)
+     physical_dups = counts["physical_rows"] - counts["logical_unique_rows"]
+     audit = {
+         "audited_files": audited,
++        "archive_unavailable": unavailable,
++        "failed": failed,
+         "symbols": len(symbols),
+         "missing_symbol_days": missing_cov,
+         "logical_unique_rows": counts["logical_unique_rows"],
+@@ -408,29 +531,33 @@ def run_global_audit(
+         "archive_unique_expected": 4_251_001,
+         "archive_unchanged": archive_n == 4_251_001,
+         "collector": collector_snapshot(),
++        "strict": strict,
+     }
+     write_csv(
+         results / "dedup_audit.csv",
+         [{"metric": k, "value": v} for k, v in audit.items() if k != "missing_symbol_days"],
+     )
+     write_json(results / "global_audit.json", audit)
+-    if missing_cov:
++    if missing_cov and strict:
+         raise SystemExit(
+             f"PUBLIC_TRADES_7D_BACKFILL_BLOCKED_AUDIT: missing {len(missing_cov)} symbol-days"
+         )
+     if archive_n != 4_251_001:
+         raise SystemExit(
+-            f"PUBLIC_TRADES_7D_BACKFILL_BLOCKED_AUDIT: archive unique {archive_n} != 4251001"
++            f"PUBLIC_TRADES_BACKFILL_BLOCKED_AUDIT: archive unique {archive_n} != 4251001"
+         )
+     return audit
+ 
+ 
+ def run_candle_reconcile(
+-    results: Path, client: ClickHouseClient, symbols: list[str]
++    results: Path,
++    client: ClickHouseClient,
++    symbols: list[str],
++    days: list[date],
+ ) -> dict[str, Any]:
+     rows: list[dict[str, Any]] = []
+     for symbol in symbols:
+-        for day in BACKFILL_DAYS:
++        for day in days:
+             logger.info("reconcile %s %s", symbol, day.isoformat())
+             rows.extend(reconcile_symbol_day(client, symbol=symbol, day=day))
+     write_csv(results / "candle_reconciliation.csv", rows)
+@@ -493,53 +620,147 @@ def build_parser() -> argparse.ArgumentParser:
+             "all",
+         ),
+     )
+-    p.add_argument("--results-dir", type=Path, default=DEFAULT_RESULTS)
++    p.add_argument("--results-dir", type=Path, default=None)
++    p.add_argument("--run-dir", type=Path, default=None, help="Alias for --results-dir")
+     p.add_argument("--max-files", type=int, default=None)
++    p.add_argument("--start-date", default=None, help="Inclusive UTC date YYYY-MM-DD")
++    p.add_argument(
++        "--end-date-exclusive",
++        default=None,
++        help="Exclusive UTC date YYYY-MM-DD",
++    )
++    p.add_argument("--symbols", default=None, help="Comma-separated subset of the universe")
++    p.add_argument(
++        "--universe-file",
++        type=Path,
++        default=UNIVERSE_PATH,
++        help="Gold-51 JSON (default: config/universe_tradeable_51.json)",
++    )
++    p.add_argument(
++        "--workers",
++        type=int,
++        default=1,
++        help="Must be 1 (fail-closed otherwise)",
++    )
++    p.add_argument(
++        "--resume",
++        action="store_true",
++        help="Skip AUDITED files (default backfill behavior); still takes the run lock",
++    )
++    p.add_argument(
++        "--smoke",
++        action="store_true",
++        help="BTCUSDT 2026-07-19 only",
++    )
+     return p
+ 
+ 
++def _plan_from_args(args: argparse.Namespace) -> BackfillPlan:
++    try:
++        return resolve_backfill_plan(
++            start_date=args.start_date,
++            end_date_exclusive=args.end_date_exclusive,
++            symbols_csv=args.symbols,
++            universe_file=args.universe_file,
++            smoke=bool(args.smoke),
++        )
++    except BackfillCliError as exc:
++        raise SystemExit(f"PUBLIC_TRADES_BACKFILL_BLOCKED: {exc}") from exc
++
++
+ def main(argv: list[str] | None = None) -> int:
+     args = build_parser().parse_args(argv)
+     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+-    results: Path = args.results_dir
++    if int(args.workers) != 1:
++        raise SystemExit("PUBLIC_TRADES_BACKFILL_BLOCKED: --workers must be 1")
++    plan = _plan_from_args(args)
++    results: Path = args.run_dir or args.results_dir or DEFAULT_RESULTS
++    results = results.resolve()
+     results.mkdir(parents=True, exist_ok=True)
+-    symbols = load_universe()
++    lock_fd = acquire_run_lock(results / "backfill.lock")
++    symbols = list(plan.symbols)
++    days = list(plan.days)
+     settings = get_clickhouse_settings()
+     client = ClickHouseClient.from_settings(settings)
+     repo = CanonicalPublicTradeRepository(client)
+     repo.ensure_table()
+-    manifest = ensure_manifest(results, symbols)
++    manifest = ensure_manifest(
++        results, symbols, days, expected_files=plan.expected_files
++    )
++    win_start, _ = utc_day_bounds(days[0])
++    _, win_end = utc_day_bounds(days[-1])
++    coverage_rows = query_coverage(
++        client, symbols=symbols, start=win_start, end=win_end
++    )
+     summary: dict[str, Any] = {
+         "mode": args.mode,
+         "started_at": _iso(datetime.now(timezone.utc)),
+-        "symbols": len(symbols),
+-        "expected_files": EXPECTED_FILES,
+-        "days": [d.isoformat() for d in BACKFILL_DAYS],
++        "symbols": list(symbols),
++        "symbol_count": len(symbols),
++        "expected_files": plan.expected_files,
++        "days": [d.isoformat() for d in days],
++        "start_date": plan.start.isoformat(),
++        "end_date_exclusive": plan.end_exclusive.isoformat(),
++        "legacy_7d": plan.legacy_7d,
++        "smoke": plan.smoke,
++        "resume": bool(args.resume),
++        "workers": 1,
++        "universe_file": str(plan.universe_file),
++        "run_dir": str(results),
+     }
+     try:
+         if args.mode in {"preflight", "all"}:
+             summary["preflight"] = run_preflight(results, client)
+         if args.mode in {"check-sources", "all"}:
+-            summary["sources"] = run_check_sources(results, manifest)
++            summary["sources"] = run_check_sources(
++                results,
++                manifest,
++                expected_files=plan.expected_files,
++                strict=plan.strict_sources,
++            )
+         if args.mode in {"storage-gate", "all"}:
+             free = disk_free_bytes(results)
+             summary["storage"] = run_storage_gate(results, manifest, free_bytes=free)
+         if args.mode in {"backfill", "all"}:
+             summary["backfill"] = run_backfill(
+-                results, manifest, repo, max_files=args.max_files
++                results,
++                manifest,
++                repo,
++                expected_files=plan.expected_files,
++                max_files=args.max_files,
++                seed_pilot=plan.legacy_7d,
++                coverage_rows=coverage_rows if not plan.legacy_7d else None,
++                job_keys={(s, d.isoformat()) for s in symbols for d in days},
+             )
+         if args.mode in {"audit", "all"}:
+-            summary["audit"] = run_global_audit(results, manifest, repo, client)
++            summary["audit"] = run_global_audit(
++                results,
++                manifest,
++                repo,
++                client,
++                days=days,
++                expected_files=plan.expected_files,
++                strict=plan.strict_sources,
++            )
+         if args.mode in {"candle-reconcile", "all"}:
+-            summary["candle"] = run_candle_reconcile(results, client, symbols)
++            summary["candle"] = run_candle_reconcile(results, client, symbols, days)
+         summary["collector_after"] = collector_snapshot()
+         summary["manifest_summary"] = manifest.summary()
+         summary["finished_at"] = _iso(datetime.now(timezone.utc))
+         write_json(results / f"run_{args.mode.replace('-', '_')}.json", summary)
+-        print(json.dumps({"mode": args.mode, "ok": True, "manifest": manifest.summary()}, default=str))
++        print(
++            json.dumps(
++                {"mode": args.mode, "ok": True, "manifest": manifest.summary()},
++                default=str,
++            )
++        )
+         return 0
+     finally:
+         client.close()
++        try:
++            lock_fd.close()
++        except Exception:  # noqa: BLE001
++            pass
+ 
+ 
+ if __name__ == "__main__":
+diff --git a/src/signal_generator/bybit/backfill.py b/src/signal_generator/bybit/backfill.py
+index e9967d2..46e813e 100644
+--- a/src/signal_generator/bybit/backfill.py
++++ b/src/signal_generator/bybit/backfill.py
+@@ -161,20 +161,7 @@ def write_artifacts(run: BackfillRunResult, out_dir: Path) -> None:
+ 
+     quality_path = out_dir / "quality_by_symbol.csv"
+     with quality_path.open("w", newline="", encoding="utf-8") as f:
+-        fields = [
+-            "symbol",
+-            "expected",
+-            "unique_final",
+-            "physical_rows",
+-            "min_open_time",
+-            "max_open_time",
+-            "duplicate_logical_keys",
+-            "gap_count",
+-            "largest_gap_seconds",
+-            "ohlc_error_count",
+-            "close_time_errors",
+-            "crosscheck_pass",
+-        ]
++        fields = list(run.quality[0].to_quality_row().keys()) if run.quality else ["symbol"]
+         writer = csv.DictWriter(f, fieldnames=fields)
+         writer.writeheader()
+         for q in run.quality:
+diff --git a/src/signal_generator/bybit/live/collector.py b/src/signal_generator/bybit/live/collector.py
+index 087a78f..021dc0b 100644
+--- a/src/signal_generator/bybit/live/collector.py
++++ b/src/signal_generator/bybit/live/collector.py
+@@ -94,8 +94,9 @@ class Live1mCollector:
+         signal_symbols: Sequence[str] | None = None,
+         enable_public_trades: bool = False,
+         public_trade_symbols: Sequence[str] | None = None,
+-        public_trade_queue_maxsize: int = 5000,
+-        public_trade_batch_size: int = 500,
++        public_trade_queue_maxsize: int = 100_000,
++        public_trade_batch_size: int = 2_000,
++        public_trade_spool_dir: str | Path | None = None,
+     ) -> None:
+         assert_shadow_only()
+         if candle_symbols is None:
+@@ -184,7 +185,15 @@ class Live1mCollector:
+             self.public_trade_symbols = pt_syms
+         self._public_trade_queue_maxsize = public_trade_queue_maxsize
+         self._public_trade_batch_size = public_trade_batch_size
++        self._public_trade_spool_dir = (
++            Path(public_trade_spool_dir)
++            if public_trade_spool_dir
++            else Path("results/live_collector/public_trade_spool")
++        )
+         self._trade_buffer = None
++        # Dedicated CH session for public-trade inserts (never share with candle/
++        # recovery paths — clickhouse-connect forbids concurrent session use).
++        self._ch_public: ClickHouseClient | None = None
+         self.health.public_trades_enabled = self.enable_public_trades
+         self.health.public_trade_symbols = list(self.public_trade_symbols)
+ 
+@@ -295,8 +304,21 @@ class Live1mCollector:
+         if buf is None:
+             return
+         try:
++            if buf.metrics.writer_fatal:
++                self.health.set_state(
++                    CollectorState.ERROR, reason="public_trade_writer_fatal"
++                )
++                self.health.public_trade_last_error = buf.metrics.last_error
++                self._stop.set()
++                return
+             buf.enqueue(trade)
+             self.health.apply_public_trade_metrics(buf.metrics.to_dict())
++            if buf.metrics.writer_fatal:
++                self.health.set_state(
++                    CollectorState.ERROR, reason="public_trade_fail_closed"
++                )
++                self.health.public_trade_last_error = buf.metrics.last_error
++                self._stop.set()
+         except Exception as exc:  # noqa: BLE001
+             logger.exception("public trade enqueue failed: %s", exc)
+             self.health.public_trade_last_error = str(exc)[:300]
+@@ -307,14 +329,24 @@ class Live1mCollector:
+         if self._trade_buffer is None:
+             from signal_generator.bybit.live.trade_buffer import PublicTradeInsertBuffer
+ 
+-            repo = CanonicalPublicTradeRepository(self.ch)
++            if self._ch_public is None:
++                self._ch_public = ClickHouseClient.from_settings(self._ch_settings)
++            repo = CanonicalPublicTradeRepository(self._ch_public)
+             self._trade_buffer = PublicTradeInsertBuffer(
+                 repo,
+                 queue_maxsize=self._public_trade_queue_maxsize,
+                 batch_size=self._public_trade_batch_size,
++                spool_dir=self._public_trade_spool_dir,
+             )
+         return self._trade_buffer
+ 
++    async def _stop_trade_buffer(self) -> None:
++        """Stop public insert worker; keep buffer instance for reconnect start()."""
++        if self._trade_buffer is None:
++            return
++        await self._trade_buffer.stop()
++        self.health.apply_public_trade_metrics(self._trade_buffer.metrics.to_dict())
++
+     def _assert_public_trade_subscription_set(self) -> None:
+         """Guard immediately before WS subscribe; do not derive from candles."""
+         if not self.enable_public_trades:
+@@ -596,6 +628,8 @@ class Live1mCollector:
+                     await stale_task
+                 except asyncio.CancelledError:
+                     pass
++                # Stop public inserts before recovery/reconnect reuses CPU/CH.
++                await self._stop_trade_buffer()
+                 self._ws = None
+ 
+             if self._stop.is_set():
+@@ -624,9 +658,13 @@ class Live1mCollector:
+             sh.state = SymbolRuntimeState.STOPPED
+         await self._stop_signal_pool()
+         await asyncio.to_thread(self.buffer.flush)
+-        if self._trade_buffer is not None:
+-            await self._trade_buffer.stop()
+-            self.health.apply_public_trade_metrics(self._trade_buffer.metrics.to_dict())
++        await self._stop_trade_buffer()
++        if self._ch_public is not None:
++            try:
++                self._ch_public.close()
++            except Exception:  # noqa: BLE001
++                logger.exception("failed closing public-trade ClickHouse client")
++            self._ch_public = None
+         # Final blocking catch-up — watermark SoT; short because STOP must stay snappy
+         if self.enable_signals:
+             try:
+@@ -716,12 +754,17 @@ class Live1mCollector:
+ def install_signal_handlers(
+     collector: Live1mCollector, loop: asyncio.AbstractEventLoop
+ ) -> None:
++    """Graceful collector stop. Does not replace supervisor-level handlers if already set."""
++
+     def _handler() -> None:
+-        logger.info("signal received → graceful stop")
++        logger.info("signal received → graceful collector stop")
+         collector.request_stop()
+ 
+     for sig in (signal.SIGINT, signal.SIGTERM):
+         try:
++            # Prefer chaining: if a handler exists, asyncio replaces it — so also
++            # request_stop here; supervisor must register AFTER collector start
++            # or re-register. Collector stop is always safe.
+             loop.add_signal_handler(sig, _handler)
+         except NotImplementedError:  # pragma: no cover - Windows
+             signal.signal(sig, lambda *_: collector.request_stop())
+diff --git a/src/signal_generator/bybit/live/health.py b/src/signal_generator/bybit/live/health.py
+index fb921b9..2673f7b 100644
+--- a/src/signal_generator/bybit/live/health.py
++++ b/src/signal_generator/bybit/live/health.py
+@@ -138,8 +138,14 @@ class HealthState:
+     public_trade_reconnect_count: int = 0
+     public_trade_queue_depth: int = 0
+     public_trade_queue_maxsize: int = 0
++    public_trade_queue_high_watermark: int = 0
+     public_trade_dropped_events: int = 0
+     public_trade_insert_failures: int = 0
++    public_trade_spool_batches_written: int = 0
++    public_trade_spool_batches_replayed: int = 0
++    public_trade_spool_bytes_used: int = 0
++    public_trade_writer_alive: bool = False
++    public_trade_writer_fatal: bool = False
+     public_trade_last_error: str | None = None
+     _signal_metrics_provider: Callable[[], dict[str, Any]] | None = field(
+         default=None, repr=False, compare=False
+@@ -367,8 +373,14 @@ class HealthState:
+                 "reconnect_count": self.public_trade_reconnect_count,
+                 "queue_depth": self.public_trade_queue_depth,
+                 "queue_maxsize": self.public_trade_queue_maxsize,
++                "queue_high_watermark": self.public_trade_queue_high_watermark,
+                 "dropped_events": self.public_trade_dropped_events,
+                 "insert_failures": self.public_trade_insert_failures,
++                "spool_batches_written": self.public_trade_spool_batches_written,
++                "spool_batches_replayed": self.public_trade_spool_batches_replayed,
++                "spool_bytes_used": self.public_trade_spool_bytes_used,
++                "writer_alive": self.public_trade_writer_alive,
++                "writer_fatal": self.public_trade_writer_fatal,
+                 "last_error": self.public_trade_last_error,
+             },
+             "symbols": [
+@@ -416,6 +428,18 @@ class HealthState:
+         self.public_trade_reconnect_count = int(metrics.get("reconnect_count") or 0)
+         self.public_trade_queue_depth = int(metrics.get("queue_depth") or 0)
+         self.public_trade_queue_maxsize = int(metrics.get("queue_maxsize") or 0)
++        self.public_trade_queue_high_watermark = int(
++            metrics.get("queue_high_watermark") or 0
++        )
+         self.public_trade_dropped_events = int(metrics.get("dropped_events") or 0)
+         self.public_trade_insert_failures = int(metrics.get("insert_failures") or 0)
++        self.public_trade_spool_batches_written = int(
++            metrics.get("spool_batches_written") or 0
++        )
++        self.public_trade_spool_batches_replayed = int(
++            metrics.get("spool_batches_replayed") or 0
++        )
++        self.public_trade_spool_bytes_used = int(metrics.get("spool_bytes_used") or 0)
++        self.public_trade_writer_alive = bool(metrics.get("writer_alive"))
++        self.public_trade_writer_fatal = bool(metrics.get("writer_fatal"))
+         self.public_trade_last_error = metrics.get("last_error")
+diff --git a/src/signal_generator/bybit/live/trade_buffer.py b/src/signal_generator/bybit/live/trade_buffer.py
+index a641633..2d34739 100644
+--- a/src/signal_generator/bybit/live/trade_buffer.py
++++ b/src/signal_generator/bybit/live/trade_buffer.py
+@@ -1,18 +1,31 @@
+-"""Bounded async queue + batch insert for live public trades."""
++"""Bounded async queue + durable overflow spool + batch insert for live public trades."""
+ 
+ from __future__ import annotations
+ 
+ import asyncio
+ import logging
++import time
+ from dataclasses import dataclass, field
+ from datetime import datetime, timezone
++from pathlib import Path
+ from typing import Any
+ 
++from signal_generator.bybit.live.public_trade_spool import (
++    PublicTradeSpool,
++    PublicTradeSpoolCorruptError,
++    PublicTradeSpoolFullError,
++)
+ from signal_generator.bybit.live.ws_public_trade import WsPublicTrade, ws_trade_to_parsed
+ from signal_generator.db.public_trades import CanonicalPublicTradeRepository
+ 
+ logger = logging.getLogger(__name__)
+ 
++DEFAULT_QUEUE_MAXSIZE = 100_000
++DEFAULT_BATCH_SIZE = 2_000
++DEFAULT_FLUSH_INTERVAL_S = 0.25
++DEFAULT_OVERFLOW_BATCH = 200
++INSERT_MAX_ATTEMPTS = 8
++
+ 
+ @dataclass
+ class PublicTradeHealthMetrics:
+@@ -25,10 +38,16 @@ class PublicTradeHealthMetrics:
+     reconnect_count: int = 0
+     queue_depth: int = 0
+     queue_maxsize: int = 0
+-    dropped_events: int = 0
++    queue_high_watermark: int = 0
++    dropped_events: int = 0  # lifetime; must stay 0 after spool fix
+     insert_failures: int = 0
+     gap_detected: int = 0
+     gap_recovered: int = 0
++    spool_batches_written: int = 0
++    spool_batches_replayed: int = 0
++    spool_bytes_used: int = 0
++    writer_alive: bool = False
++    writer_fatal: bool = False
+     last_error: str | None = None
+ 
+     def to_dict(self) -> dict[str, Any]:
+@@ -46,40 +65,58 @@ class PublicTradeHealthMetrics:
+             "reconnect_count": self.reconnect_count,
+             "queue_depth": self.queue_depth,
+             "queue_maxsize": self.queue_maxsize,
++            "queue_high_watermark": self.queue_high_watermark,
+             "dropped_events": self.dropped_events,
+             "insert_failures": self.insert_failures,
+             "gap_detected": self.gap_detected,
+             "gap_recovered": self.gap_recovered,
++            "spool_batches_written": self.spool_batches_written,
++            "spool_batches_replayed": self.spool_batches_replayed,
++            "spool_bytes_used": self.spool_bytes_used,
++            "writer_alive": self.writer_alive,
++            "writer_fatal": self.writer_fatal,
+             "last_error": self.last_error,
+         }
+ 
+ 
+ class PublicTradeInsertBuffer:
+-    """Non-blocking enqueue; background worker batch-inserts to ClickHouse."""
++    """Non-blocking enqueue with durable overflow; background worker batch-inserts."""
+ 
+     def __init__(
+         self,
+         repo: CanonicalPublicTradeRepository,
+         *,
+-        queue_maxsize: int = 5000,
+-        batch_size: int = 500,
+-        flush_interval_s: float = 0.5,
++        queue_maxsize: int = DEFAULT_QUEUE_MAXSIZE,
++        batch_size: int = DEFAULT_BATCH_SIZE,
++        flush_interval_s: float = DEFAULT_FLUSH_INTERVAL_S,
++        spool_dir: Path | None = None,
++        overflow_batch_size: int = DEFAULT_OVERFLOW_BATCH,
+     ) -> None:
+         self.repo = repo
+-        self.queue_maxsize = max(1, queue_maxsize)
+-        self.batch_size = max(1, batch_size)
+-        self.flush_interval_s = max(0.05, flush_interval_s)
++        self.queue_maxsize = max(1, int(queue_maxsize))
++        self.batch_size = max(1, int(batch_size))
++        self.flush_interval_s = max(0.05, float(flush_interval_s))
++        self.overflow_batch_size = max(1, int(overflow_batch_size))
+         self._queue: asyncio.Queue[WsPublicTrade | None] = asyncio.Queue(
+             maxsize=self.queue_maxsize
+         )
+         self.metrics = PublicTradeHealthMetrics(queue_maxsize=self.queue_maxsize)
+         self._worker: asyncio.Task | None = None
+         self._stop = asyncio.Event()
++        self._overflow: list[WsPublicTrade] = []
++        self._overflow_lock = asyncio.Lock()
++        self._spool: PublicTradeSpool | None = None
++        if spool_dir is not None:
++            self._spool = PublicTradeSpool(Path(spool_dir))
++            st = self._spool.stats()
++            self.metrics.spool_bytes_used = int(st.get("bytes_used") or 0)
+ 
+     def start(self) -> None:
+         if self._worker is None or self._worker.done():
+             self._stop.clear()
+-            self._worker = asyncio.create_task(self._run())
++            self.metrics.writer_fatal = False
++            self.metrics.writer_alive = True
++            self._worker = asyncio.create_task(self._run_supervised())
+ 
+     async def stop(self) -> None:
+         self._stop.set()
+@@ -88,38 +125,129 @@ class PublicTradeInsertBuffer:
+         except asyncio.QueueFull:
+             pass
+         if self._worker is not None:
+-            await self._worker
++            try:
++                await self._worker
++            except Exception:  # noqa: BLE001
++                logger.exception("public trade writer stop awaited fatal")
+             self._worker = None
++        self.metrics.writer_alive = False
++        if self._spool is not None:
++            # flush pending overflow into spool before close
++            if self._overflow:
++                try:
++                    self._spool.append_trades(list(self._overflow))
++                    self.metrics.spool_batches_written += 1
++                    self._overflow.clear()
++                except Exception:  # noqa: BLE001
++                    logger.exception("overflow flush to spool on stop failed")
++            self._spool.close()
+ 
+     def note_reconnect(self) -> None:
+         self.metrics.reconnect_count += 1
+ 
++    def _note_depth(self) -> None:
++        depth = self._queue.qsize() + len(self._overflow)
++        self.metrics.queue_depth = depth
++        if depth > self.metrics.queue_high_watermark:
++            self.metrics.queue_high_watermark = depth
++
++    async def _spill_overflow_locked(self) -> None:
++        """Caller must hold _overflow_lock. Spill overflow list to durable spool."""
++        if not self._overflow:
++            return
++        if self._spool is None:
++            # No spool configured: fail closed rather than silent drop.
++            self.metrics.dropped_events += len(self._overflow)
++            self.metrics.last_error = "queue_full_no_spool_fail_closed"
++            self.metrics.writer_fatal = True
++            raise RuntimeError("public_trade_queue_full_no_spool")
++        batch = list(self._overflow)
++        self._overflow.clear()
++        try:
++            await asyncio.to_thread(self._spool.append_trades, batch)
++            self.metrics.spool_batches_written += 1
++            st = self._spool.stats()
++            self.metrics.spool_bytes_used = int(st.get("bytes_used") or 0)
++            self.metrics.last_error = None
++        except PublicTradeSpoolFullError as exc:
++            # Put back and fail closed — never silently discard.
++            self._overflow = batch + self._overflow
++            self.metrics.last_error = f"spool_full:{exc}"
++            self.metrics.writer_fatal = True
++            raise
++        except PublicTradeSpoolCorruptError as exc:
++            self._overflow = batch + self._overflow
++            self.metrics.last_error = f"spool_corrupt:{exc}"
++            self.metrics.writer_fatal = True
++            raise
++
+     def enqueue(self, trade: WsPublicTrade) -> bool:
+-        """Try enqueue without blocking. Returns False if dropped."""
++        """Try enqueue without blocking. Spill overflow to spool; never silent-drop."""
++        if self.metrics.writer_fatal:
++            self.metrics.last_error = "writer_fatal_rejecting_enqueue"
++            return False
+         self.metrics.rows_received += 1
+         self.metrics.last_trade_event_ts = trade.trade_ts
+         now = datetime.now(timezone.utc)
+-        self.metrics.lag_seconds = max(
+-            0.0, (now - trade.trade_ts).total_seconds()
+-        )
++        self.metrics.lag_seconds = max(0.0, (now - trade.trade_ts).total_seconds())
+         try:
+             self._queue.put_nowait(trade)
+-            self.metrics.queue_depth = self._queue.qsize()
++            self._note_depth()
+             return True
+         except asyncio.QueueFull:
+-            self.metrics.dropped_events += 1
+-            self.metrics.last_error = "queue_full_dropped_event"
+-            logger.error(
+-                "PUBLIC_TRADE_DROPPED symbol=%s trade_id=%s queue_depth=%s",
+-                trade.symbol,
+-                trade.trade_id,
+-                self._queue.qsize(),
+-            )
+-            return False
++            # Synchronous spill path: accumulate then write batch via thread later.
++            # Use overflow list; schedule spill if large.
++            self._overflow.append(trade)
++            self._note_depth()
++            if len(self._overflow) >= self.overflow_batch_size:
++                # Best-effort immediate spill (sync) to keep memory bounded.
++                if self._spool is None:
++                    self.metrics.last_error = "queue_full_no_spool_fail_closed"
++                    self.metrics.writer_fatal = True
++                    logger.error("PUBLIC_TRADE_FAIL_CLOSED queue_full_no_spool depth=%s", self._queue.qsize())
++                    return False
++                batch = self._overflow[: self.overflow_batch_size]
++                del self._overflow[: self.overflow_batch_size]
++                try:
++                    self._spool.append_trades(batch)
++                    self.metrics.spool_batches_written += 1
++                    st = self._spool.stats()
++                    self.metrics.spool_bytes_used = int(st.get("bytes_used") or 0)
++                    self.metrics.last_error = "spooled_overflow_batch"
++                    self._note_depth()
++                    return True
++                except Exception as exc:  # noqa: BLE001
++                    # Restore and fail closed — never silently discard.
++                    self._overflow = batch + self._overflow
++                    self.metrics.last_error = f"spool_append_failed:{exc}"[:500]
++                    self.metrics.writer_fatal = True
++                    logger.exception("PUBLIC_TRADE_SPOOL_FAIL_CLOSED: %s", exc)
++                    return False
++            self.metrics.last_error = "queue_full_buffered_overflow"
++            return True
++
++    async def _run_supervised(self) -> None:
++        self.metrics.writer_alive = True
++        try:
++            await self._run()
++        except Exception as exc:  # noqa: BLE001
++            self.metrics.writer_fatal = True
++            self.metrics.writer_alive = False
++            self.metrics.last_error = f"writer_fatal:{exc}"[:500]
++            logger.exception("PUBLIC_TRADE_WRITER_FATAL: %s", exc)
++            raise
++        finally:
++            self.metrics.writer_alive = False
+ 
+     async def _run(self) -> None:
++        # Replay any unacked spool from prior process first.
++        await self._replay_spool()
+         batch: list[WsPublicTrade] = []
+-        while not self._stop.is_set() or not self._queue.empty() or batch:
++        while not self._stop.is_set() or not self._queue.empty() or self._overflow or batch:
++            # Opportunistically spill overflow under lock.
++            async with self._overflow_lock:
++                if len(self._overflow) >= self.overflow_batch_size:
++                    await self._spill_overflow_locked()
+             try:
+                 item = await asyncio.wait_for(
+                     self._queue.get(), timeout=self.flush_interval_s
+@@ -128,17 +256,92 @@ class PublicTradeInsertBuffer:
+                 item = None
+             if item is None:
+                 if batch:
+-                    await self._flush(batch)
++                    await self._flush_with_retry(batch)
++                    batch = []
++                # drain a bit of overflow into batch
++                async with self._overflow_lock:
++                    if self._overflow and len(batch) < self.batch_size:
++                        take = min(self.batch_size - len(batch), len(self._overflow))
++                        batch.extend(self._overflow[:take])
++                        del self._overflow[:take]
++                        self._note_depth()
++                if batch and (self._stop.is_set() or len(batch) >= self.batch_size):
++                    await self._flush_with_retry(batch)
+                     batch = []
+-                if self._stop.is_set() and self._queue.empty():
++                if self._stop.is_set() and self._queue.empty() and not self._overflow and not batch:
++                    # final spool replay
++                    await self._replay_spool()
+                     break
++                # periodic spool drain while idle
++                if not self._stop.is_set():
++                    await self._replay_spool(max_batches=2)
+                 continue
+             batch.append(item)
+-            self.metrics.queue_depth = self._queue.qsize()
++            self._note_depth()
+             if len(batch) >= self.batch_size:
+-                await self._flush(batch)
++                await self._flush_with_retry(batch)
+                 batch = []
+ 
++    async def _replay_spool(self, max_batches: int | None = None) -> None:
++        if self._spool is None:
++            return
++        try:
++            batches = list(self._spool.iter_unacked())
++        except PublicTradeSpoolCorruptError as exc:
++            self.metrics.writer_fatal = True
++            self.metrics.last_error = f"spool_corrupt:{exc}"
++            raise
++        n = 0
++        for sp in batches:
++            await self._flush_with_retry(sp.trades, spool_seq=sp.seq)
++            self.metrics.spool_batches_replayed += 1
++            n += 1
++            if max_batches is not None and n >= max_batches:
++                break
++
++    async def _flush_with_retry(
++        self,
++        trades: list[WsPublicTrade],
++        *,
++        spool_seq: int | None = None,
++    ) -> None:
++        if not trades:
++            return
++        delay = 0.05
++        last_exc: Exception | None = None
++        for attempt in range(1, INSERT_MAX_ATTEMPTS + 1):
++            try:
++                await self._flush(trades)
++                if spool_seq is not None and self._spool is not None:
++                    await asyncio.to_thread(self._spool.ack, spool_seq)
++                return
++            except Exception as exc:  # noqa: BLE001
++                last_exc = exc
++                self.metrics.insert_failures += 1
++                self.metrics.last_error = str(exc)[:500]
++                logger.exception(
++                    "public trade insert failed attempt=%s/%s: %s",
++                    attempt,
++                    INSERT_MAX_ATTEMPTS,
++                    exc,
++                )
++                await asyncio.sleep(delay)
++                delay = min(2.0, delay * 2)
++        # Exhausted retries: durable-spill then fail closed so main process dies.
++        if spool_seq is None:
++            if self._spool is not None:
++                try:
++                    await asyncio.to_thread(self._spool.append_trades, trades)
++                    self.metrics.spool_batches_written += 1
++                except Exception as spill_exc:  # noqa: BLE001
++                    logger.exception("failed spilling after insert retries: %s", spill_exc)
++            else:
++                self.metrics.dropped_events += len(trades)
++        self.metrics.writer_fatal = True
++        raise RuntimeError(
++            f"public_trade_insert_exhausted retries last={last_exc!r}"
++        )
++
+     async def _flush(self, trades: list[WsPublicTrade]) -> None:
+         if not trades:
+             return
+@@ -146,17 +349,16 @@ class PublicTradeInsertBuffer:
+         parsed = [ws_trade_to_parsed(t) for t in trades]
+ 
+         def _insert() -> tuple[int, int]:
+-            return self.repo.insert_trades_skip_existing(
++            # Live path: direct insert. Canonical table is ReplacingMergeTree on
++            # (symbol, trade_id) — skip_existing SELECTs cannot keep up with 51-coin
++            # WS volume under CH load and only add session/query contention.
++            n = self.repo.insert_trades(
+                 parsed, ingest_timestamp=ingest_ts, source="live"
+             )
++            return n, 0
+ 
+-        try:
+-            inserted, skipped = await asyncio.to_thread(_insert)
+-            self.metrics.rows_inserted += inserted
+-            self.metrics.duplicate_rows_skipped += skipped
+-            self.metrics.last_trade_ingest_ts = ingest_ts
+-            self.metrics.queue_depth = self._queue.qsize()
+-        except Exception as exc:  # noqa: BLE001
+-            self.metrics.insert_failures += 1
+-            self.metrics.last_error = str(exc)[:500]
+-            logger.exception("public trade insert failed: %s", exc)
++        inserted, skipped = await asyncio.to_thread(_insert)
++        self.metrics.rows_inserted += inserted
++        self.metrics.duplicate_rows_skipped += skipped
++        self.metrics.last_trade_ingest_ts = ingest_ts
++        self._note_depth()
+diff --git a/src/signal_generator/bybit/public_trades/backfill_manifest.py b/src/signal_generator/bybit/public_trades/backfill_manifest.py
+index 2711ced..518b2dc 100644
+--- a/src/signal_generator/bybit/public_trades/backfill_manifest.py
++++ b/src/signal_generator/bybit/public_trades/backfill_manifest.py
+@@ -17,17 +17,35 @@ STATUSES = (
+     "AUDITED",
+     "FAILED",
+     "MISSING",
++    "ARCHIVE_UNAVAILABLE",
+ )
+ 
+ ALLOWED_TRANSITIONS = {
+-    "PENDING": frozenset({"AVAILABLE", "MISSING", "FAILED", "PENDING", "AUDITED", "DOWNLOADED"}),
+-    "AVAILABLE": frozenset({"DOWNLOADED", "FAILED", "AVAILABLE", "AUDITED"}),
++    "PENDING": frozenset(
++        {
++            "AVAILABLE",
++            "MISSING",
++            "ARCHIVE_UNAVAILABLE",
++            "FAILED",
++            "PENDING",
++            "AUDITED",
++            "DOWNLOADED",
++        }
++    ),
++    "AVAILABLE": frozenset(
++        {"DOWNLOADED", "FAILED", "AVAILABLE", "AUDITED", "ARCHIVE_UNAVAILABLE", "MISSING"}
++    ),
+     "DOWNLOADED": frozenset({"VERIFIED", "FAILED", "DOWNLOADED"}),
+     "VERIFIED": frozenset({"IMPORTED", "FAILED", "VERIFIED"}),
+     "IMPORTED": frozenset({"AUDITED", "FAILED", "IMPORTED", "VERIFIED"}),
+     "AUDITED": frozenset({"AUDITED"}),
+-    "FAILED": frozenset({"PENDING", "AVAILABLE", "DOWNLOADED", "VERIFIED", "IMPORTED", "FAILED"}),
++    "FAILED": frozenset(
++        {"PENDING", "AVAILABLE", "DOWNLOADED", "VERIFIED", "IMPORTED", "FAILED"}
++    ),
+     "MISSING": frozenset({"PENDING", "AVAILABLE", "MISSING", "FAILED", "DOWNLOADED"}),
++    "ARCHIVE_UNAVAILABLE": frozenset(
++        {"PENDING", "AVAILABLE", "ARCHIVE_UNAVAILABLE", "FAILED"}
++    ),
+ }
+ 
+ BACKFILL_MANIFEST_FIELDS = [
+@@ -53,6 +71,7 @@ BACKFILL_MANIFEST_FIELDS = [
+     "download_started_at",
+     "import_finished_at",
+     "audit_finished_at",
++    "sha256",
+     "updated_at",
+ ]
+ 
+@@ -89,6 +108,7 @@ class BackfillManifestRow:
+     download_started_at: str = ""
+     import_finished_at: str = ""
+     audit_finished_at: str = ""
++    sha256: str = ""
+     updated_at: str = field(default_factory=_utcnow)
+ 
+     @property
+@@ -135,6 +155,7 @@ class BackfillManifestStore:
+                     download_started_at=raw.get("download_started_at") or "",
+                     import_finished_at=raw.get("import_finished_at") or "",
+                     audit_finished_at=raw.get("audit_finished_at") or "",
++                    sha256=raw.get("sha256") or "",
+                     updated_at=raw.get("updated_at") or _utcnow(),
+                 )
+                 self.rows[row.key] = row
+diff --git a/src/signal_generator/bybit/public_trades/backfill_runner.py b/src/signal_generator/bybit/public_trades/backfill_runner.py
+index 8da8ff3..49913b0 100644
+--- a/src/signal_generator/bybit/public_trades/backfill_runner.py
++++ b/src/signal_generator/bybit/public_trades/backfill_runner.py
+@@ -19,8 +19,10 @@ from signal_generator.bybit.public_trades.csv_parse import (
+ from signal_generator.bybit.public_trades.downloader import (
+     DISK_FREE_MIN_BYTES,
+     HttpxTransport,
++    PublicTradeDownloadError,
+     assert_disk_free,
+     download_day_file,
++    sha256_file,
+ )
+ from signal_generator.bybit.public_trades.importer import (
+     FileParseStats,
+@@ -88,10 +90,18 @@ def check_sources(
+                 ok += 1
+                 if cl_int:
+                     total_cl += cl_int
++            elif resp.status_code == 404:
++                manifest.set_status(
++                    row,
++                    "ARCHIVE_UNAVAILABLE",
++                    http_status=404,
++                    error="HTTP 404",
++                )
++                missing += 1
+             else:
+                 manifest.set_status(
+                     row,
+-                    "MISSING" if resp.status_code == 404 else "FAILED",
++                    "FAILED",
+                     http_status=resp.status_code,
+                     error=f"HTTP {resp.status_code}",
+                 )
+@@ -182,11 +192,33 @@ class BackfillRunner:
+         if row.status == "AUDITED":
+             logger.info("skip AUDITED %s %s", row.symbol, row.utc_date)
+             return row
++        if row.status == "ARCHIVE_UNAVAILABLE":
++            logger.info("skip ARCHIVE_UNAVAILABLE %s %s", row.symbol, row.utc_date)
++            return row
+         self.cache_dir.mkdir(parents=True, exist_ok=True)
+         assert_disk_free(self.cache_dir)
+         day = date.fromisoformat(row.utc_date)
+         symbol = row.symbol
+-        path = self._download(row, symbol, day)
++        try:
++            path = self._download(row, symbol, day)
++        except PublicTradeDownloadError as exc:
++            if exc.status == "SOURCE_FILE_MISSING":
++                if row.status in {"PENDING", "AVAILABLE", "FAILED", "MISSING"}:
++                    self.manifest.set_status(
++                        row,
++                        "ARCHIVE_UNAVAILABLE",
++                        error=str(exc)[:400],
++                        http_status=404,
++                    )
++                else:
++                    row.status = "ARCHIVE_UNAVAILABLE"
++                    row.error = str(exc)[:400]
++                    self.manifest.save()
++                return row
++            raise
++        digest = sha256_file(path)
++        row.sha256 = digest
++        self.manifest.save()
+         day_start, day_end = utc_day_bounds(day)
+         existing_day = self.repo.physical_and_logical_counts(
+             symbols=(symbol,), start=day_start, end=day_end
+@@ -242,6 +274,7 @@ class BackfillRunner:
+             min_event_time=stats.min_trade_ts.isoformat() if stats.min_trade_ts else "",
+             max_event_time=stats.max_trade_ts.isoformat() if stats.max_trade_ts else "",
+             compressed_bytes=path.stat().st_size,
++            sha256=digest,
+             error="",
+         )
+         if stats.empty_trade_id:
+@@ -304,8 +337,12 @@ class BackfillRunner:
+                     "DOWNLOADED",
+                     compressed_bytes=cached.stat().st_size,
+                     http_status=200,
++                    sha256=sha256_file(cached),
+                     error="",
+                 )
++            elif not row.sha256:
++                row.sha256 = sha256_file(cached)
++                self.manifest.save()
+             return cached
+         if not row.download_started_at:
+             if row.status == "PENDING":
+@@ -324,16 +361,19 @@ class BackfillRunner:
+             transport=self.transport,
+             disk_free_fn=assert_disk_free,
+         )
++        digest = sha256_file(path)
+         if row.status in {"PENDING", "AVAILABLE", "FAILED", "MISSING"}:
+             self.manifest.set_status(
+                 row,
+                 "DOWNLOADED",
+                 compressed_bytes=path.stat().st_size,
+                 http_status=200,
++                sha256=digest,
+                 error="",
+             )
+         else:
+             row.compressed_bytes = path.stat().st_size
++            row.sha256 = digest
+             self.manifest.save()
+         return path
+ 
+@@ -385,3 +425,48 @@ def seed_pilot_audited(
+                 audit_finished_at=datetime.now(timezone.utc).isoformat(),
+                 error="seeded_from_pilot",
+             )
++
++
++def seed_full_canonical_days(
++    manifest: BackfillManifestStore,
++    coverage_rows: list[dict[str, Any]],
++) -> int:
++    """AUDITED only for archive-backed days whose event window covers the UTC day.
++
++    Partial ClickHouse data (e.g. live-only morning hole) is never treated as complete.
++    """
++    from signal_generator.bybit.public_trades.window import classify_symbol_day
++
++    seeded = 0
++    by_key = {(str(r["symbol"]).upper(), str(r["utc_day"])): r for r in coverage_rows}
++    for row in manifest.as_rows():
++        if row.status == "AUDITED":
++            continue
++        meta = by_key.get((row.symbol.upper(), row.utc_date))
++        if meta is None:
++            continue
++        klass = classify_symbol_day(
++            logical_unique=int(meta.get("logical_unique") or 0),
++            min_ts=meta.get("min_ts"),
++            max_ts=meta.get("max_ts"),
++            sources=list(meta.get("sources") or []),
++            day=date.fromisoformat(row.utc_date),
++        )
++        if klass != "ALREADY_AUDITED":
++            continue
++        if row.status not in {"PENDING", "AVAILABLE"}:
++            continue
++        manifest.set_status(
++            row,
++            "AUDITED",
++            parsed_rows=int(meta.get("logical_unique") or 0),
++            source_rows=int(meta.get("logical_unique") or 0),
++            skipped_existing_rows=int(meta.get("logical_unique") or 0),
++            min_event_time=str(meta.get("min_ts") or ""),
++            max_event_time=str(meta.get("max_ts") or ""),
++            audit_finished_at=datetime.now(timezone.utc).isoformat(),
++            error="seeded_from_full_canonical_day",
++        )
++        seeded += 1
++    return seeded
++
+diff --git a/src/signal_generator/bybit/public_trades/downloader.py b/src/signal_generator/bybit/public_trades/downloader.py
+index 17f9241..498a2d9 100644
+--- a/src/signal_generator/bybit/public_trades/downloader.py
++++ b/src/signal_generator/bybit/public_trades/downloader.py
+@@ -3,6 +3,7 @@
+ from __future__ import annotations
+ 
+ import gzip
++import hashlib
+ import time
+ from collections.abc import Iterator
+ from datetime import date
+@@ -130,6 +131,17 @@ def assert_disk_free(path: Path, *, minimum: int = DISK_FREE_MIN_BYTES) -> int:
+     return free
+ 
+ 
++def sha256_file(path: Path, *, chunk_size: int = DEFAULT_CHUNK) -> str:
++    digest = hashlib.sha256()
++    with path.open("rb") as fh:
++        while True:
++            chunk = fh.read(chunk_size)
++            if not chunk:
++                break
++            digest.update(chunk)
++    return digest.hexdigest()
++
++
+ def verify_gzip_file(path: Path) -> None:
+     with path.open("rb") as fh:
+         magic = fh.read(2)
+diff --git a/src/signal_generator/db/client.py b/src/signal_generator/db/client.py
+index e276248..2aea122 100644
+--- a/src/signal_generator/db/client.py
++++ b/src/signal_generator/db/client.py
+@@ -2,6 +2,7 @@
+ 
+ from __future__ import annotations
+ 
++import threading
+ from typing import Any, Sequence
+ 
+ import clickhouse_connect
+@@ -11,11 +12,21 @@ from signal_generator.config import ClickHouseSettings, get_clickhouse_settings
+ 
+ 
+ class ClickHouseClient:
+-    """Small wrapper around clickhouse-connect focused on inserts + queries."""
++    """Small wrapper around clickhouse-connect focused on inserts + queries.
++
++    clickhouse-connect sessions are not safe for concurrent queries. This wrapper
++    serializes command/query/insert/ping on a per-instance RLock so callers that
++    share one client across asyncio.to_thread / worker threads do not trip
++    ``ProgrammingError: concurrent queries within the same session``.
++
++    Parallel writers still need separate ``ClickHouseClient`` instances (e.g.
++    candle path vs live public-trade inserts).
++    """
+ 
+     def __init__(self, client: Client, *, database: str) -> None:
+         self._client = client
+         self.database = database
++        self._lock = threading.RLock()
+ 
+     @classmethod
+     def from_settings(cls, settings: ClickHouseSettings) -> ClickHouseClient:
+@@ -33,10 +44,12 @@ class ClickHouseClient:
+         return self._client
+ 
+     def command(self, sql: str, parameters: dict[str, Any] | None = None) -> Any:
+-        return self._client.command(sql, parameters=parameters)
++        with self._lock:
++            return self._client.command(sql, parameters=parameters)
+ 
+     def query(self, sql: str, parameters: dict[str, Any] | None = None) -> Any:
+-        return self._client.query(sql, parameters=parameters)
++        with self._lock:
++            return self._client.query(sql, parameters=parameters)
+ 
+     def insert(
+         self,
+@@ -57,17 +70,20 @@ class ClickHouseClient:
+         }
+         if settings:
+             kwargs["settings"] = settings
+-        return self._client.insert(**kwargs)
++        with self._lock:
++            return self._client.insert(**kwargs)
+ 
+     def ping(self) -> tuple[str, str, str]:
+-        result = self._client.query(
+-            "SELECT version(), currentDatabase(), currentUser()"
+-        )
++        with self._lock:
++            result = self._client.query(
++                "SELECT version(), currentDatabase(), currentUser()"
++            )
+         row = result.result_rows[0]
+         return str(row[0]), str(row[1]), str(row[2])
+ 
+     def close(self) -> None:
+-        self._client.close()
++        with self._lock:
++            self._client.close()
+ 
+     def __enter__(self) -> ClickHouseClient:
+         return self
+diff --git a/tests/unit/test_public_trades_7d.py b/tests/unit/test_public_trades_7d.py
+index 8ccbcd1..2927d8d 100644
+--- a/tests/unit/test_public_trades_7d.py
++++ b/tests/unit/test_public_trades_7d.py
+@@ -303,40 +303,64 @@ def test_collector_public_trades_default_off(monkeypatch):
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_trade_buffer_queue_limit_and_duplicate_skip():
++async def test_trade_buffer_queue_limit_and_flush(tmp_path):
+     repo = SkipExistingRepo()
+-    buf = PublicTradeInsertBuffer(repo, queue_maxsize=2, batch_size=10, flush_interval_s=0.05)
++    buf = PublicTradeInsertBuffer(
++        repo,
++        queue_maxsize=2,
++        batch_size=10,
++        flush_interval_s=0.05,
++        spool_dir=tmp_path / "spool",
++        overflow_batch_size=2,
++    )
+     from signal_generator.bybit.live.ws_public_trade import WsPublicTrade
+ 
+-    t = WsPublicTrade(
+-        symbol="DOGEUSDT",
+-        trade_id="a",
+-        trade_ts=datetime(2026, 8, 17, tzinfo=timezone.utc),
+-        side="Buy",
+-        price=Decimal("1"),
+-        size=Decimal("1"),
+-        notional=Decimal("1"),
+-        tick_direction="",
+-        is_rpi_trade=0,
+-    )
+-    assert buf.enqueue(t) is True
+-    assert buf.enqueue(t) is True
+-    assert buf.enqueue(t) is False
+-    assert buf.metrics.dropped_events == 1
++    def _t(i: str) -> WsPublicTrade:
++        return WsPublicTrade(
++            symbol="DOGEUSDT",
++            trade_id=i,
++            trade_ts=datetime(2026, 8, 17, tzinfo=timezone.utc),
++            side="Buy",
++            price=Decimal("1"),
++            size=Decimal("1"),
++            notional=Decimal("1"),
++            tick_direction="",
++            is_rpi_trade=0,
++        )
++
++    assert buf.enqueue(_t("a")) is True
++    assert buf.enqueue(_t("b")) is True
++    # Queue full → durable overflow spool (no silent drop)
++    assert buf.enqueue(_t("c")) is True
++    assert buf.enqueue(_t("d")) is True
++    assert buf.metrics.dropped_events == 0
++    assert buf.metrics.spool_batches_written >= 1
+     buf.start()
+-    await asyncio.sleep(0.2)
++    await asyncio.sleep(0.3)
+     await buf.stop()
+     assert buf.metrics.rows_inserted >= 1
+ 
+ 
+ @pytest.mark.asyncio
+-async def test_candle_path_continues_when_trade_insert_fails():
++async def test_candle_path_continues_when_trade_insert_fails(tmp_path):
+     class BoomRepo(SkipExistingRepo):
+-        def insert_trades_skip_existing(self, *a, **k):
++        def insert_trades(self, *a, **k):
+             raise RuntimeError("insert boom")
+ 
+-    buf = PublicTradeInsertBuffer(BoomRepo(), queue_maxsize=10, batch_size=1, flush_interval_s=0.05)
++    buf = PublicTradeInsertBuffer(
++        BoomRepo(),
++        queue_maxsize=10,
++        batch_size=1,
++        flush_interval_s=0.05,
++        spool_dir=tmp_path / "spool",
++    )
+     from signal_generator.bybit.live.ws_public_trade import WsPublicTrade
++    from signal_generator.bybit.live import trade_buffer as tb
++
++    # Speed up fail-closed for unit test
++    monkey_attempts = 3
++    original = tb.INSERT_MAX_ATTEMPTS
++    tb.INSERT_MAX_ATTEMPTS = monkey_attempts
+ 
+     trade = WsPublicTrade(
+         symbol="DOGEUSDT",
+@@ -349,11 +373,22 @@ async def test_candle_path_continues_when_trade_insert_fails():
+         tick_direction="",
+         is_rpi_trade=0,
+     )
+-    buf.start()
+-    buf.enqueue(trade)
+-    await asyncio.sleep(0.2)
+-    await buf.stop()
+-    assert buf.metrics.insert_failures >= 1
++    try:
++        buf.start()
++        assert buf.enqueue(trade) is True
++        for _ in range(100):
++            if buf.metrics.insert_failures >= 1:
++                break
++            await asyncio.sleep(0.05)
++        # Writer may be fatal; stop should still return.
++        try:
++            await asyncio.wait_for(buf.stop(), timeout=15)
++        except Exception:
++            pass
++        assert buf.metrics.insert_failures >= 1
++        assert "insert boom" in (buf.metrics.last_error or "") or buf.metrics.writer_fatal
++    finally:
++        tb.INSERT_MAX_ATTEMPTS = original
+     candle = Candle1m(
+         exchange="bybit",
+         symbol="DOGEUSDT",

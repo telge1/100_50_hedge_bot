@@ -1,0 +1,14 @@
+{
+  "timestamps": {
+    "fanout_probe_s": 0.234,
+    "monitor_warmup_s": 4.0
+  },
+  "fanout_status_ok": true,
+  "fanout_doge_events": 1,
+  "forming_XAUUSDT": true,
+  "forming_QNTUSDT": true,
+  "monitor_fanout_available": true,
+  "monitor_doge_source": "public_trade_fanout",
+  "monitor_doge_status": "LIVE_PUBLIC_TRADE",
+  "fired_count_after_warmup": 0
+}

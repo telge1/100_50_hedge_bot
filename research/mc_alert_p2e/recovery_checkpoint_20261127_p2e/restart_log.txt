@@ -1,0 +1,5 @@
+old_pid=1550962
+restart_requested_at=2026-11-27T11:45:15Z
+305108  1.6 2.4
+old_pid=1550962 new_pid=2350340 live_after_s=~21
+2026-11-27T11:46:12Z
