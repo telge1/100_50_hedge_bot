@@ -620,9 +620,6 @@ def _is_circuit_breaker_exempt(path: str) -> bool:
         return True
     if path.startswith("/api/research/forming-bar"):
         return True
-    # One lease per pane; cold subscribes block for seconds. ob1000_on_demand enforces OB_V3_ON_DEMAND_MAX_ACTIVE.
-    if path == "/api/research/ob1000/lease":
-        return True
     # Research chart reads poll frequently; transient CH slowness must not block the UI for 60s.
     if path.startswith("/api/research/candles"):
         return True
@@ -648,6 +645,9 @@ def _is_circuit_breaker_exempt(path: str) -> bool:
 def _is_rate_limit_exempt(path: str) -> bool:
     """User-Klicks (Laden/Update/Config/Stop/Start/Restart): kein Rate-Limit, damit sie sofort durchkommen."""
     if path.startswith("/api/research/forming-bar"):
+        return True
+    # One lease per pane; cold subscribes block for seconds. ob1000_on_demand enforces OB_V3_ON_DEMAND_MAX_ACTIVE.
+    if path == "/api/research/ob1000/lease":
         return True
     if path.startswith("/api/bots/") and (
         "/config" in path or path.endswith("/stop") or path.endswith("/start") or "/restart" in path
@@ -3114,10 +3114,10 @@ app.include_router(
 )
 app.include_router(_build_wall_decision_router(require_auth=require_auth))
 
-
 from research_charts.pane_gzip_middleware_v1 import ResearchPaneGzipMiddleware  # noqa: E402
 
 app.add_middleware(ResearchPaneGzipMiddleware)
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -4682,6 +4682,18 @@ async def api_collector_ensure_symbol(
 
 _PRICE_ALERT_STATE_FILE = project_root / "data" / "state" / "price_alert.json"
 
+from price_alert_store import (  # noqa: E402
+    alert_key as _price_alert_store_key,
+    list_fired_events,
+    load_state as _load_price_alert_state_store,
+    save_state as _save_price_alert_state_store,
+)
+from price_alert_monitor import ensure_monitor_running, get_monitor_status  # noqa: E402
+
+_PRICE_ALERT_USE_LEGACY_WORKER = os.environ.get("PRICE_ALERT_LEGACY_WORKER", "").strip() == "1"
+_PRICE_ALERT_REF_MAX_AGE_S = 45.0
+_price_alert_start_lock = threading.Lock()
+
 
 def _fetch_bybit_ticker_price(symbol: str) -> float | None:
     """Holt letzten Preis von Bybit Market Tickers (öffentliche API, keine Auth)."""
@@ -4706,30 +4718,33 @@ def _fetch_bybit_ticker_price(symbol: str) -> float | None:
 
 def _load_price_alert_state() -> dict:
     """Lädt aktive Price-Alerts aus State-Datei."""
-    if not _PRICE_ALERT_STATE_FILE.exists():
-        return {}
-    try:
-        with open(_PRICE_ALERT_STATE_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        # Migration: alte Keys (nur Symbol) -> neuer Key (symbol_target_trigger)
-        result = {}
-        for k, v in data.items():
-            if isinstance(v, dict) and "target_price" in v and "trigger" in v:
-                sym = v.get("symbol") or k
-                tp = v.get("target_price")
-                tr = v.get("trigger", "above")
-                new_key = f"{sym}_{tp:.6f}_{tr}" if isinstance(tp, (int, float)) else f"{sym}_{tp}_{tr}"
-                result[new_key] = {**v, "symbol": str(sym).strip().upper()}
-            else:
-                result[k] = v
-        return result
-    except Exception:
-        return {}
+    return _load_price_alert_state_store()
 
 
 def _price_alert_key(symbol: str, target_price: float, trigger: str) -> str:
     """Eindeutiger Key für mehrere Alerts pro Symbol."""
-    return f"{symbol}_{target_price:.6f}_{trigger}"
+    return _price_alert_store_key(symbol, target_price, trigger)
+
+
+async def _price_alert_reference(symbol: str) -> tuple[float | None, str | None, float | None]:
+    """Frische Referenz: Collector forming, sonst Bybit last."""
+    sym = str(symbol or "").strip().upper()
+    if not sym:
+        return None, None, None
+    try:
+        from research_charts.collector_control import fetch_forming_candle
+
+        forming = await asyncio.to_thread(fetch_forming_candle, sym, timeout=2.0)
+        if isinstance(forming, dict) and forming.get("close"):
+            px = float(forming["close"])
+            if px > 0:
+                return px, "forming", time.time()
+    except Exception:
+        pass
+    px = await asyncio.to_thread(_fetch_bybit_ticker_price, sym)
+    if px is not None and px > 0:
+        return float(px), "bybit_ticker", time.time()
+    return None, None, None
 
 
 @app.get("/api/price-alert/current-price")
@@ -4752,7 +4767,7 @@ async def api_price_alert_start(
     payload: dict = Body(...),
     user: dict = Depends(require_auth),
 ):
-    """Startet Price-Alert-Script im Hintergrund (pollt Bybit, benachrichtigt ntfy)."""
+    """Aktiviert Price-Alert (zentraler Monitor oder Legacy-Worker)."""
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     symbol = str((payload.get("symbol") or "").strip().upper())
@@ -4760,45 +4775,85 @@ async def api_price_alert_start(
         target_price = float(payload.get("target_price"))
     except (TypeError, ValueError):
         return {"success": False, "error": "target_price fehlt oder ungültig"}
-    trigger = str((payload.get("trigger") or "").strip().lower() or "above")
-    if trigger not in ("above", "below"):
-        return {"success": False, "error": "trigger muss 'above' oder 'below' sein"}
+    req_trigger = str((payload.get("trigger") or "").strip().lower())
     if not symbol:
         return {"success": False, "error": "symbol fehlt"}
     if target_price <= 0:
         return {"success": False, "error": "target_price muss > 0 sein"}
-    script_path = project_root / "scripts" / "price_alert.py"
-    if not script_path.exists():
-        return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
-    state = _load_price_alert_state()
-    alert_key = _price_alert_key(symbol, target_price, trigger)
-    if alert_key in state:
-        return {"success": False, "error": f"Alert für {symbol} {trigger} {target_price} bereits aktiv."}
-    try:
-        env = {**os.environ, "PYTHONPATH": str(project_root)}
-        if "XDG_RUNTIME_DIR" not in env:
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-        proc = subprocess.Popen(
-            [sys.executable, str(script_path), "--symbol", symbol, "--target-price", str(target_price), "--trigger", trigger],
-            cwd=str(project_root),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            env=env,
-        )
-        state[alert_key] = {
+
+    ref_price, ref_source, ref_ts = await _price_alert_reference(symbol)
+    if ref_price is None or ref_ts is None:
+        return {"success": False, "error": "Referenzpreis nicht verfügbar — Alert nicht erstellt."}
+    if abs(ref_price - target_price) < ref_price * 1e-9:
+        return {"success": False, "error": "Zielpreis gleich Referenzpreis."}
+
+    inferred = "above" if target_price > ref_price else "below"
+    trigger = req_trigger if req_trigger in ("above", "below") else inferred
+    if req_trigger in ("above", "below") and req_trigger != inferred:
+        return {
+            "success": False,
+            "error": f"Trigger {req_trigger} passt nicht zur Referenz ({ref_price} → Ziel {target_price}, erwartet {inferred}).",
+        }
+
+    with _price_alert_start_lock:
+        state = _load_price_alert_state()
+        alert_key = _price_alert_key(symbol, target_price, trigger)
+        if alert_key in state:
+            return {"success": False, "error": f"Alert für {symbol} {trigger} {target_price} bereits aktiv."}
+        started_unix = int(time.time())
+        entry = {
             "symbol": symbol,
-            "pid": proc.pid,
             "target_price": target_price,
             "trigger": trigger,
-            "started_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime()),
+            "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started_unix)),
+            "started_at_unix": started_unix,
+            "reference_price": ref_price,
+            "reference_source": ref_source,
+            "reference_ts_unix": int(ref_ts),
         }
-        _PRICE_ALERT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(_PRICE_ALERT_STATE_FILE, "w", encoding="utf-8") as f:
-            json.dump(state, f, indent=2)
-        return {"success": True, "message": f"Alert aktiv: {symbol} {trigger} {target_price}.", "symbol": symbol}
-    except Exception as e:
-        logger.error(f"Fehler beim Starten von price_alert: {e}", exc_info=True)
-        return {"success": False, "error": str(e)}
+        if _PRICE_ALERT_USE_LEGACY_WORKER:
+            script_path = project_root / "scripts" / "price_alert.py"
+            if not script_path.exists():
+                return {"success": False, "error": f"Script nicht gefunden: {script_path}"}
+            try:
+                env = {**os.environ, "PYTHONPATH": str(project_root)}
+                if "XDG_RUNTIME_DIR" not in env:
+                    env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
+                proc = subprocess.Popen(
+                    [
+                        sys.executable,
+                        str(script_path),
+                        "--symbol",
+                        symbol,
+                        "--target-price",
+                        str(target_price),
+                        "--trigger",
+                        trigger,
+                    ],
+                    cwd=str(project_root),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    env=env,
+                )
+                entry["pid"] = proc.pid
+                entry["engine"] = "legacy_subprocess"
+            except Exception as e:
+                logger.error(f"Fehler beim Starten von price_alert: {e}", exc_info=True)
+                return {"success": False, "error": str(e)}
+        else:
+            entry["engine"] = "monitor_v1"
+            ensure_monitor_running()
+        state[alert_key] = entry
+        _save_price_alert_state_store(state)
+    return {
+        "success": True,
+        "message": f"Alert aktiv: {symbol} {trigger} {target_price}.",
+        "symbol": symbol,
+        "alert_key": alert_key,
+        "trigger": trigger,
+        "reference_price": ref_price,
+        "reference_source": ref_source,
+    }
 
 
 @app.get("/api/price-alert/status")
@@ -4817,6 +4872,7 @@ async def api_price_alert_stop(
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     symbol = str((payload.get("symbol") or "").strip().upper())
+    body_key = str((payload.get("alert_key") or "").strip())
     try:
         target_price = float(payload.get("target_price")) if payload.get("target_price") not in (None, "") else None
     except (TypeError, ValueError):
@@ -4825,7 +4881,9 @@ async def api_price_alert_stop(
     if not symbol:
         return {"success": False, "error": "symbol fehlt"}
     data = _load_price_alert_state()
-    alert_key = _price_alert_key(symbol, target_price, trigger) if target_price is not None else None
+    alert_key = body_key if body_key and body_key in data else None
+    if not alert_key and target_price is not None:
+        alert_key = _price_alert_key(symbol, target_price, trigger)
     if alert_key and alert_key in data:
         entry = data[alert_key]
     else:
@@ -4839,21 +4897,33 @@ async def api_price_alert_stop(
     if not entry or not alert_key:
         return {"success": True, "message": f"Kein aktiver Alert für {symbol}."}
     pid = entry.get("pid")
-    try:
-        os.kill(int(pid), signal.SIGTERM)
-    except (OSError, ProcessLookupError, ValueError) as e:
-        logger.warning(f"Stop Price-Alert: Prozess {pid} nicht erreichbar: {e}")
+    if pid and entry.get("engine") != "monitor_v1":
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except (OSError, ProcessLookupError, ValueError) as e:
+            logger.warning(f"Stop Price-Alert: Prozess {pid} nicht erreichbar: {e}")
     data.pop(alert_key, None)
     try:
-        _PRICE_ALERT_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        if data:
-            with open(_PRICE_ALERT_STATE_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
-        elif _PRICE_ALERT_STATE_FILE.exists():
-            _PRICE_ALERT_STATE_FILE.unlink(missing_ok=True)
+        _save_price_alert_state_store(data)
     except Exception as e:
         logger.warning(f"State-Datei nach Stop nicht geschrieben: {e}")
-    return {"success": True, "message": f"Alert für {symbol} beendet."}
+    return {"success": True, "message": f"Alert für {symbol} beendet.", "alert_key": alert_key}
+
+
+@app.get("/api/price-alert/events")
+async def api_price_alert_events(
+    user: dict = Depends(require_auth),
+    since: int = Query(0, ge=0, description="Unix sekunden — nur neuere Trigger-Events"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    events = await asyncio.to_thread(list_fired_events, since_unix=int(since), limit=int(limit))
+    return {"success": True, "events": events}
+
+
+@app.get("/api/price-alert/monitor-status")
+async def api_price_alert_monitor_status(user: dict = Depends(require_auth)):
+    """Per-symbol price source health for monitor_v1 alerts."""
+    return await asyncio.to_thread(get_monitor_status)
 
 
 @app.get("/live-orderbook", response_class=HTMLResponse)

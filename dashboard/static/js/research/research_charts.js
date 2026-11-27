@@ -352,7 +352,7 @@
   const HISTORY_KEY = "research.history";
   const SYNC_CHART_KEY = "research.sync_chart_after_bt";
   const HISTORY_SPAN_DAYS = { rolling: 17, "7d": 7, "30d": 30, "90d": 90 };
-  const ASSET_V = "research-mc-opi-p3u-v1";
+  const ASSET_V = "research-mc-alert-p2h-v1";
   const BT_D26_DISPLAY_MODE_KEY = "researchBtD26DisplayMode";
   const PANE_LOAD_RECOVERY_MAX = 2;
   try { console.info("[research] asset lld-cull-25"); } catch (e) { /* ignore */ }
@@ -2922,6 +2922,30 @@
       on_drawing_event: function (blob) { handleDrawingEvent(pane.id, blob); },
       on_tool_idle: function () { deactivateToolsLocal(); },
       on_chart_key: function (key) { handleChartKey(key); },
+      on_price_alert_create: function (priceStr) {
+        const p = pane;
+        if (!p) return;
+        if (isMultiManualMode() && !p.symbol) {
+          setStatus("Kein Symbol auf dieser Kachel.", "error");
+          return;
+        }
+        const sym = paneSymbol(p);
+        if (!sym) {
+          setStatus("Symbol fehlt für Preisalarm.", "error");
+          return;
+        }
+        if (window.MCPriceAlert && MCPriceAlert.createAlert) {
+          MCPriceAlert.createAlert(sym, Number(priceStr));
+        }
+      },
+      on_price_alert_delete: function (blob) {
+        let data = {};
+        try { data = typeof blob === "string" ? JSON.parse(blob) : blob || {}; } catch (e) { return; }
+        const sym = paneSymbol(pane);
+        if (window.MCPriceAlert && MCPriceAlert.deleteAlert) {
+          MCPriceAlert.deleteAlert(data.alert_key, sym, data.target_price, data.trigger);
+        }
+      },
     };
     if (win.document && win.document.body) {
       win.document.body.classList.add("research-legend-compact");
@@ -13760,6 +13784,16 @@
     else clearMultiManualChrome();
     buildTools();
     buildPanes();
+    if (window.MCPriceAlert && MCPriceAlert.initHost) {
+      MCPriceAlert.initHost({
+        panes: state.panes,
+        paneSymbol: paneSymbol,
+        api: api,
+        setStatus: setStatus,
+      });
+      const hdr = document.querySelector(".research-live-bar") || $("trpToolbar");
+      if (MCPriceAlert.mountSoundButton) MCPriceAlert.mountSoundButton(hdr);
+    }
     bindUi();
     restoreWorkspaceHeight();
     const symbols = await getJson("/api/research/symbols");

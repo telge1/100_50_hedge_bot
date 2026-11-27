@@ -345,6 +345,35 @@ def test_shift_measure_host_shift_copy_price_and_crosshair():
     assert "FORMING_MS = 250" in host
 
 
+def test_chart_context_menu_alert_and_copy_price_regression():
+    """P2G: extend legacy right-click copy — menu with two actions, same coordinateToPrice price."""
+    js = TRP_JS.read_text(encoding="utf-8")
+    host = HOST_JS.read_text(encoding="utf-8")
+    assert "candleSeries.coordinateToPrice(xy.y)" in js
+    assert "function priceAtEvent" in js
+    assert "function formatCopiedPrice" in js
+    assert "function copyText" in js
+    assert 'el.textContent = "Preis kopiert: " + text' in js
+    assert "function onChartContextMenu" in js
+    assert 'data-act="copy-price"' in js
+    assert 'data-act="create-alert"' in js
+    assert "🔔 Preisalarm erstellen" in js
+    assert 'data-act="cancel"' not in js
+    # Opening the menu must not copy immediately (legacy was copyText on contextmenu).
+    start = js.index("function onChartContextMenu")
+    end = js.index("function onShiftMeasureDown", start)
+    body = js[start:end]
+    assert "copyText(text)" not in body
+    assert "formatCopiedPrice(price)" in body
+    assert "chartContextMenuStoredText" in body
+    assert 'e.key === "Escape"' in js
+    assert "on_price_alert_create" in host
+    assert "on_price_alert_delete" in host
+    assert "function contextMenuViewportXY" in js
+    assert "window.frameElement" in js
+    assert 'ASSET_V = "research-mc-alert-p2h-v1"' in host
+
+
 def test_price_scale_precision_from_candles():
     js = TRP_JS.read_text(encoding="utf-8")
     assert "function inferPriceFormat" in js

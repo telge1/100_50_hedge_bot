@@ -310,6 +310,12 @@
   let viewManual = false;
   let replayViewLock = null;
   let livePriceLine = null;
+  let priceAlertLineRows = [];
+  let chartContextMenuEl = null;
+  let chartContextMenuOpen = false;
+  let chartContextMenuNearAlert = null;
+  let chartContextMenuStoredPrice = null;
+  let chartContextMenuStoredText = "";
   let wallBreakpointLine = null;
   let wallBpDrag = null;
   let wallTargetGuideLines = [];
@@ -6301,15 +6307,168 @@
   function priceAtEvent(ev) {
     const xy = xyFromEvent(ev);
     if (xy && candleSeries) {
-      const px = candleSeries.coordinateToPrice(xy.y);
+      let px = null;
+      try {
+        px = candleSeries.coordinateToPrice(xy.y);
+      } catch (errPrice) {
+        px = null;
+      }
+      if (px == null || Number.isNaN(Number(px))) {
+        const yMax = plotBottomY();
+        const yClamped = Math.max(0, Math.min(yMax > 0 ? yMax - 1 : xy.y, xy.y));
+        try {
+          px = candleSeries.coordinateToPrice(yClamped);
+        } catch (errPrice2) {
+          px = null;
+        }
+      }
       if (px != null && !Number.isNaN(Number(px))) return Number(px);
     }
-    return lastCursorPrice;
+    if (lastCursorPrice != null && Number.isFinite(Number(lastCursorPrice))) {
+      return Number(lastCursorPrice);
+    }
+    return null;
+  }
+
+  function contextMenuViewportXY(ev) {
+    let x = ev.clientX != null ? ev.clientX : 0;
+    let y = ev.clientY != null ? ev.clientY : 0;
+    if (window.frameElement) {
+      const fr = window.frameElement.getBoundingClientRect();
+      x = x - fr.left;
+      y = y - fr.top;
+    }
+    return { x: x, y: y };
+  }
+
+  function ensureChartContextMenu() {
+    if (chartContextMenuEl) return chartContextMenuEl;
+    const el = document.createElement("div");
+    el.id = "chart-ctx-menu";
+    el.className = "chart-ctx-menu";
+    el.hidden = true;
+    el.addEventListener("mousedown", function (e) {
+      if (e.stopPropagation) e.stopPropagation();
+    });
+    document.body.appendChild(el);
+    chartContextMenuEl = el;
+    if (!el._ctxMenuClickBound) {
+      el._ctxMenuClickBound = true;
+      el.addEventListener("click", function (e) {
+        const btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+        if (!btn || !chartContextMenuOpen) return;
+        const act = btn.getAttribute("data-act");
+        const price = chartContextMenuStoredPrice;
+        const text = chartContextMenuStoredText;
+        const nearSnap = chartContextMenuNearAlert;
+        hideChartContextMenu();
+        if (act === "copy-price") {
+          copyText(text).then(function (ok) {
+            if (ok) showCopyToast(text);
+          });
+        } else if (act === "create-alert") {
+          if (window.bridge && window.bridge.on_price_alert_create && price != null) {
+            window.bridge.on_price_alert_create(String(price));
+          }
+        } else if (act === "delete-alert" && nearSnap) {
+          if (window.bridge && window.bridge.on_price_alert_delete) {
+            window.bridge.on_price_alert_delete(JSON.stringify({
+              alert_key: nearSnap.alert_key,
+              target_price: nearSnap.target_price,
+              trigger: nearSnap.trigger,
+            }));
+          }
+        }
+      });
+    }
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") hideChartContextMenu();
+    });
+    document.addEventListener("mousedown", function (e) {
+      if (!chartContextMenuOpen || !chartContextMenuEl) return;
+      if (chartContextMenuEl.contains(e.target)) return;
+      hideChartContextMenu();
+    });
+    return el;
+  }
+
+  function hideChartContextMenu() {
+    chartContextMenuOpen = false;
+    chartContextMenuNearAlert = null;
+    chartContextMenuStoredPrice = null;
+    chartContextMenuStoredText = "";
+    if (chartContextMenuEl) chartContextMenuEl.hidden = true;
+  }
+
+  function priceAlertHitTolerance() {
+    const mv = lastPriceFormat && lastPriceFormat.minMove != null ? Number(lastPriceFormat.minMove) : 0.0001;
+    return Math.max(mv * 3, Math.abs(mv));
+  }
+
+  function findPriceAlertNearPrice(price) {
+    const p = Number(price);
+    if (!Number.isFinite(p)) return null;
+    const tol = priceAlertHitTolerance();
+    for (let i = 0; i < priceAlertLineRows.length; i++) {
+      const row = priceAlertLineRows[i];
+      if (!row) continue;
+      if (Math.abs(Number(row.target_price) - p) <= tol) return row;
+    }
+    return null;
+  }
+
+  function clearPriceAlertLines() {
+    if (!candleSeries) {
+      priceAlertLineRows = [];
+      return;
+    }
+    for (let i = 0; i < priceAlertLineRows.length; i++) {
+      const row = priceAlertLineRows[i];
+      if (row && row.handle) {
+        try {
+          candleSeries.removePriceLine(row.handle);
+        } catch (err) { /* ignore */ }
+      }
+    }
+    priceAlertLineRows = [];
+  }
+
+  function setPriceAlertLines(rows) {
+    clearPriceAlertLines();
+    if (!candleSeries) return;
+    const list = Array.isArray(rows) ? rows : [];
+    for (let i = 0; i < list.length; i++) {
+      const r = list[i];
+      if (!r || r.target_price == null) continue;
+      const px = Number(r.target_price);
+      if (!Number.isFinite(px)) continue;
+      const label = "🔔 " + formatCopiedPrice(px);
+      try {
+        const handle = candleSeries.createPriceLine({
+          price: px,
+          color: "rgba(250, 204, 21, 0.92)",
+          lineWidth: 2,
+          lineStyle: LightweightCharts.LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: label,
+        });
+        priceAlertLineRows.push({
+          alert_key: r.alert_key,
+          target_price: px,
+          trigger: r.trigger,
+          handle: handle,
+        });
+      } catch (err) {
+        /* best-effort */
+      }
+    }
   }
 
   function onChartContextMenu(ev) {
+    /* Legacy path: priceAtEvent → formatCopiedPrice → copyText (now on menu pick only). */
     if (ev.preventDefault) ev.preventDefault();
     if (ev.stopPropagation) ev.stopPropagation();
+    if (shiftMeasure && shiftMeasure.dragging) return false;
     const xy = xyFromEvent(ev);
     if (xy) {
       const size = chartSize();
@@ -6318,9 +6477,24 @@
     const price = priceAtEvent(ev);
     const text = formatCopiedPrice(price);
     if (!text) return false;
-    copyText(text).then(function (ok) {
-      if (ok) showCopyToast(text);
-    });
+    const near = findPriceAlertNearPrice(price);
+    const menu = ensureChartContextMenu();
+    chartContextMenuNearAlert = near;
+    chartContextMenuStoredPrice = price;
+    chartContextMenuStoredText = text;
+    const pos = contextMenuViewportXY(ev);
+    menu.style.left = pos.x + "px";
+    menu.style.top = pos.y + "px";
+    let html = "";
+    if (near && near.alert_key) {
+      html += '<button type="button" data-act="delete-alert">Preisalarm löschen</button>';
+    } else {
+      html += '<button type="button" data-act="create-alert">🔔 Preisalarm erstellen</button>';
+    }
+    html += '<button type="button" data-act="copy-price">Preis kopieren</button>';
+    menu.innerHTML = html;
+    menu.hidden = false;
+    chartContextMenuOpen = true;
     return false;
   }
 
@@ -7809,6 +7983,9 @@
     clearWallTargetGuides: clearWallTargetGuides,
     setWallTargetHighlight: setWallTargetHighlight,
     clearWallTargetHighlight: clearWallTargetHighlight,
+    setPriceAlertLines: setPriceAlertLines,
+    clearPriceAlertLines: clearPriceAlertLines,
+    hideChartContextMenu: hideChartContextMenu,
     setXrayZone: setXrayZone,
     clearXrayZone: clearXrayZone,
     setOrderbookLevels: setOrderbookLevels,
